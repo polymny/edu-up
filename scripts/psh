@@ -342,7 +342,8 @@ params_pip_slide_record() {
     if [[  "$color" != "null" ]]; then
         matted_record=$(do_matting $record)
         echo "matted_record $matted_record" >&2
-        keying_filter=$(colorkey "#79FF9C")
+        #keying_filter=$(colorkey "#79FF9C")
+        keying_filter=$(colorkey $color)
         record=$matted_record
     fi
     pointer_filter=$(colorkey black)
@@ -479,14 +480,12 @@ do_matting() {
     inference=$(echo python inference.py \
     --variant mobilenetv3 \
     --checkpoint "/home/polymny/dev/models/PyTorch/rvm_mobilenetv3.pth" \
-    --device cuda \
+    --device cpu \
     --input-source "$record_mp4" \
     --output-type video \
     --output-composition "${record_basedir}/${filename}_composition.mp4" \
-    --output-alpha "${record_basedir}/${filename}_alpha.mp4" \
-    --output-foreground "${record_basedir}/${filename}_foreground.mp4" \
-    --output-video-mbps 4 \
-    --seq-chunk 15
+    --downsample-ratio 1 \
+    --seq-chunk 4
     )
 
     cd $INFERENCE_PATH
