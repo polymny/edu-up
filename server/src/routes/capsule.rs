@@ -204,6 +204,7 @@ pub async fn upload_record(
     id: HashId,
     gos: i32,
     data: Data<'_>,
+    sem: &S<Arc<Semaphore>>,
 ) -> Result<Value> {
     // Check that the user has write access to the capsule.
     let (mut capsule, role) = user
@@ -256,7 +257,53 @@ pub async fn upload_record(
     capsule.set_changed();
     capsule.save(&db).await?;
 
-    Ok(capsule.to_json(role, &db).await?)
+    let res = capsule.to_json(role, &db).await?;
+    let sem = sem.inner().clone();
+    // launch async matting
+    tokio::spawn(async move {
+        let child = Command::new("../scripts/psh")
+            .arg("on-matting")
+            .arg(format!("{}", &capsule.id))
+            .arg(format!("{}", uuid))
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .spawn();
+
+        let succeed = if let Ok(mut child) = child {
+            if let Some(stdin) = child.stdin.as_mut() {
+                stdin
+                    .write_all(json!(&capsule.structure.0).to_string().as_bytes())
+                    .await
+                    .unwrap();
+
+                if let Ok(_) = sem.acquire().await {
+                    child.stdin.unwrap();
+                    let stdout = child.stdout.take().unwrap();
+                    let reader = BufReader::new(stdout);
+
+                    let mut lines = reader.lines();
+                    while let Some(line) = lines.next_line().await.unwrap() {
+                        debug!("line = {}", line);
+                    }
+                    true
+                } else {
+                    false
+                }
+            } else {
+                false
+            }
+        } else {
+            false
+        };
+
+        if succeed {
+            info!("Matting succeed");
+        } else {
+            error!("Matting fails");
+        };
+    });
+
+    Ok(res)
 }
 
 /// The route that uploads a pointer to a capsule for a specific gos.

@@ -340,11 +340,7 @@ params_pip_slide_record() {
     color=$(get_keycolor "$webcam_settings")
 
     if [[  "$color" != "null" ]]; then
-        matted_record=$(do_matting $record)
-        echo "matted_record $matted_record" >&2
-        #keying_filter=$(colorkey "#79FF9C")
         keying_filter=$(colorkey $color)
-        record=$matted_record
     fi
     pointer_filter=$(colorkey black)
 
@@ -443,19 +439,29 @@ params_pip_slide_record() {
 
 
 
-do_matting() {
+on-matting() {
+    cid=$1
+    uuid=$2
+    INFERENCE_PATH="../../RobustVideoMatting "
 
-    INFERENCE_PATH="/home/polymny/dev/git/github/PeterL1n/RobustVideoMatting "
-    record=$1
+    capsule_path=$(get_config "data_path")"/$cid"
+    tmp_path="${capsule_path}/tmp"
+    if [ ! -d "$tmp_path" ]; then
+        mkdir $tmp_path
+    fi
+
+    record="${capsule_path}/assets/${uuid}.webm"
+
+
 
     filename=$(basename -- "$record")
     extension="${filename##*.}"
     filename="${filename%.*}"
     record_basedir="${record%/*}"
-    record_mp4="${record_basedir}/${filename}.mp4"
-    record_aac="${record_basedir}/${filename}.aac"
+    record_mp4="${tmp_path}/${filename}.mp4"
+    record_aac="${tmp_path}/${filename}.aac"
 
-    local output="${record_basedir}/${filename}_matted.mp4"
+    local output="${tmp_path}/${filename}_matted.mp4"
 
 
     ### Convert webm record to mp4
@@ -479,11 +485,11 @@ do_matting() {
 
     inference=$(echo python inference.py \
     --variant mobilenetv3 \
-    --checkpoint "/home/polymny/dev/models/PyTorch/rvm_mobilenetv3.pth" \
+    --checkpoint "checkpoints/rvm_mobilenetv3.pth" \
     --device cpu \
     --input-source "$record_mp4" \
     --output-type video \
-    --output-composition "${record_basedir}/${filename}_composition.mp4" \
+    --output-composition "${tmp_path}/${filename}_composition.mp4" \
     --downsample-ratio 1 \
     --seq-chunk 4
     )
@@ -498,7 +504,7 @@ do_matting() {
 
     cd $current_dir
     echo "\n MERGE AUDIO VIDEO \n " >&2
-    merge_audio_video "${record_basedir}/${filename}_composition.mp4" $record_aac $output
+    merge_audio_video "${tmp_path}/${filename}_composition.mp4" $record_aac $output
 
     echo "\n MATTING \n " >&2
     echo $output >&2
@@ -1350,6 +1356,11 @@ main() {
         "on-record")
             on-record "$@"
             ;;
+
+        "on-matting")
+            on-matting "$@"
+            ;;
+
         "on-video-upload")
             on-video-upload "$@"
             ;;
