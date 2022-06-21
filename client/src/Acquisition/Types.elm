@@ -48,16 +48,18 @@ type alias Record =
     { events : List Capsule.Event
     , webcamBlob : Encode.Value
     , pointerBlob : Maybe Encode.Value
+    , matted : Maybe Capsule.TaskStatus
     , old : Bool
     }
 
 
 decodeRecord : Decoder Record
 decodeRecord =
-    Decode.map4 Record
+    Decode.map5 Record
         (Decode.field "events" (Decode.list Capsule.decodeEvent))
         (Decode.field "webcam_blob" Decode.value)
         (Decode.field "pointer_blob" (Decode.nullable Decode.value))
+        (Decode.field "matted" (Decode.nullable Capsule.decodeTaskStatus))
         (Decode.succeed False)
 
 
@@ -127,6 +129,7 @@ init devices chosenDeviceIds capsule id =
                                     |> Maybe.map (Capsule.assetPath capsule)
                                     |> Maybe.map Encode.string
                           , events = g.events
+                          , matted = Nothing
                           , old = True
                           }
                         ]

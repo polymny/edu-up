@@ -270,25 +270,16 @@ pub async fn upload_record(
             .spawn();
 
         let succeed = if let Ok(mut child) = child {
-            if let Some(stdin) = child.stdin.as_mut() {
-                stdin
-                    .write_all(json!(&capsule.structure.0).to_string().as_bytes())
-                    .await
-                    .unwrap();
+            if let Ok(_) = sem.acquire().await {
+                child.stdin.unwrap();
+                let stdout = child.stdout.take().unwrap();
+                let reader = BufReader::new(stdout);
 
-                if let Ok(_) = sem.acquire().await {
-                    child.stdin.unwrap();
-                    let stdout = child.stdout.take().unwrap();
-                    let reader = BufReader::new(stdout);
-
-                    let mut lines = reader.lines();
-                    while let Some(line) = lines.next_line().await.unwrap() {
-                        debug!("line = {}", line);
-                    }
-                    true
-                } else {
-                    false
+                let mut lines = reader.lines();
+                while let Some(line) = lines.next_line().await.unwrap() {
+                    debug!("line = {}", line);
                 }
+                true
             } else {
                 false
             }

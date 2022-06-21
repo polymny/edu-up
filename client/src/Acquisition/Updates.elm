@@ -317,6 +317,10 @@ update msg model =
                     ( model, Cmd.none )
 
         Acquisition.UploadRecord record ->
+            let
+                record2 =
+                    { record | matted = Just Capsule.Idle }
+            in
             case model.page of
                 Core.Acquisition p ->
                     ( mkModel model (Core.Acquisition { p | uploading = Just 0.0, status = Status.Sent })

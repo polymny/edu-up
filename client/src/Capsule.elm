@@ -227,15 +227,17 @@ type alias Record =
     { uuid : String
     , pointerUuid : Maybe String
     , size : Maybe ( Int, Int )
+    , matted : Maybe TaskStatus
     }
 
 
 decodeRecord : Decoder Record
 decodeRecord =
-    Decode.map3 Record
+    Decode.map4 Record
         (Decode.field "uuid" Decode.string)
         (Decode.maybe (Decode.field "pointer_uuid" Decode.string))
         (Decode.maybe (Decode.field "size" decodeIntPair))
+        (Decode.maybe (Decode.field "matted" decodeTaskStatus))
 
 
 encodeRecord : Maybe Record -> Encode.Value
@@ -251,6 +253,12 @@ encodeRecord record =
 
                     _ ->
                         ( "size", Encode.null )
+                , case r.matted of
+                    Just m ->
+                        ( "matted", Encode.string <| printTaskStatus m )
+
+                    _ ->
+                        ( "matted", Encode.null )
                 ]
 
         Nothing ->
