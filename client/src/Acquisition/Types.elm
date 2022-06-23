@@ -41,6 +41,7 @@ type alias Model =
     , uploading : Maybe Float
     , state : State
     , status : Status
+    , mattingEnabled : Bool
     }
 
 
@@ -85,6 +86,7 @@ type alias Submodel =
     , showSettings : Bool
     , uploading : Maybe Float
     , status : Status
+    , mattingEnabled : Bool
     }
 
 
@@ -102,12 +104,37 @@ toSubmodel devices model =
     , showSettings = model.showSettings
     , uploading = model.uploading
     , status = model.status
+    , mattingEnabled = model.mattingEnabled
     }
 
 
-init : Maybe Devices -> { a | videoDeviceId : Maybe String, resolution : Maybe String, audioDeviceId : Maybe String } -> Capsule -> Int -> ( Model, Cmd Msg )
-init devices chosenDeviceIds capsule id =
+init : Bool -> Maybe Devices -> { a | videoDeviceId : Maybe String, resolution : Maybe String, audioDeviceId : Maybe String } -> Capsule -> Int -> ( Model, Cmd Msg )
+init matting devices chosenDeviceIds capsule id =
     let
+        ( records, mattingEnabled ) =
+            let
+                gos =
+                    List.head (List.drop id capsule.structure)
+            in
+            case ( Maybe.map .record gos, gos ) of
+                ( Just (Just r), Just g ) ->
+                    ( [ { webcamBlob = Encode.string (Capsule.assetPath capsule (r.uuid ++ ".webm"))
+                        , pointerBlob =
+                            r.pointerUuid
+                                |> Maybe.map (\x -> x ++ ".webm")
+                                |> Maybe.map (Capsule.assetPath capsule)
+                                |> Maybe.map Encode.string
+                        , events = g.events
+                        , matted = r.matted
+                        , old = True
+                        }
+                      ]
+                    , matting
+                    )
+
+                _ ->
+                    ( [], matting )
+
         model =
             { capsule = capsule
             , gos = id
@@ -115,27 +142,7 @@ init devices chosenDeviceIds capsule id =
             , currentSlide = 0
             , recording = False
             , webcamBound = False
-            , records =
-                let
-                    gos =
-                        List.head (List.drop id capsule.structure)
-                in
-                case ( Maybe.map .record gos, gos ) of
-                    ( Just (Just r), Just g ) ->
-                        [ { webcamBlob = Encode.string (Capsule.assetPath capsule (r.uuid ++ ".webm"))
-                          , pointerBlob =
-                                r.pointerUuid
-                                    |> Maybe.map (\x -> x ++ ".webm")
-                                    |> Maybe.map (Capsule.assetPath capsule)
-                                    |> Maybe.map Encode.string
-                          , events = g.events
-                          , matted = Nothing
-                          , old = True
-                          }
-                        ]
-
-                    _ ->
-                        []
+            , records = records
             , showSettings = False
             , chosenDevice =
                 case devices of
@@ -153,6 +160,7 @@ init devices chosenDeviceIds capsule id =
                     _ ->
                         DetectingDevices
             , status = Status.NotSent
+            , mattingEnabled = mattingEnabled
             }
     in
     ( model
@@ -274,6 +282,7 @@ type Msg
     | IncreasePromptSize
     | DecreasePromptSize
     | SetCanvas SetCanvas
+    | ToggleMatting
 
 
 defaultDevice : Devices -> Device

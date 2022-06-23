@@ -57,7 +57,7 @@ port nextSlideReceived : (() -> msg) -> Sub msg
 port playRecordFinished : (() -> msg) -> Sub msg
 
 
-port uploadRecord : ( String, Int, Json.Encode.Value ) -> Cmd msg
+port uploadRecord : { capsuleId : String, gos : Int, matting : Bool, record : Json.Encode.Value } -> Cmd msg
 
 
 port capsuleUpdated : (Json.Encode.Value -> msg) -> Sub msg
@@ -79,3 +79,6 @@ port setPromptSize : Int -> Cmd msg
 
 
 port setCanvas : Json.Encode.Value -> Cmd msg
+
+
+port setMatting : Bool -> Cmd msg

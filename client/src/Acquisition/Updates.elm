@@ -151,6 +151,16 @@ update msg model =
                 _ ->
                     ( model, Cmd.none )
 
+        Acquisition.ToggleMatting ->
+            case model.page of
+                Core.Acquisition p ->
+                    ( mkModel model (Core.Acquisition { p | mattingEnabled = not p.mattingEnabled })
+                    , Ports.setMatting (not p.mattingEnabled)
+                    )
+
+                _ ->
+                    ( model, Cmd.none )
+
         Acquisition.VideoDeviceChanged v ->
             case model.page of
                 Core.Acquisition p ->
@@ -324,7 +334,12 @@ update msg model =
             case model.page of
                 Core.Acquisition p ->
                     ( mkModel model (Core.Acquisition { p | uploading = Just 0.0, status = Status.Sent })
-                    , Ports.uploadRecord ( p.capsule.id, p.gos, Acquisition.encodeRecord record )
+                    , Ports.uploadRecord
+                        { capsuleId = p.capsule.id
+                        , gos = p.gos
+                        , matting = p.mattingEnabled
+                        , record = Acquisition.encodeRecord record
+                        }
                     )
 
                 _ ->

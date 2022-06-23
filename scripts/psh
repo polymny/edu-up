@@ -1,6 +1,11 @@
 #!/usr/bin/env bash
 trap 'kill $(jobs -p)' EXIT SIGINT
 
+# Specific python path from env.
+if [ -z "$PYTHON" ]; then
+    PYTHON=python
+fi
+
 # USAGE:
 #   header
 #
@@ -483,7 +488,7 @@ on-matting() {
     current_dir=$PWD
 
 
-    inference=$(echo python inference.py \
+    inference=$(echo $PYTHON inference.py \
     --variant mobilenetv3 \
     --checkpoint "checkpoints/rvm_mobilenetv3.pth" \
     --device cpu \

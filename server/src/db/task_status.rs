@@ -9,6 +9,9 @@ use serde::{Deserialize, Serialize};
 #[derive(PgEnum, Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "lowercase")]
 pub enum TaskStatus {
+    /// The task should not be run.
+    Disabled,
+
     /// Waiting to start.
     Idle,
 

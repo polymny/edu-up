@@ -23,7 +23,7 @@ use crate::command::{export_slides, run_command};
 use crate::config::Config;
 use crate::db::capsule::{Capsule, Fade, Gos, Privacy, Record, Role, Slide, WebcamSettings};
 use crate::db::task_status::TaskStatus;
-use crate::db::user::User;
+use crate::db::user::{Plan, User};
 use crate::websockets::WebSockets;
 use crate::{Db, Error, HashId, Result};
 
@@ -196,16 +196,19 @@ pub async fn delete_project(user: User, db: Db, config: &S<Config>, name: String
 }
 
 /// The route that uploads a record to a capsule for a specific gos.
-#[post("/upload-record/<id>/<gos>", data = "<data>")]
+#[post("/upload-record/<id>/<gos>/<matting>", data = "<data>")]
 pub async fn upload_record(
     user: User,
     db: Db,
     config: &S<Config>,
     id: HashId,
     gos: i32,
+    matting: Option<bool>,
     data: Data<'_>,
     sem: &S<Arc<Semaphore>>,
 ) -> Result<Value> {
+    println!("matting: {:?}", matting);
+
     // Check that the user has write access to the capsule.
     let (mut capsule, role) = user
         .get_capsule_with_permission(*id, Role::Write, &db)
@@ -245,10 +248,17 @@ pub async fn upload_record(
         None
     };
 
+    let matting = if user.plan > Plan::Free && matting == Some(true) {
+        Some(TaskStatus::Idle)
+    } else {
+        None
+    };
+
     gos.record = Some(Record {
         uuid,
         size,
         pointer_uuid: None,
+        matting,
     });
 
     if size.is_none() {

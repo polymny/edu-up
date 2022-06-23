@@ -125,6 +125,10 @@ function setupPorts(app) {
         localStorage.setItem('promptSize', arg);
     }
 
+    function setMatting(arg) {
+        localStorage.setItem('matting', arg);
+    }
+
     function setOnBeforeUnloadValue(arg) {
         onbeforeunloadvalue = arg;
     }
@@ -332,12 +336,14 @@ function setupPorts(app) {
             webcam_blob: recordArrived,
             pointer_blob: (isPremium && pointerExists) ? pointerArrived : null,
             events: currentEvents,
+            matted: 'idle',
         });
 
         port.send({
             webcam_blob: recordArrived,
             pointer_blob: (isPremium && pointerExists) ? pointerArrived : null,
             events: currentEvents,
+            matted: 'idle',
         });
 
         recordArrived = null;
@@ -645,9 +651,10 @@ function setupPorts(app) {
     }
 
     async function uploadRecord(args) {
-        let capsuleId = args[0];
-        let gos = args[1];
-        let record = args[2];
+        let capsuleId = args.capsuleId;
+        let gos = args.gos;
+        let matting = args.matting;
+        let record = args.record;
 
         if (typeof record.webcam_blob === "string" || record.webcam_blob instanceof String) {
 
@@ -679,7 +686,7 @@ function setupPorts(app) {
 
             try {
                 let factor = record.pointer_blob === null ? 1 : 2;
-                let xhr = await makeRequest("POST", "/api/upload-record/" + capsuleId + "/" + gos, record.webcam_blob, (e) => {
+                let xhr = await makeRequest("POST", "/api/upload-record/" + capsuleId + "/" + gos+ "/" + matting, record.webcam_blob, (e) => {
                     app.ports.progressReceived.send(e.loaded / (factor * e.total));
                 });
 
@@ -941,6 +948,7 @@ function setupPorts(app) {
     subscribe(app.ports.setAudioDeviceId, setAudioDeviceId);
     subscribe(app.ports.setSortBy, setSortBy);
     subscribe(app.ports.setPromptSize, setPromptSize);
+    subscribe(app.ports.setMatting, setMatting);
     subscribe(app.ports.setOnBeforeUnloadValue, setOnBeforeUnloadValue);
     subscribe(app.ports.findDevices, findDevices);
     subscribe(app.ports.playWebcam, playWebcam);

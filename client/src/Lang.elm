@@ -1996,3 +1996,13 @@ createGrain lang =
 
         _ ->
             "Create grain"
+
+
+backgroundRemoval : Lang -> String
+backgroundRemoval lang =
+    case lang of
+        FrFr ->
+            "Suppression du fond"
+
+        _ ->
+            "Background removal"

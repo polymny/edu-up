@@ -135,6 +135,13 @@ impl Default for WebcamSettings {
     }
 }
 
+/// The disabled task status.
+///
+/// This is a helper function for default value for matting in records.
+fn none() -> Option<TaskStatus> {
+    None
+}
+
 /// A record, with an uuid, a resolution and a duration.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Record {
@@ -146,6 +153,10 @@ pub struct Record {
 
     /// The size of the record, if it contains video.
     pub size: Option<(u32, u32)>,
+
+    /// The state of the matting.
+    #[serde(default = "none")]
+    pub matting: Option<TaskStatus>,
 }
 
 /// The type of a record event.

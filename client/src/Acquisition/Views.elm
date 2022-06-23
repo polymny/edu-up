@@ -163,6 +163,17 @@ rightColumn global user submodel =
                             |> Element.text
                             |> paragraph
                         , settingsButton
+                        , case ( submodel, User.isPremium user ) of
+                            ( Just m, True ) ->
+                                Input.checkbox []
+                                    { checked = m.mattingEnabled
+                                    , icon = Input.defaultCheckbox
+                                    , label = Input.labelRight [] (Element.text (Lang.backgroundRemoval global.lang))
+                                    , onChange = \_ -> Core.AcquisitionMsg Acquisition.ToggleMatting
+                                    }
+
+                            _ ->
+                                Element.none
                         ]
 
                 _ ->
@@ -614,66 +625,68 @@ toolbarElement global user model =
                     |> Just
         in
         Element.column [ Element.centerY ]
-            [ Element.row [ Ui.wf, Element.spacing 5 ]
-                [ Element.el [ Ui.wf, Element.height (Element.px 45) ]
-                    (Element.el [ Element.centerX, Element.centerY, Font.color Colors.navbar, Font.size 30 ]
-                        (Ui.iconButton []
-                            { icon = Fa.bullseye
-                            , onPress = mkMsg (Acquisition.ChangeStyle Acquisition.Pointer)
-                            , text = Nothing
-                            , tooltip = Nothing
-                            }
+            [ Element.column [ Element.centerY ]
+                [ Element.row [ Ui.wf, Element.spacing 5 ]
+                    [ Element.el [ Ui.wf, Element.height (Element.px 45) ]
+                        (Element.el [ Element.centerX, Element.centerY, Font.color Colors.navbar, Font.size 30 ]
+                            (Ui.iconButton []
+                                { icon = Fa.bullseye
+                                , onPress = mkMsg (Acquisition.ChangeStyle Acquisition.Pointer)
+                                , text = Nothing
+                                , tooltip = Nothing
+                                }
+                            )
                         )
-                    )
-                , Element.el [ Ui.wf, Element.height (Element.px 45) ]
-                    (Element.el [ Element.centerX, Element.centerY, Font.color Colors.navbar, Font.size 30 ]
-                        (Ui.iconButton []
-                            { icon = Fa.paintBrush
-                            , onPress = mkMsg (Acquisition.ChangeStyle Acquisition.Brush)
-                            , text = Nothing
-                            , tooltip = Nothing
-                            }
+                    , Element.el [ Ui.wf, Element.height (Element.px 45) ]
+                        (Element.el [ Element.centerX, Element.centerY, Font.color Colors.navbar, Font.size 30 ]
+                            (Ui.iconButton []
+                                { icon = Fa.paintBrush
+                                , onPress = mkMsg (Acquisition.ChangeStyle Acquisition.Brush)
+                                , text = Nothing
+                                , tooltip = Nothing
+                                }
+                            )
                         )
-                    )
+                    ]
+                , Element.row [ Ui.wf, Element.spacing 5 ]
+                    [ Element.el [ Ui.wf, Element.height (Element.px 45) ]
+                        (Element.el [ Element.centerX, Element.centerY, Font.color Colors.navbar, Font.size 30 ]
+                            (Ui.iconButton []
+                                { icon = Fa.eraser
+                                , onPress = mkMsg Acquisition.Erase
+                                , text = Nothing
+                                , tooltip = Nothing
+                                }
+                            )
+                        )
+                    , Element.el [ Ui.wf, Element.height (Element.px 45) ] Element.none
+                    ]
+                , Element.row [ Ui.wf, Element.spacing 5 ]
+                    [ Element.el [ Ui.wf, Element.height (Element.px 45) ]
+                        (Element.el [ Element.centerX, Element.centerY, Font.color Colors.navbar, Font.size 30 ]
+                            (Ui.iconButton []
+                                { icon = Fa.circle
+                                , onPress = mkMsg (Acquisition.ChangeSize 20)
+                                , text = Nothing
+                                , tooltip = Nothing
+                                }
+                            )
+                        )
+                    , Element.el [ Ui.wf, Element.height (Element.px 45) ]
+                        (Element.el [ Element.centerX, Element.centerY, Font.color Colors.navbar, Font.size 30 ]
+                            (Ui.iconButton []
+                                { icon = Fa.circle
+                                , onPress = mkMsg (Acquisition.ChangeSize 40)
+                                , text = Nothing
+                                , tooltip = Nothing
+                                }
+                            )
+                        )
+                    ]
+                , palette
+                    |> List.map (\( x, y ) -> Element.row [ Element.spacing 5, Ui.wf, Ui.hf ] [ colorToButton x, colorToButton y ])
+                    |> Element.column [ Element.width (Element.px 100), Element.spacing 5, Element.padding 5 ]
                 ]
-            , Element.row [ Ui.wf, Element.spacing 5 ]
-                [ Element.el [ Ui.wf, Element.height (Element.px 45) ]
-                    (Element.el [ Element.centerX, Element.centerY, Font.color Colors.navbar, Font.size 30 ]
-                        (Ui.iconButton []
-                            { icon = Fa.eraser
-                            , onPress = mkMsg Acquisition.Erase
-                            , text = Nothing
-                            , tooltip = Nothing
-                            }
-                        )
-                    )
-                , Element.el [ Ui.wf, Element.height (Element.px 45) ] Element.none
-                ]
-            , Element.row [ Ui.wf, Element.spacing 5 ]
-                [ Element.el [ Ui.wf, Element.height (Element.px 45) ]
-                    (Element.el [ Element.centerX, Element.centerY, Font.color Colors.navbar, Font.size 30 ]
-                        (Ui.iconButton []
-                            { icon = Fa.circle
-                            , onPress = mkMsg (Acquisition.ChangeSize 20)
-                            , text = Nothing
-                            , tooltip = Nothing
-                            }
-                        )
-                    )
-                , Element.el [ Ui.wf, Element.height (Element.px 45) ]
-                    (Element.el [ Element.centerX, Element.centerY, Font.color Colors.navbar, Font.size 30 ]
-                        (Ui.iconButton []
-                            { icon = Fa.circle
-                            , onPress = mkMsg (Acquisition.ChangeSize 40)
-                            , text = Nothing
-                            , tooltip = Nothing
-                            }
-                        )
-                    )
-                ]
-            , palette
-                |> List.map (\( x, y ) -> Element.row [ Element.spacing 5, Ui.wf, Ui.hf ] [ colorToButton x, colorToButton y ])
-                |> Element.column [ Element.width (Element.px 100), Element.spacing 5, Element.padding 5 ]
             ]
 
 
