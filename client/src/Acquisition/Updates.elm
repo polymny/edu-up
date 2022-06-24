@@ -154,7 +154,7 @@ update msg model =
         Acquisition.ToggleMatting ->
             case model.page of
                 Core.Acquisition p ->
-                    ( mkModel model (Core.Acquisition { p | mattingEnabled = not p.mattingEnabled })
+                    ( mkModel { model | global = { global | matting = not p.mattingEnabled } } (Core.Acquisition { p | mattingEnabled = not p.mattingEnabled })
                     , Ports.setMatting (not p.mattingEnabled)
                     )
 
