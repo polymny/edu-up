@@ -111,29 +111,27 @@ toSubmodel devices model =
 init : Bool -> Maybe Devices -> { a | videoDeviceId : Maybe String, resolution : Maybe String, audioDeviceId : Maybe String } -> Capsule -> Int -> ( Model, Cmd Msg )
 init matting devices chosenDeviceIds capsule id =
     let
-        ( records, mattingEnabled ) =
+        records =
             let
                 gos =
                     List.head (List.drop id capsule.structure)
             in
             case ( Maybe.map .record gos, gos ) of
                 ( Just (Just r), Just g ) ->
-                    ( [ { webcamBlob = Encode.string (Capsule.assetPath capsule (r.uuid ++ ".webm"))
-                        , pointerBlob =
+                    [ { webcamBlob = Encode.string (Capsule.assetPath capsule (r.uuid ++ ".webm"))
+                      , pointerBlob =
                             r.pointerUuid
                                 |> Maybe.map (\x -> x ++ ".webm")
                                 |> Maybe.map (Capsule.assetPath capsule)
                                 |> Maybe.map Encode.string
-                        , events = g.events
-                        , matted = r.matted
-                        , old = True
-                        }
-                      ]
-                    , matting
-                    )
+                      , events = g.events
+                      , matted = r.matted
+                      , old = True
+                      }
+                    ]
 
                 _ ->
-                    ( [], matting )
+                    []
 
         model =
             { capsule = capsule
@@ -160,7 +158,7 @@ init matting devices chosenDeviceIds capsule id =
                     _ ->
                         DetectingDevices
             , status = Status.NotSent
-            , mattingEnabled = mattingEnabled
+            , mattingEnabled = matting
             }
     in
     ( model
