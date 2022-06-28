@@ -214,6 +214,7 @@ pub async fn upload_record(
         .get_capsule_with_permission(*id, Role::Write, &db)
         .await?;
 
+    let gosid = gos;
     let gos = capsule
         .structure
         .0
@@ -249,7 +250,7 @@ pub async fn upload_record(
     };
 
     let matting = if user.plan > Plan::Free && matting == Some(true) {
-        Some(TaskStatus::Idle)
+        Some(TaskStatus::Running)
     } else {
         None
     };
@@ -268,41 +269,61 @@ pub async fn upload_record(
     capsule.save(&db).await?;
 
     let res = capsule.to_json(role, &db).await?;
-    let sem = sem.inner().clone();
-    // launch async matting
-    tokio::spawn(async move {
-        let child = Command::new("../scripts/psh")
-            .arg("on-matting")
-            .arg(format!("{}", &capsule.id))
-            .arg(format!("{}", uuid))
-            .stdin(Stdio::piped())
-            .stdout(Stdio::piped())
-            .spawn();
+    if let Some(matting) = matting {
+        let sem = sem.inner().clone();
+        // launch async matting
+        tokio::spawn(async move {
+            let child = Command::new("../scripts/psh")
+                .arg("on-matting")
+                .arg(format!("{}", &capsule.id))
+                .arg(format!("{}", uuid))
+                .stdin(Stdio::piped())
+                .stdout(Stdio::piped())
+                .spawn();
 
-        let succeed = if let Ok(mut child) = child {
-            if let Ok(_) = sem.acquire().await {
-                child.stdin.unwrap();
-                let stdout = child.stdout.take().unwrap();
-                let reader = BufReader::new(stdout);
+            let succeed = if let Ok(mut child) = child {
+                if let Ok(_) = sem.acquire().await {
+                    child.stdin.unwrap();
+                    let stdout = child.stdout.take().unwrap();
+                    let reader = BufReader::new(stdout);
 
-                let mut lines = reader.lines();
-                while let Some(line) = lines.next_line().await.unwrap() {
-                    debug!("line = {}", line);
+                    let mut lines = reader.lines();
+                    while let Some(line) = lines.next_line().await.unwrap() {
+                        debug!("line = {}", line);
+                    }
+                    true
+                } else {
+                    false
                 }
-                true
             } else {
                 false
-            }
-        } else {
-            false
-        };
+            };
+            let gos = capsule
+                .structure
+                .0
+                .get_mut(gosid as usize)
+                .ok_or(Error(Status::BadRequest));
 
-        if succeed {
-            info!("Matting succeed");
-        } else {
-            error!("Matting fails");
-        };
-    });
+            if succeed {
+                if let Ok(gos) = gos {
+                    if let Some(record) = &mut gos.record {
+                        println!("record: {:?}", record);
+                        record.matting = Some(TaskStatus::Done);
+                    }
+                };
+            } else {
+                error!("Matting fails");
+                if let Ok(gos) = gos {
+                    if let Some(record) = &mut gos.record {
+                        println!("record: {:?}", record);
+                        record.matting = Some(TaskStatus::Idle);
+                    }
+                };
+            }
+            capsule.set_changed();
+            capsule.save(&db).await.ok();
+        });
+    };
 
     Ok(res)
 }

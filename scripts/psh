@@ -1161,6 +1161,24 @@ on-record() {
 }
 
 
+
+is-matting-active() {
+
+
+    mattings="$(echo "$capsule_structure" | jq -r '.[] | .record.matting')"
+    echo "mattings \n $mattings" >&2
+    running='false'
+    for i in $mattings
+    do
+        if  [[ "$i" == "running" ]]; then
+            running="true"
+        fi
+    done
+
+    echo "Is matting active/running: $running " >&2
+
+}
+
 # USAGE:
 #   on-produce <capule_id>
 #     and stdin
@@ -1171,9 +1189,12 @@ on-produce() {
     local cid=$1
     local gosid=$2
 
+    is-matting-active
+
+
     #transcode_records $cid
     echo "Composition start for capsule $cid and gos $gosid" >&2
-    compose_goss $cid $gosid
+    #compose_goss $cid $gosid
     echo "Composition end for capsule $cid and gos $gosid" >&2
 }
 
