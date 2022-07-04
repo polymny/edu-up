@@ -496,7 +496,7 @@ on-matting() {
     --input-source "$record_mp4" \
     --output-type video \
     --output-composition "${tmp_path}/${filename}_composition.mp4" \
-    --downsample-ratio 1 \
+    --downsample-ratio 0.4 \
     --seq-chunk 4
     )
 
@@ -1218,7 +1218,7 @@ on-produce() {
 
     #transcode_records $cid
     echo "Composition start for capsule $cid and gos $gosid" >&2
-    #compose_goss $cid $gosid
+    compose_goss $cid $gosid
     echo "Composition end for capsule $cid and gos $gosid" >&2
 }
 

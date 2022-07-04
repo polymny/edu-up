@@ -303,35 +303,40 @@ pub async fn upload_record(
             } else {
                 false
             };
-            let gos = capsule
-                .structure
-                .0
-                .get_mut(gosid as usize)
-                .ok_or(Error(Status::BadRequest));
 
-            if succeed {
-                if let Ok(gos) = gos {
-                    if let Some(record) = &mut gos.record {
-                        record.matting = Some(TaskStatus::Done);
-                        println!("record: {:#?}", record);
-                    }
-                };
-            } else {
-                error!("Matting fails");
-                if let Ok(gos) = gos {
-                    if let Some(record) = &mut gos.record {
-                        record.matting = Some(TaskStatus::Idle);
-                        println!("record: {:#?}", record);
-                    }
-                };
-            }
-            capsule.set_changed();
-            capsule.save(&db).await.ok();
+            let capsule = Capsule::get_by_id(capsule.id, &db).await.unwrap();
+            if let Some(mut capsule) = capsule {
+                let gos = capsule
+                    .structure
+                    .0
+                    .get_mut(gosid as usize)
+                    .ok_or(Error(Status::BadRequest));
 
-            if !capsule.is_matting_running().await {
-                if capsule.produced == TaskStatus::Waiting {
+                if succeed {
+                    if let Ok(gos) = gos {
+                        if let Some(record) = &mut gos.record {
+                            record.matting = Some(TaskStatus::Done);
+                        }
+                    };
                 } else {
-                    let ret = run_produce(user, capsule.id, db, socks, sem, config).await;
+                    error!("Matting fails");
+                    if let Ok(gos) = gos {
+                        if let Some(record) = &mut gos.record {
+                            record.matting = Some(TaskStatus::Idle);
+                        }
+                    };
+                }
+
+                println!("capsule produced: {:#?}", capsule.produced);
+                capsule.set_changed();
+                capsule.save(&db).await.ok();
+
+                if !capsule.is_matting_running().await {
+                    let ret = if capsule.produced == TaskStatus::Waiting {
+                        run_produce(user, capsule.id, db, socks, sem, config).await
+                    } else {
+                        Ok(())
+                    };
                 }
             }
         });
@@ -854,31 +859,32 @@ pub async fn run_produce(
             capsule.produced = if succeed {
                 TaskStatus::Done
             } else {
-                TaskStatus::Idle
+                TaskStatus::Failed
             };
 
-            let output = run_command(&vec![
-                "../scripts/psh",
-                "duration",
-                output_path.to_str().unwrap(),
-            ]);
+            if succeed {
+                let output = run_command(&vec![
+                    "../scripts/psh",
+                    "duration",
+                    output_path.to_str().unwrap(),
+                ]);
 
-            match &output {
-                Ok(o) => {
-                    let line = ((std::str::from_utf8(&o.stdout)
-                        .map_err(|_| Error(Status::InternalServerError))
-                        .unwrap()
-                        .trim()
-                        .parse::<f32>()
-                        .unwrap())
-                        * 1000.) as i32;
+                match &output {
+                    Ok(o) => {
+                        let line = ((std::str::from_utf8(&o.stdout)
+                            .map_err(|_| Error(Status::InternalServerError))
+                            .unwrap()
+                            .trim()
+                            .parse::<f32>()
+                            .unwrap())
+                            * 1000.) as i32;
 
-                    capsule.duration_ms = line;
-                    capsule.save(&db).await.ok();
-                }
-                Err(_) => error!("Impossible to get duration"),
-            };
-
+                        capsule.duration_ms = line;
+                        capsule.save(&db).await.ok();
+                    }
+                    Err(_) => error!("Impossible to get duration"),
+                };
+            }
             capsule.production_pid = None;
             capsule.save(&db).await.ok();
 
@@ -933,6 +939,7 @@ pub async fn produce(
         return Err(Error(Status::Conflict));
     }
 
+    println!("capsule: {:#?}", capsule);
     if capsule.is_matting_running().await {
         println!("matting is active");
         capsule.produced = TaskStatus::Waiting;
@@ -951,6 +958,7 @@ pub async fn produce(
         .await;
     };
 
+    println!("capsule Produced: {:#?}", capsule.produced);
     ret
 }
 
