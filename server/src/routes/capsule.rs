@@ -270,8 +270,12 @@ pub async fn upload_record(
     capsule.save(&db).await?;
 
     let res = capsule.to_json(role, &db).await?;
+
+    let socks = S::inner(socks).clone();
+    let sem = S::inner(sem).clone();
+    let config = config.inner().clone();
+
     if let Some(matting) = matting {
-        let sem_matting = sem.inner().clone();
         // launch async matting
         tokio::spawn(async move {
             let child = Command::new("../scripts/psh")
@@ -283,7 +287,7 @@ pub async fn upload_record(
                 .spawn();
 
             let succeed = if let Ok(mut child) = child {
-                if let Ok(_) = sem_matting.acquire().await {
+                if let Ok(_) = sem.acquire().await {
                     child.stdin.unwrap();
                     let stdout = child.stdout.take().unwrap();
                     let reader = BufReader::new(stdout);
@@ -327,7 +331,7 @@ pub async fn upload_record(
             if !capsule.is_matting_running().await {
                 if capsule.produced == TaskStatus::Waiting {
                 } else {
-                    let ret = run_produce(user, capsule.id, db, socks, sem, &config).await;
+                    let ret = run_produce(user, capsule.id, db, socks, sem, config).await;
                 }
             }
         });
@@ -786,9 +790,9 @@ pub async fn run_produce(
     user: User,
     id: i32,
     db: Db,
-    socks: &S<WebSockets>,
-    sem: &S<Arc<Semaphore>>,
-    config: &S<Config>,
+    socks: WebSockets,
+    sem: Arc<Semaphore>,
+    config: Config,
 ) -> Result<()> {
     let capsule = Capsule::get_by_id(id, &db).await?;
     let hid = HashId(id);
@@ -797,8 +801,6 @@ pub async fn run_produce(
         .join(format!("{}", *hid))
         .join("output.mp4");
 
-    let socks = socks.inner().clone();
-    let sem = sem.inner().clone();
     if let Some(mut capsule) = capsule {
         tokio::spawn(async move {
             let child = Command::new("../scripts/psh")
@@ -938,7 +940,15 @@ pub async fn produce(
         capsule.save(&db).await.ok();
     } else {
         println!("matting is not active");
-        ret = run_produce(user, capsule.id, db, socks, sem, config).await;
+        ret = run_produce(
+            user,
+            capsule.id,
+            db,
+            S::inner(socks).clone(),
+            S::inner(sem).clone(),
+            config.inner().clone(),
+        )
+        .await;
     };
 
     ret
