@@ -506,4 +506,20 @@ impl Capsule {
 
         Ok(())
     }
+    /// Sets the last modified to now.
+    pub async fn is_matting_running(&self) -> bool {
+        println!(
+            "{:#?}",
+            self.structure
+                .0
+                .iter()
+                .filter_map(|x| x.record.as_ref())
+                .collect::<Vec<_>>()
+        );
+        self.structure
+            .0
+            .iter()
+            .filter_map(|x| x.record.as_ref())
+            .any(|x| x.matting == Some(TaskStatus::Running))
+    }
 }

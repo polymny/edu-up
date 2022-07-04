@@ -12,12 +12,18 @@ pub enum TaskStatus {
     /// The task should not be run.
     Disabled,
 
-    /// Waiting to start.
+    /// Nothings happe yet.
     Idle,
+
+    /// Wait other task end before start
+    Waiting,
 
     /// Running, but not finished.
     Running,
 
-    /// Finished.
+    /// Finished OK.
     Done,
+
+    /// Finished with failure
+    Failed,
 }

@@ -344,9 +344,12 @@ params_pip_slide_record() {
     keying_filter="null"
     color=$(get_keycolor "$webcam_settings")
 
+
     if [[  "$color" != "null" ]]; then
         keying_filter=$(colorkey $color)
     fi
+
+
     pointer_filter=$(colorkey black)
 
     fade_filter=$(get_fadefilter "$gos" "$duration")
@@ -358,6 +361,7 @@ params_pip_slide_record() {
             webcam_overlay=$(get_overlay "$webcam_settings")
             scale_record="scale=${webcam_size},format=argb,colorchannelmixer=aa=${webcam_alpha}"
             if [[ "$pointer_overlay" == "null" ]] ; then
+                echo "record = $record ">&2
                 inputs="-i $slide -i $record "
                 filter_complex="[0]scale=$width_slide:$height_slide[slide];[1]$keying_filter,$scale_record[record];[slide][record]overlay=$webcam_overlay,$fade_filter,fps=fps=$fps[vout]"
             else
@@ -456,9 +460,6 @@ on-matting() {
     fi
 
     record="${capsule_path}/assets/${uuid}.webm"
-
-
-
     filename=$(basename -- "$record")
     extension="${filename##*.}"
     filename="${filename%.*}"
@@ -466,7 +467,7 @@ on-matting() {
     record_mp4="${tmp_path}/${filename}.mp4"
     record_aac="${tmp_path}/${filename}.aac"
 
-    local output="${tmp_path}/${filename}_matted.mp4"
+    local output="${capsule_path}/assets/${uuid}_matted.mp4"
 
 
     ### Convert webm record to mp4
@@ -937,10 +938,19 @@ compose_gos(){
         webcam_settings=$( echo '{"type" :"slide"}' | jq  ".")
         transitions=( 0 )
         input_record="${assets_path}/null.webm"
+        matting="null"
     else
         transitions=( 0 $(echo "$gos" | jq -cr ".events[] | select(.ty==\"next_slide\" or .ty==\"end\") | .time") )
         webcam_settings=$(echo "$gos" | jq  ".webcam_settings")
         input_record="${assets_path}/$record.webm"
+        matting=$(echo "$gos" | jq -cr ".record.matting")
+        echo "matting = $matting" >&2
+        if [[ "$matting" == "done" ]] ; then
+
+            echo "coucou matting = $matting" >&2
+            input_record="${assets_path}/${record}_matted.mp4"
+
+        fi
     fi
 
     pointer=$(echo "$gos" | jq -cr ".record.pointer_uuid")
@@ -1061,6 +1071,7 @@ compose_gos(){
         # No compostion to perform: output is the concatenation of files
         cp $video_slides "${tmp_path}/$output_gos"
     else
+
         cmd=$(header_progress && params_pip_slide_record $video_slides $input_record "${duration_ms}ms" "$webcam_settings" $input_pointer "${tmp_path}/$output_gos")
         total_frames=$(echo "($slide_duration*25)/1000" | bc)
 
@@ -1165,17 +1176,30 @@ on-record() {
 is-matting-active() {
 
 
-    mattings="$(echo "$capsule_structure" | jq -r '.[] | .record.matting')"
-    echo "mattings \n $mattings" >&2
-    running='false'
-    for i in $mattings
-    do
-        if  [[ "$i" == "running" ]]; then
-            running="true"
-        fi
-    done
+    test_matting() {
+        local mattings="$(echo "$capsule_structure" | jq -r '.[] | .record.matting')"
+        echo "mattings \n $mattings" >&2
+        local running='false'
+        for i in $mattings
+        do
+            if  [[ "$i" == "running" ]]; then
+                running="true"
+            fi
+        done
+        echo $running
+    }
 
-    echo "Is matting active/running: $running " >&2
+    while true
+    do
+        local running=$(test_matting)
+        echo "Is matting active/running: $running " >&2
+        if [[ "$running" == "true" ]]; then
+            sleep 3;
+        else
+            break;
+        fi
+
+    done
 
 }
 
@@ -1189,7 +1213,7 @@ on-produce() {
     local cid=$1
     local gosid=$2
 
-    is-matting-active
+    #is-matting-active
 
 
     #transcode_records $cid
@@ -1392,7 +1416,7 @@ main() {
             ;;
         "on-produce")
             read -r capsule_structure
-            echo "$capsule_structure" | jq . >&2
+            #echo "$capsule_structure" | jq . >&2
             on-produce "$@"
             ;;
         "on-publish")

@@ -205,6 +205,7 @@ pub async fn upload_record(
     gos: i32,
     matting: Option<bool>,
     data: Data<'_>,
+    socks: &S<WebSockets>,
     sem: &S<Arc<Semaphore>>,
 ) -> Result<Value> {
     println!("matting: {:?}", matting);
@@ -222,7 +223,7 @@ pub async fn upload_record(
         .ok_or(Error(Status::BadRequest))?;
 
     let uuid = Uuid::new_v4();
-    let output = config
+    let output = &config
         .data_path
         .join(format!("{}", *id))
         .join("assets")
@@ -270,7 +271,7 @@ pub async fn upload_record(
 
     let res = capsule.to_json(role, &db).await?;
     if let Some(matting) = matting {
-        let sem = sem.inner().clone();
+        let sem_matting = sem.inner().clone();
         // launch async matting
         tokio::spawn(async move {
             let child = Command::new("../scripts/psh")
@@ -282,7 +283,7 @@ pub async fn upload_record(
                 .spawn();
 
             let succeed = if let Ok(mut child) = child {
-                if let Ok(_) = sem.acquire().await {
+                if let Ok(_) = sem_matting.acquire().await {
                     child.stdin.unwrap();
                     let stdout = child.stdout.take().unwrap();
                     let reader = BufReader::new(stdout);
@@ -307,21 +308,28 @@ pub async fn upload_record(
             if succeed {
                 if let Ok(gos) = gos {
                     if let Some(record) = &mut gos.record {
-                        println!("record: {:?}", record);
                         record.matting = Some(TaskStatus::Done);
+                        println!("record: {:#?}", record);
                     }
                 };
             } else {
                 error!("Matting fails");
                 if let Ok(gos) = gos {
                     if let Some(record) = &mut gos.record {
-                        println!("record: {:?}", record);
                         record.matting = Some(TaskStatus::Idle);
+                        println!("record: {:#?}", record);
                     }
                 };
             }
             capsule.set_changed();
             capsule.save(&db).await.ok();
+
+            if !capsule.is_matting_running().await {
+                if capsule.produced == TaskStatus::Waiting {
+                } else {
+                    let ret = run_produce(user, capsule.id, db, socks, sem, &config).await;
+                }
+            }
         });
     };
 
@@ -773,6 +781,137 @@ pub async fn add_gos(
     Ok(capsule.to_json(role, &db).await?)
 }
 
+/// laucnhe psh script for capsule production
+pub async fn run_produce(
+    user: User,
+    id: i32,
+    db: Db,
+    socks: &S<WebSockets>,
+    sem: &S<Arc<Semaphore>>,
+    config: &S<Config>,
+) -> Result<()> {
+    let capsule = Capsule::get_by_id(id, &db).await?;
+    let hid = HashId(id);
+    let output_path = config
+        .data_path
+        .join(format!("{}", *hid))
+        .join("output.mp4");
+
+    let socks = socks.inner().clone();
+    let sem = sem.inner().clone();
+    if let Some(mut capsule) = capsule {
+        tokio::spawn(async move {
+            let child = Command::new("../scripts/psh")
+                .arg("on-produce")
+                .arg(format!("{}", capsule.id))
+                .arg("-1")
+                .stdin(Stdio::piped())
+                .stdout(Stdio::piped())
+                .spawn();
+
+            let succeed = if let Ok(mut child) = child {
+                capsule.produced = TaskStatus::Running;
+                capsule.published = TaskStatus::Idle;
+                capsule.production_pid = child.id().map(|x| x as i32);
+                capsule.save(&db).await.ok();
+
+                if let Some(stdin) = child.stdin.as_mut() {
+                    stdin
+                        .write_all(json!(capsule.structure.0).to_string().as_bytes())
+                        .await
+                        .unwrap();
+
+                    if let Ok(_) = sem.acquire().await {
+                        child.stdin.unwrap();
+                        let stdout = child.stdout.take().unwrap();
+                        let reader = BufReader::new(stdout);
+
+                        let mut lines = reader.lines();
+                        while let Some(line) = lines.next_line().await.unwrap() {
+                            capsule
+                                .notify_production_progress(
+                                    &hid.hash(),
+                                    &format!("{}", line),
+                                    &db,
+                                    &socks,
+                                )
+                                .await
+                                .ok();
+                        }
+                        true
+                    } else {
+                        false
+                    }
+                } else {
+                    false
+                }
+            } else {
+                false
+            };
+
+            capsule.produced = if succeed {
+                TaskStatus::Done
+            } else {
+                TaskStatus::Idle
+            };
+
+            let output = run_command(&vec![
+                "../scripts/psh",
+                "duration",
+                output_path.to_str().unwrap(),
+            ]);
+
+            match &output {
+                Ok(o) => {
+                    let line = ((std::str::from_utf8(&o.stdout)
+                        .map_err(|_| Error(Status::InternalServerError))
+                        .unwrap()
+                        .trim()
+                        .parse::<f32>()
+                        .unwrap())
+                        * 1000.) as i32;
+
+                    capsule.duration_ms = line;
+                    capsule.save(&db).await.ok();
+                }
+                Err(_) => error!("Impossible to get duration"),
+            };
+
+            capsule.production_pid = None;
+            capsule.save(&db).await.ok();
+
+            if succeed {
+                capsule
+                    .notify_production(&hid.hash(), &db, &socks)
+                    .await
+                    .ok();
+
+                user.notify(
+                    &socks,
+                    "Production terminée",
+                    &format!(
+                        "La capsule \"{}\" a été correctement produite.",
+                        capsule.name
+                    ),
+                    &db,
+                )
+                .await
+                .ok();
+            } else {
+                user.notify(
+                    &socks,
+                    "Production terminée",
+                    &format!("La production de la capsule \"{}\" a échoué.", capsule.name),
+                    &db,
+                )
+                .await
+                .ok();
+            };
+        });
+    };
+    Ok(())
+}
+
 /// The route that triggers the production of a capsule.
 #[post("/produce/<id>")]
 pub async fn produce(
@@ -786,126 +925,23 @@ pub async fn produce(
     let (mut capsule, _) = user
         .get_capsule_with_permission(*id, Role::Write, &db)
         .await?;
+    let mut ret = Ok(());
 
-    if capsule.produced == TaskStatus::Running {
+    if capsule.produced == TaskStatus::Running || capsule.produced == TaskStatus::Waiting {
         return Err(Error(Status::Conflict));
     }
 
-    let socks = socks.inner().clone();
-    let sem = sem.inner().clone();
-
-    let output_path = config.data_path.join(format!("{}", *id)).join("output.mp4");
-
-    tokio::spawn(async move {
-        let child = Command::new("../scripts/psh")
-            .arg("on-produce")
-            .arg(format!("{}", capsule.id))
-            .arg("-1")
-            .stdin(Stdio::piped())
-            .stdout(Stdio::piped())
-            .spawn();
-
-        let succeed = if let Ok(mut child) = child {
-            capsule.produced = TaskStatus::Running;
-            capsule.published = TaskStatus::Idle;
-            capsule.production_pid = child.id().map(|x| x as i32);
-            capsule.save(&db).await.ok();
-
-            if let Some(stdin) = child.stdin.as_mut() {
-                stdin
-                    .write_all(json!(capsule.structure.0).to_string().as_bytes())
-                    .await
-                    .unwrap();
-
-                if let Ok(_) = sem.acquire().await {
-                    child.stdin.unwrap();
-                    let stdout = child.stdout.take().unwrap();
-                    let reader = BufReader::new(stdout);
-
-                    let mut lines = reader.lines();
-                    while let Some(line) = lines.next_line().await.unwrap() {
-                        capsule
-                            .notify_production_progress(
-                                &id.hash(),
-                                &format!("{}", line),
-                                &db,
-                                &socks,
-                            )
-                            .await
-                            .ok();
-                    }
-                    true
-                } else {
-                    false
-                }
-            } else {
-                false
-            }
-        } else {
-            false
-        };
-
-        capsule.produced = if succeed {
-            TaskStatus::Done
-        } else {
-            TaskStatus::Idle
-        };
-
-        let output = run_command(&vec![
-            "../scripts/psh",
-            "duration",
-            output_path.to_str().unwrap(),
-        ]);
-
-        match &output {
-            Ok(o) => {
-                let line = ((std::str::from_utf8(&o.stdout)
-                    .map_err(|_| Error(Status::InternalServerError))
-                    .unwrap()
-                    .trim()
-                    .parse::<f32>()
-                    .unwrap())
-                    * 1000.) as i32;
-
-                capsule.duration_ms = line;
-                capsule.save(&db).await.ok();
-            }
-            Err(_) => error!("Impossible to get duration"),
-        };
-
-        capsule.production_pid = None;
+    if capsule.is_matting_running().await {
+        println!("matting is active");
+        capsule.produced = TaskStatus::Waiting;
+        capsule.set_changed();
         capsule.save(&db).await.ok();
+    } else {
+        println!("matting is not active");
+        ret = run_produce(user, capsule.id, db, socks, sem, config).await;
+    };
 
-        if succeed {
-            capsule
-                .notify_production(&id.hash(), &db, &socks)
-                .await
-                .ok();
-
-            user.notify(
-                &socks,
-                "Production terminée",
-                &format!(
-                    "La capsule \"{}\" a été correctement produite.",
-                    capsule.name
-                ),
-                &db,
-            )
-            .await
-            .ok();
-        } else {
-            user.notify(
-                &socks,
-                "Production terminée",
-                &format!("La production de la capsule \"{}\" a échoué.", capsule.name),
-                &db,
-            )
-            .await
-            .ok();
-        };
-    });
-
-    Ok(())
+    ret
 }
 
 /// The route that triggers the production of one gos.
