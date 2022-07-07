@@ -322,7 +322,7 @@ pub async fn upload_record(
                     error!("Matting fails");
                     if let Ok(gos) = gos {
                         if let Some(record) = &mut gos.record {
-                            record.matting = Some(TaskStatus::Idle);
+                            record.matting = Some(TaskStatus::Failed);
                         }
                     };
                 }
@@ -943,6 +943,18 @@ pub async fn produce(
     if capsule.is_matting_running().await {
         println!("matting is active");
         capsule.produced = TaskStatus::Waiting;
+        user.notify(
+            &socks,
+            "Attente fin fond vert virtuel ",
+            &format!(
+                "Le traitement du fond vert virtuel est en cours sur la capsule \"{}\" .",
+                capsule.name
+            ),
+            &db,
+        )
+        .await
+        .ok();
+
         capsule.set_changed();
         capsule.save(&db).await.ok();
     } else {
