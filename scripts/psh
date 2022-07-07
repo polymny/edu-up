@@ -946,10 +946,7 @@ compose_gos(){
         matting=$(echo "$gos" | jq -cr ".record.matting")
         echo "matting = $matting" >&2
         if [[ "$matting" == "done" ]] ; then
-
-            echo "coucou matting = $matting" >&2
             input_record="${assets_path}/${record}_matted.mp4"
-
         fi
     fi
 

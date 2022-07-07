@@ -21,7 +21,9 @@ use rocket::{Data, State as S};
 
 use crate::command::{export_slides, run_command};
 use crate::config::Config;
-use crate::db::capsule::{Capsule, Fade, Gos, Privacy, Record, Role, Slide, WebcamSettings};
+use crate::db::capsule::{
+    Anchor, Capsule, Fade, Gos, Privacy, Record, Role, Slide, WebcamSettings,
+};
 use crate::db::task_status::TaskStatus;
 use crate::db::user::{Plan, User};
 use crate::websockets::WebSockets;
@@ -195,6 +197,15 @@ pub async fn delete_project(user: User, db: Db, config: &S<Config>, name: String
     Ok(())
 }
 
+fn default_green() -> WebcamSettings {
+    WebcamSettings::Pip {
+        anchor: Anchor::default(),
+        size: (533, 300),
+        position: (4, 4),
+        opacity: 1.0,
+        keycolor: Some("#00FF00".to_string()),
+    }
+}
 /// The route that uploads a record to a capsule for a specific gos.
 #[post("/upload-record/<id>/<gos>/<matting>", data = "<data>")]
 pub async fn upload_record(
@@ -254,6 +265,35 @@ pub async fn upload_record(
         Some(TaskStatus::Running)
     } else {
         None
+    };
+
+    if matting == Some(TaskStatus::Running) {
+        let webcam_settings = match &gos.webcam_settings {
+            WebcamSettings::Pip {
+                anchor,
+                opacity,
+                position,
+                size,
+                keycolor: _,
+            } => WebcamSettings::Pip {
+                anchor: *anchor,
+                opacity: *opacity,
+                position: *position,
+                size: *size,
+                keycolor: Some("#00FF00".to_string()),
+            },
+
+            WebcamSettings::Fullscreen {
+                opacity,
+                keycolor: _,
+            } => WebcamSettings::Fullscreen {
+                opacity: *opacity,
+                keycolor: Some("#00FF00".to_string()),
+            },
+
+            _ => default_green(),
+        };
+        gos.webcam_settings = webcam_settings;
     };
 
     gos.record = Some(Record {
