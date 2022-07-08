@@ -57,6 +57,7 @@ decodeRole =
 
 type TaskStatus
     = Idle
+    | Waiting
     | Running (Maybe Float)
     | Done
 
@@ -66,6 +67,9 @@ printTaskStatus ts =
     case ts of
         Idle ->
             "Idle"
+
+        Waiting ->
+            "Waiting"
 
         Running _ ->
             "Running"
@@ -82,6 +86,9 @@ decodeTaskStatus =
                 case str of
                     "idle" ->
                         Decode.succeed Idle
+
+                    "waiting" ->
+                        Decode.succeed Waiting
 
                     "running" ->
                         Decode.succeed (Running Nothing)

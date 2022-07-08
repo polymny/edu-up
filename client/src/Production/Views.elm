@@ -529,6 +529,27 @@ bottomBar global user model =
                                 Element.none
                         ]
 
+                Capsule.Waiting ->
+                    Element.column []
+                        [ Element.row [ Element.spacing 10 ]
+                            [ Ui.primaryButton
+                                { label =
+                                    Element.row []
+                                        [ Element.text (Lang.waitingMatting global.lang)
+                                        , Element.el [ Element.paddingEach { left = 10, right = 0, top = 0, bottom = 0 } ]
+                                            Ui.spinner
+                                        ]
+                                , onPress = Nothing
+                                }
+                            , Ui.primaryButton
+                                { label = Element.text (Lang.cancelProduction global.lang)
+                                , onPress = Just (Core.ProductionMsg Production.CancelProduction)
+                                }
+                            ]
+                        , Element.el [ Element.padding 10, Element.width Element.fill, Ui.hf ]
+                            (Element.text (Lang.waitingMattingMsg global.lang))
+                        ]
+
                 _ ->
                     Ui.primaryButton
                         { label = Element.text (Lang.produceVideo global.lang)

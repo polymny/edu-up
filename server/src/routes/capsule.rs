@@ -262,12 +262,6 @@ pub async fn upload_record(
     };
 
     let matting = if user.plan > Plan::Free && matting == Some(true) {
-        Some(TaskStatus::Running)
-    } else {
-        None
-    };
-
-    if matting == Some(TaskStatus::Running) {
         let webcam_settings = match &gos.webcam_settings {
             WebcamSettings::Pip {
                 anchor,
@@ -294,6 +288,10 @@ pub async fn upload_record(
             _ => default_green(),
         };
         gos.webcam_settings = webcam_settings;
+
+        Some(TaskStatus::Running)
+    } else {
+        None
     };
 
     gos.record = Some(Record {
@@ -997,6 +995,7 @@ pub async fn produce(
 
         capsule.set_changed();
         capsule.save(&db).await.ok();
+        capsule.notify_change(&db, &socks).await?;
     } else {
         println!("matting is not active");
         ret = run_produce(

@@ -46,7 +46,7 @@ function setupPorts(app) {
         socket = new WebSocket(flags.global.socket_root);
 
         socket.onmessage = function(event) {
-            console.log(event.data);
+            //console.log(event.data);
             app.ports.websocketMsg.send(JSON.parse(event.data));
         }
 

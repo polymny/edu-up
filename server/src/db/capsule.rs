@@ -134,15 +134,6 @@ impl Default for WebcamSettings {
         }
     }
 }
-fn default_green() -> WebcamSettings {
-    WebcamSettings::Pip {
-        anchor: Anchor::default(),
-        size: (533, 300),
-        position: (4, 4),
-        opacity: 1.0,
-        keycolor: Some("#00FF00".to_string()),
-    }
-}
 
 /// The disabled task status.
 ///
