@@ -468,6 +468,8 @@ on-matting() {
     record_aac="${tmp_path}/${filename}.aac"
 
     local output="${capsule_path}/assets/${uuid}_matted.mp4"
+    local output_png="${capsule_path}/assets/${uuid}_matted.png"
+
 
 
     ### Convert webm record to mp4
@@ -514,6 +516,17 @@ on-matting() {
 
     echo "\n MATTING \n " >&2
     echo $output >&2
+
+    # generate thumbmail with matting
+    duration="0.000000"
+    command=$(header && miniatures  $output "0x00ff00" $duration $output_png)
+    $command
+    if (( $? != 0 )); then
+        echo "error with $output_png" >&2
+        return $1
+    fi
+
+
     echo $output
 }
 
@@ -712,21 +725,28 @@ get_fadefilter() {
 #   miniatures video.mkv 12233 video
 miniatures() {
     input=$1
-    duration=$2
-    output=$3
+    color=$2
+    duration=$3
+    output=$4
     middle=$(echo 'scale=6;' $duration ' / 2' | bc)
     if [ "${middle:0:1}" = "." ] ; then
         middle="0"
     fi
 
+    keying_filter="null"
+    if [[  "$color" != "null" ]]; then
+        keying_filter=$(colorkey $color)
+    fi
+
     width="400"
-    filter="scale=$width:-1"
+    filter="scale=$width:-1,$keying_filter"
     echo -i $input \
         -vf $filter \
         -ss $middle \
         -vframes 1 \
         $output
 }
+
 
 # Get vars from Config.toml
 # USAGE:
@@ -844,7 +864,7 @@ transcode_records(){
         printf 'trancode duration = %s - record duration =%s  \n' "$ELAPSED_TIME" "$duration"
 
         output="$tmp_path/$i.png"
-        command=$(header && miniatures $input  $duration $output)
+        command=$(header && miniatures $input "null" $duration $output)
         echo $command
         $command
         if (( $? != 0 )); then
@@ -1154,7 +1174,7 @@ on-record() {
             output="${capsule_path}/assets/${uuid}.png"
             duration="0.000000"
 
-            command=$(header && miniatures $input  $duration $output)
+            command=$(header && miniatures $input "null" $duration $output)
             $command
             if (( $? != 0 )); then
                 echo "error with $1" >&2
