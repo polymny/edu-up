@@ -53,6 +53,26 @@ gosView model capsule selected id gos =
                             , Element.row [ Element.padding 10 ]
                                 [ case gos.record of
                                     Just record ->
+                                        if Debug.log "matted" record.matted == Just Capsule.Done then
+                                            Ui.iconLink
+                                                [ Element.padding 5
+                                                , Border.rounded 5
+                                                , Background.color Colors.greyLighter
+                                                , Font.color Colors.navbar
+                                                ]
+                                                { route = Route.Custom (Capsule.assetPath capsule (record.uuid ++ "_matted.mp4"))
+                                                , text = Nothing
+                                                , tooltip = Just (Lang.watchRecord model.global.lang)
+                                                , icon = Fa.user
+                                                }
+
+                                        else
+                                            Element.none
+
+                                    Nothing ->
+                                        Element.none
+                                , case gos.record of
+                                    Just record ->
                                         Ui.iconLink
                                             [ Element.padding 5
                                             , Border.rounded 5

@@ -78,6 +78,22 @@ printTaskStatus ts =
             "Done"
 
 
+encodeTaskStatus : TaskStatus -> String
+encodeTaskStatus ts =
+    case ts of
+        Idle ->
+            "idle"
+
+        Waiting ->
+            "waiting"
+
+        Running _ ->
+            "running"
+
+        Done ->
+            "done"
+
+
 decodeTaskStatus : Decoder TaskStatus
 decodeTaskStatus =
     Decode.string
@@ -262,7 +278,7 @@ encodeRecord record =
                         ( "size", Encode.null )
                 , case r.matted of
                     Just m ->
-                        ( "matted", Encode.string <| printTaskStatus m )
+                        ( "matted", Encode.string <| encodeTaskStatus m )
 
                     _ ->
                         ( "matted", Encode.null )

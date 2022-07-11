@@ -156,7 +156,7 @@ pub struct Record {
 
     /// The state of the matting.
     #[serde(default = "none")]
-    pub matting: Option<TaskStatus>,
+    pub matted: Option<TaskStatus>,
 }
 
 /// The type of a record event.
@@ -520,6 +520,6 @@ impl Capsule {
             .0
             .iter()
             .filter_map(|x| x.record.as_ref())
-            .any(|x| x.matting == Some(TaskStatus::Running))
+            .any(|x| x.matted == Some(TaskStatus::Running))
     }
 }

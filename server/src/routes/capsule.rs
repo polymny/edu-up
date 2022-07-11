@@ -261,7 +261,7 @@ pub async fn upload_record(
         None
     };
 
-    let matting = if user.plan > Plan::Free && matting == Some(true) {
+    let matted = if user.plan > Plan::Free && matting == Some(true) {
         let webcam_settings = match &gos.webcam_settings {
             WebcamSettings::Pip {
                 anchor,
@@ -298,7 +298,7 @@ pub async fn upload_record(
         uuid,
         size,
         pointer_uuid: None,
-        matting,
+        matted,
     });
 
     if size.is_none() {
@@ -353,14 +353,14 @@ pub async fn upload_record(
                 if succeed {
                     if let Ok(gos) = gos {
                         if let Some(record) = &mut gos.record {
-                            record.matting = Some(TaskStatus::Done);
+                            record.matted = Some(TaskStatus::Done);
                         }
                     };
                 } else {
                     error!("Matting fails");
                     if let Ok(gos) = gos {
                         if let Some(record) = &mut gos.record {
-                            record.matting = Some(TaskStatus::Failed);
+                            record.matted = Some(TaskStatus::Failed);
                         }
                     };
                 }

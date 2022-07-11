@@ -434,7 +434,12 @@ mainView global user model gos slide =
                                     )
                                 )
                             ]
-                            { src = Capsule.assetPath model.capsule (r.uuid ++ ".png")
+                            { src =
+                                if r.matted == Just Capsule.Done then
+                                    Capsule.assetPath model.capsule (r.uuid ++ "_matted.png")
+
+                                else
+                                    Capsule.assetPath model.capsule (r.uuid ++ ".png")
                             , description = ""
                             }
                         )
