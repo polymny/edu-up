@@ -280,7 +280,7 @@ type Msg
     | IncreasePromptSize
     | DecreasePromptSize
     | SetCanvas SetCanvas
-    | ToggleMatting
+    | ToggleMatting Int
 
 
 defaultDevice : Devices -> Device

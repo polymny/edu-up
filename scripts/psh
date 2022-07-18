@@ -963,7 +963,7 @@ compose_gos(){
         transitions=( 0 $(echo "$gos" | jq -cr ".events[] | select(.ty==\"next_slide\" or .ty==\"end\") | .time") )
         webcam_settings=$(echo "$gos" | jq  ".webcam_settings")
         input_record="${assets_path}/$record.webm"
-        matting=$(echo "$gos" | jq -cr ".record.matting")
+        matting=$(echo "$gos" | jq -cr ".record.matted")
         echo "matting = $matting" >&2
         if [[ "$matting" == "done" ]] ; then
             input_record="${assets_path}/${record}_matted.mp4"
@@ -1194,7 +1194,7 @@ is-matting-active() {
 
 
     test_matting() {
-        local mattings="$(echo "$capsule_structure" | jq -r '.[] | .record.matting')"
+        local mattings="$(echo "$capsule_structure" | jq -r '.[] | .record.matted')"
         echo "mattings \n $mattings" >&2
         local running='false'
         for i in $mattings

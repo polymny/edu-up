@@ -9,6 +9,7 @@ import Core.Types as Core
 import Route
 import Status
 import User
+import Utils
 
 
 update : Acquisition.Msg -> Core.Model -> ( Core.Model, Cmd Core.Msg )
@@ -151,10 +152,29 @@ update msg model =
                 _ ->
                     ( model, Cmd.none )
 
-        Acquisition.ToggleMatting ->
+        Acquisition.ToggleMatting id ->
             case model.page of
                 Core.Acquisition p ->
-                    ( mkModel { model | global = { global | matting = not p.mattingEnabled } } (Core.Acquisition { p | mattingEnabled = not p.mattingEnabled })
+                    ( mkModel { model | global = { global | matting = not p.mattingEnabled } }
+                        (Core.Acquisition
+                            { p
+                                | mattingEnabled = not p.mattingEnabled
+                                , records =
+                                    p.records
+                                        |> Utils.change (List.length p.records - id - 1)
+                                            (\x ->
+                                                { x
+                                                    | matted =
+                                                        case x.matted of
+                                                            Nothing ->
+                                                                Just Capsule.Idle
+
+                                                            _ ->
+                                                                Nothing
+                                                }
+                                            )
+                            }
+                        )
                     , Ports.setMatting (not p.mattingEnabled)
                     )
 
@@ -327,17 +347,13 @@ update msg model =
                     ( model, Cmd.none )
 
         Acquisition.UploadRecord record ->
-            let
-                record2 =
-                    { record | matted = Just Capsule.Idle }
-            in
             case model.page of
                 Core.Acquisition p ->
                     ( mkModel model (Core.Acquisition { p | uploading = Just 0.0, status = Status.Sent })
                     , Ports.uploadRecord
                         { capsuleId = p.capsule.id
                         , gos = p.gos
-                        , matting = p.mattingEnabled
+                        , matting = record.matted /= Nothing
                         , record = Acquisition.encodeRecord record
                         }
                     )

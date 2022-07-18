@@ -163,17 +163,6 @@ rightColumn global user submodel =
                             |> Element.text
                             |> paragraph
                         , settingsButton
-                        , case ( submodel, User.isPremium user ) of
-                            ( Just m, True ) ->
-                                Input.checkbox []
-                                    { checked = m.mattingEnabled
-                                    , icon = Input.defaultCheckbox
-                                    , label = Input.labelRight [] (Element.text (Lang.backgroundRemoval global.lang))
-                                    , onChange = \_ -> Core.AcquisitionMsg Acquisition.ToggleMatting
-                                    }
-
-                            _ ->
-                                Element.none
                         ]
 
                 _ ->
@@ -201,6 +190,16 @@ rightColumn global user submodel =
                               else
                                 Element.text "pointer"
                             ]
+
+                      else
+                        Element.none
+                    , if User.isPremium user then
+                        Input.checkbox []
+                            { checked = record.matted /= Nothing
+                            , icon = Input.defaultCheckbox
+                            , label = Input.labelRight [] (Element.text (Lang.backgroundRemoval global.lang))
+                            , onChange = \_ -> Core.AcquisitionMsg (Acquisition.ToggleMatting id)
+                            }
 
                       else
                         Element.none

@@ -313,7 +313,7 @@ pub async fn upload_record(
     let sem = S::inner(sem).clone();
     let config = config.inner().clone();
 
-    if let Some(matting) = matting {
+    if matted.is_some() {
         // launch async matting
         tokio::spawn(async move {
             let child = Command::new("../scripts/psh")
