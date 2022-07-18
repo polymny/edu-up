@@ -38,7 +38,7 @@ use rocket::fairing::AdHoc;
 use rocket::http::Status;
 use rocket::request::{FromParam, FromRequest, Outcome, Request};
 use rocket::response::{self, Responder};
-use rocket::State;
+use rocket::{Ignite, Rocket, State};
 
 use crate::command::run_command;
 use crate::config::Config;
@@ -61,7 +61,7 @@ lazy_static! {
 
 /// The error type of this library.
 #[derive(Debug)]
-pub struct Error(Status);
+pub struct Error(pub Status);
 
 /// The result type of this library
 pub type Result<T> = StdResult<T, Error>;
@@ -372,7 +372,7 @@ pub async fn update_video_duration() {
 }
 
 /// Starts the rocket server.
-pub async fn rocket() -> StdResult<(), rocket::Error> {
+pub async fn rocket() -> StdResult<Rocket<Ignite>, rocket::Error> {
     let figment = rocket::Config::figment();
     let config = Config::from_figment(&figment);
 

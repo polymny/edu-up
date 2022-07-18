@@ -10,8 +10,7 @@ use tokio::fs::remove_dir_all;
 
 use rocket::form::Form;
 use rocket::http::{Cookie, CookieJar, SameSite, Status};
-use rocket::response::content::Html;
-use rocket::response::Redirect;
+use rocket::response::{content, status, Redirect};
 use rocket::serde::json::{json, Json, Value};
 use rocket::State as S;
 
@@ -119,7 +118,7 @@ pub async fn activate<'a>(
     key: String,
     cookies: &CookieJar<'_>,
     lang: Lang,
-) -> Result<Html<String>> {
+) -> Result<status::Accepted<content::RawHtml<String>>> {
     let mut user = User::get_by_activation_key(key, &db)
         .await?
         .ok_or(Error(Status::NotFound))?;
@@ -131,7 +130,7 @@ pub async fn activate<'a>(
     add_cookies(&session.secret, &config, cookies);
 
     let body = unlogged_html(json!({ "global": global_flags(&config, &lang) }));
-    Ok(Html(body))
+    Ok(status::Accepted(Some(content::RawHtml(body))))
 }
 
 /// A struct that serves for form veryfing.
@@ -314,7 +313,7 @@ pub async fn reset_password<'a>(
     config: &S<Config>,
     key: String,
     lang: Lang,
-) -> Cors<Result<Html<String>>> {
+) -> Cors<Result<status::Accepted<content::RawHtml<String>>>> {
     let user = User::get_by_reset_password_key(Some(key), &db).await;
 
     match user {
@@ -324,7 +323,7 @@ pub async fn reset_password<'a>(
     };
 
     let body = unlogged_html(json!({ "global": global_flags(&config, &lang) }));
-    Cors::ok(&config.home, Html(body))
+    Cors::ok(&config.home, status::Accepted(Some(content::RawHtml(body))))
 }
 
 /// The type to change a user's email address.
@@ -354,11 +353,11 @@ pub async fn validate_email<'a>(
     config: &S<Config>,
     db: Db,
     lang: Lang,
-) -> Cors<Result<Html<String>>> {
+) -> Cors<Result<status::Accepted<content::RawHtml<String>>>> {
     match User::validate_change_email(key, &db).await {
         Ok(_) => {
             let body = unlogged_html(json!({ "global": global_flags(&config, &lang) }));
-            Cors::ok(&config.home, Html(body))
+            Cors::ok(&config.home, status::Accepted(Some(content::RawHtml(body))))
         }
         Err(Error(s)) => Cors::err(&config.home, s),
     }
@@ -422,7 +421,7 @@ pub async fn validate_invitation<'a>(
     key: String,
     cookies: &CookieJar<'_>,
     lang: Lang,
-) -> Result<Html<String>> {
+) -> Result<status::Accepted<content::RawHtml<String>>> {
     let user = User::get_by_activation_key(key, &db)
         .await?
         .ok_or(Error(Status::NotFound))?;
@@ -432,7 +431,7 @@ pub async fn validate_invitation<'a>(
 
     let body = unlogged_html(json!({ "global": global_flags(&config, &lang) }));
 
-    Ok(Html(body))
+    Ok(status::Accepted(Some(content::RawHtml(body))))
 }
 
 /// The form for validating inscription
@@ -453,7 +452,7 @@ pub async fn request_invitation<'a>(
     cookies: &CookieJar<'_>,
     form: Json<RequestInvitationForm>,
     lang: Lang,
-) -> Result<Html<String>> {
+) -> Result<status::Accepted<content::RawHtml<String>>> {
     let mut user = User::get_by_activation_key(form.key.to_string(), &db)
         .await?
         .ok_or(Error(Status::NotFound))?;
@@ -465,5 +464,5 @@ pub async fn request_invitation<'a>(
     add_cookies(&session.secret, &config, cookies);
 
     let body = unlogged_html(json!({ "global": global_flags(&config, &lang) }));
-    Ok(Html(body))
+    Ok(status::Accepted(Some(content::RawHtml(body))))
 }
