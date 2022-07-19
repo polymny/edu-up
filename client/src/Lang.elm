@@ -1878,6 +1878,26 @@ activateKeying lang =
             "Activate keying"
 
 
+matting : Lang -> String
+matting lang =
+    case lang of
+        FrFr ->
+            "Fond vert virtuel"
+
+        _ ->
+            "Virtual green screen"
+
+
+activateMatting : Lang -> String
+activateMatting lang =
+    case lang of
+        FrFr ->
+            "Activer le font vert virtuel"
+
+        _ ->
+            "Activate virtual green screen"
+
+
 activateFade : Lang -> String
 activateFade lang =
     case lang of

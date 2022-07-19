@@ -101,3 +101,4 @@ type Msg
     | ProduceGos Int
     | VideoProduced
     | CancelProduction
+    | ToggleMatting

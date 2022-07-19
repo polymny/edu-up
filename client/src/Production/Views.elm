@@ -248,6 +248,21 @@ leftColumn global user _ gos =
                 |> Element.el [ Ui.wfp 1, Element.alignBottom ]
             ]
         , if User.isPremium user then
+            Element.el (Ui.formTitle ++ disabledAttr) (Element.text (Lang.matting global.lang))
+
+          else
+            Element.none
+        , if User.isPremium user then
+            Input.checkbox disabledAttr
+                { checked = Maybe.andThen .matted gos.record /= Nothing
+                , icon = Input.defaultCheckbox
+                , label = Input.labelRight forceDisabledAttr (Element.text (Lang.activateMatting global.lang))
+                , onChange = \x -> Core.ProductionMsg Production.ToggleMatting
+                }
+
+          else
+            Element.none
+        , if User.isPremium user then
             Element.el (Ui.formTitle ++ disabledAttr) (Element.text (Lang.key global.lang))
 
           else

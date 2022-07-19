@@ -53,7 +53,7 @@ gosView model capsule selected id gos =
                             , Element.row [ Element.padding 10 ]
                                 [ case gos.record of
                                     Just record ->
-                                        if Debug.log "matted" record.matted == Just Capsule.Done then
+                                        if record.matted == Just Capsule.Done then
                                             Ui.iconLink
                                                 [ Element.padding 5
                                                 , Border.rounded 5

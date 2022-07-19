@@ -186,6 +186,29 @@ update msg model =
                             in
                             ( mkModel model (Core.Production newModel), Cmd.none )
 
+                        Production.ToggleMatting ->
+                            let
+                                newRecord =
+                                    case gos.record of
+                                        Just r ->
+                                            Just
+                                                { r
+                                                    | matted =
+                                                        if r.matted == Nothing then
+                                                            Just Capsule.Idle
+
+                                                        else
+                                                            Nothing
+                                                }
+
+                                        Nothing ->
+                                            Nothing
+
+                                newGos =
+                                    { gos | record = newRecord }
+                            in
+                            updateModel newGos model m
+
                         Production.ProduceVideo ->
                             let
                                 oldCapsule =
