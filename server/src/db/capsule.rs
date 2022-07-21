@@ -264,7 +264,7 @@ impl Gos {
 }
 
 /// Privacy settings for a video.
-#[derive(PgEnum, Serialize, Deserialize, Debug, PartialEq, Eq)]
+#[derive(PgEnum, Serialize, Deserialize, Debug, PartialEq, Eq, Copy, Clone)]
 #[serde(rename_all = "snake_case")]
 pub enum Privacy {
     /// Public video.
@@ -506,16 +506,19 @@ impl Capsule {
 
         Ok(())
     }
+
+    /// Returns the list of matting processes to run.
+    pub fn matting_idle(&mut self) -> impl Iterator<Item = (i32, &mut Record)> {
+        self.structure
+            .0
+            .iter_mut()
+            .enumerate()
+            .filter_map(|(x, y)| y.record.as_mut().map(|z| (x as i32, z)))
+            .filter(|(_, x)| x.matted == Some(TaskStatus::Idle))
+    }
+
     /// Sets the last modified to now.
-    pub async fn is_matting_running(&self) -> bool {
-        println!(
-            "{:#?}",
-            self.structure
-                .0
-                .iter()
-                .filter_map(|x| x.record.as_ref())
-                .collect::<Vec<_>>()
-        );
+    pub fn is_matting_running(&self) -> bool {
         self.structure
             .0
             .iter()

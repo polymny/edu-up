@@ -27,7 +27,7 @@ use crate::db::capsule::{
 use crate::db::task_status::TaskStatus;
 use crate::db::user::{Plan, User};
 use crate::websockets::WebSockets;
-use crate::{Db, Error, HashId, Result};
+use crate::{Db, Error, HashId, Pool, Result};
 
 /// The route that gives the capsule information.
 #[get("/capsule/<capsule_id>")]
@@ -316,71 +316,100 @@ pub async fn upload_record(
     if matted.is_some() {
         // launch async matting
         tokio::spawn(async move {
-            let child = Command::new("../scripts/psh")
-                .arg("on-matting")
-                .arg(format!("{}", &capsule.id))
-                .arg(format!("{}", uuid))
-                .stdin(Stdio::piped())
-                .stdout(Stdio::piped())
-                .spawn();
-
-            let succeed = if let Ok(mut child) = child {
-                if let Ok(_) = sem.acquire().await {
-                    child.stdin.unwrap();
-                    let stdout = child.stdout.take().unwrap();
-                    let reader = BufReader::new(stdout);
-
-                    let mut lines = reader.lines();
-                    while let Some(line) = lines.next_line().await.unwrap() {
-                        debug!("line = {}", line);
-                    }
-                    true
-                } else {
-                    false
-                }
-            } else {
-                false
-            };
-
-            let capsule = Capsule::get_by_id(capsule.id, &db).await.unwrap();
-            if let Some(mut capsule) = capsule {
-                let gos = capsule
-                    .structure
-                    .0
-                    .get_mut(gosid as usize)
-                    .ok_or(Error(Status::BadRequest));
-
-                if succeed {
-                    if let Ok(gos) = gos {
-                        if let Some(record) = &mut gos.record {
-                            record.matted = Some(TaskStatus::Done);
-                        }
-                    };
-                } else {
-                    error!("Matting fails");
-                    if let Ok(gos) = gos {
-                        if let Some(record) = &mut gos.record {
-                            record.matted = Some(TaskStatus::Failed);
-                        }
-                    };
-                }
-
-                println!("capsule produced: {:#?}", capsule.produced);
-                capsule.set_changed();
-                capsule.save(&db).await.ok();
-
-                if !capsule.is_matting_running().await {
-                    let ret = if capsule.produced == TaskStatus::Waiting {
-                        run_produce(user, capsule.id, db, socks, sem, config).await
-                    } else {
-                        Ok(())
-                    };
-                }
-            }
+            run_matting(user, capsule.id, gosid, sem, socks, config, db)
+                .await
+                .ok();
         });
     };
 
     Ok(res)
+}
+
+/// Runs the matting on a specific gos.
+pub async fn run_matting(
+    user: User,
+    capsule_id: i32,
+    gosid: i32,
+    sem: Arc<Semaphore>,
+    socks: WebSockets,
+    config: Config,
+    db: Db,
+) -> Result<()> {
+    let mut capsule = Capsule::get_by_id(capsule_id, &db)
+        .await?
+        .ok_or(Error(Status::BadRequest))?;
+
+    let gos = capsule
+        .structure
+        .0
+        .get_mut(gosid as usize)
+        .ok_or(Error(Status::BadRequest))?;
+
+    let record_uuid = gos.record.as_ref().ok_or(Error(Status::BadRequest))?.uuid;
+
+    let child = Command::new("../scripts/psh")
+        .arg("on-matting")
+        .arg(format!("{}", &capsule.id))
+        .arg(format!("{}", record_uuid))
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .spawn();
+
+    let succeed = if let Ok(mut child) = child {
+        if let Ok(_) = sem.acquire().await {
+            child.stdin.unwrap();
+            let stdout = child.stdout.take().unwrap();
+            let reader = BufReader::new(stdout);
+
+            let mut lines = reader.lines();
+            while let Some(line) = lines.next_line().await.unwrap() {
+                debug!("line = {}", line);
+            }
+            true
+        } else {
+            false
+        }
+    } else {
+        false
+    };
+
+    let capsule = Capsule::get_by_id(capsule.id, &db).await.unwrap();
+    if let Some(mut capsule) = capsule {
+        let gos = capsule
+            .structure
+            .0
+            .get_mut(gosid as usize)
+            .ok_or(Error(Status::BadRequest));
+
+        if succeed {
+            if let Ok(gos) = gos {
+                if let Some(record) = &mut gos.record {
+                    record.matted = Some(TaskStatus::Done);
+                }
+            };
+        } else {
+            error!("Matting fails");
+            if let Ok(gos) = gos {
+                if let Some(record) = &mut gos.record {
+                    record.matted = Some(TaskStatus::Failed);
+                }
+            };
+        }
+
+        println!("capsule produced: {:#?}", capsule.produced);
+        capsule.set_changed();
+        capsule.save(&db).await.ok();
+
+        if !capsule.is_matting_running() {
+            let ret = if capsule.produced == TaskStatus::Waiting {
+                run_produce(user, capsule.id, db, socks, sem, config).await
+            } else {
+                Ok(())
+            };
+        }
+    }
+
+    Ok(())
 }
 
 /// The route that uploads a pointer to a capsule for a specific gos.
@@ -966,8 +995,14 @@ pub async fn produce(
     socks: &S<WebSockets>,
     sem: &S<Arc<Semaphore>>,
     config: &S<Config>,
-    db: Db,
+    pool: &S<Pool>,
 ) -> Result<()> {
+    let pool = S::inner(pool);
+    let db = Db(pool
+        .get()
+        .await
+        .map_err(|_| Error(Status::InternalServerError))?);
+
     let (mut capsule, _) = user
         .get_capsule_with_permission(*id, Role::Write, &db)
         .await?;
@@ -978,7 +1013,29 @@ pub async fn produce(
     }
 
     println!("capsule: {:#?}", capsule);
-    if capsule.is_matting_running().await {
+    let capsule_id = capsule.id;
+
+    for (gosid, record) in capsule.matting_idle() {
+        record.matted = Some(TaskStatus::Running);
+        // launch async matting
+        let user = user.clone();
+        let sem = S::inner(sem).clone();
+        let socks = S::inner(socks).clone();
+        let config = config.inner().clone();
+        let db = Db(pool
+            .get()
+            .await
+            .map_err(|_| Error(Status::InternalServerError))?);
+
+        tokio::spawn(async move {
+            run_matting(user, capsule_id, gosid, sem, socks, config, db)
+                .await
+                .ok();
+        });
+    }
+    capsule.save(&db).await?;
+
+    if capsule.is_matting_running() {
         println!("matting is active");
         capsule.produced = TaskStatus::Waiting;
         user.notify(
