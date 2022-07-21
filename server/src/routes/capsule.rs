@@ -1033,6 +1033,7 @@ pub async fn produce(
                 .ok();
         });
     }
+    capsule.set_changed();
     capsule.save(&db).await?;
 
     if capsule.is_matting_running() {
