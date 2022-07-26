@@ -2046,3 +2046,13 @@ backgroundRemoval lang =
 
         _ ->
             "Background removal"
+
+
+keyDisabledBecauseMatting : Lang -> String
+keyDisabledBecauseMatting lang =
+    case lang of
+        FrFr ->
+            "Le keying est réglé par rapport aux paramètres du fond vert virtuel."
+
+        _ ->
+            "Keying is set up to work with virtual green screen."

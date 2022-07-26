@@ -156,6 +156,16 @@ leftColumn global user _ gos =
 
                 Capsule.Fullscreen _ ->
                     Nothing
+
+        keyDisabled =
+            User.isPremium user && Maybe.andThen .matted gos.record /= Nothing
+
+        keyDisabledAttr =
+            if keyDisabled then
+                Ui.disabled
+
+            else
+                disabledAttr
     in
     Element.column [ Ui.wf, Element.centerY, Element.spacing 30 ]
         [ Input.checkbox []
@@ -263,12 +273,12 @@ leftColumn global user _ gos =
           else
             Element.none
         , if User.isPremium user then
-            Element.el (Ui.formTitle ++ disabledAttr) (Element.text (Lang.key global.lang))
+            Element.el (Ui.formTitle ++ keyDisabledAttr) (Element.text (Lang.key global.lang))
 
           else
             Element.none
         , if User.isPremium user then
-            Input.checkbox disabledAttr
+            Input.checkbox keyDisabledAttr
                 { checked = isJust currentKeyColor
                 , icon = Input.defaultCheckbox
                 , label = Input.labelRight forceDisabledAttr (Element.text (Lang.activateKeying global.lang))
@@ -290,7 +300,7 @@ leftColumn global user _ gos =
           else
             Element.none
         , if User.isPremium user then
-            Element.row disabledAttr
+            Element.row keyDisabledAttr
                 [ Element.el
                     (if isJust currentKeyColor then
                         []
@@ -318,6 +328,11 @@ leftColumn global user _ gos =
                         )
                     )
                 ]
+
+          else
+            Element.none
+        , if keyDisabled then
+            Element.paragraph Ui.disabled [ Element.text (Lang.keyDisabledBecauseMatting global.lang) ]
 
           else
             Element.none
