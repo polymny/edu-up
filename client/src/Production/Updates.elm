@@ -188,24 +188,49 @@ update msg model =
 
                         Production.ToggleMatting ->
                             let
+                                changeKeyColor : Maybe String -> Capsule.WebcamSettings -> Capsule.WebcamSettings
+                                changeKeyColor newcolor settings =
+                                    case settings of
+                                        Capsule.Pip { anchor, opacity, position, size } ->
+                                            Capsule.Pip
+                                                { anchor = anchor
+                                                , opacity = opacity
+                                                , position = position
+                                                , size = size
+                                                , keycolor = newcolor
+                                                }
+
+                                        Capsule.Fullscreen { opacity } ->
+                                            Capsule.Fullscreen { opacity = opacity, keycolor = newcolor }
+
+                                        x ->
+                                            x
+
+                                ( newmatted, newkeycolor ) =
+                                    case gos.record of
+                                        Just r ->
+                                            if r.matted == Nothing then
+                                                ( Just Capsule.Idle, Just "#00FF00" )
+
+                                            else
+                                                ( Nothing, Nothing )
+
+                                        Nothing ->
+                                            ( Nothing, Nothing )
+
                                 newRecord =
                                     case gos.record of
                                         Just r ->
-                                            Just
-                                                { r
-                                                    | matted =
-                                                        if r.matted == Nothing then
-                                                            Just Capsule.Idle
-
-                                                        else
-                                                            Nothing
-                                                }
+                                            Just { r | matted = newmatted }
 
                                         Nothing ->
                                             Nothing
 
                                 newGos =
-                                    { gos | record = newRecord }
+                                    { gos
+                                        | record = newRecord
+                                        , webcamSettings = changeKeyColor newkeycolor gos.webcamSettings
+                                    }
                             in
                             updateModel newGos model m
 
