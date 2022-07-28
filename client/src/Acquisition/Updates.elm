@@ -341,7 +341,7 @@ update msg model =
         Acquisition.PlayRecordFinished ->
             case model.page of
                 Core.Acquisition p ->
-                    ( mkModel model (Core.Acquisition { p | currentSlide = 0 }), Cmd.none )
+                    ( mkModel model (Core.Acquisition { p | currentSlide = 0, recording = False }), Cmd.none )
 
                 _ ->
                     ( model, Cmd.none )
