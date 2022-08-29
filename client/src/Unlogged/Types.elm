@@ -6,6 +6,7 @@ import Core.Types as Core
 import Core.Utils as Core
 import Json.Decode as Decode
 import Lang exposing (Lang)
+import Log
 import Status exposing (Status)
 import Url
 
@@ -121,6 +122,10 @@ init flags url key =
                     Just (Model g page)
 
                 _ ->
+                    let
+                        _ =
+                            Log.debug "global" global
+                    in
                     Nothing
     in
     ( model, Cmd.none )

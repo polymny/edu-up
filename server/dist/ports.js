@@ -22,7 +22,7 @@ function setupPorts(app) {
         style = "Pointer",
         color = "rgb(255, 0, 0)",
         size = 20,
-        isPremium = flags.user.plan !== 'free';
+        isPremium = flags.user !== undefined && flags.user.plan !== 'free';
 
     tmpCanvas.width = 1920;
     tmpCanvas.height = 1080;
