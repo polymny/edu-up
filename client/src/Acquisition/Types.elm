@@ -42,6 +42,7 @@ type alias Model =
     , state : State
     , status : Status
     , mattingEnabled : Bool
+    , downsampling : Float
     }
 
 
@@ -50,17 +51,19 @@ type alias Record =
     , webcamBlob : Encode.Value
     , pointerBlob : Maybe Encode.Value
     , matted : Maybe Capsule.TaskStatus
+    , downsampling : Maybe Float
     , old : Bool
     }
 
 
 decodeRecord : Decoder Record
 decodeRecord =
-    Decode.map5 Record
+    Decode.map6 Record
         (Decode.field "events" (Decode.list Capsule.decodeEvent))
         (Decode.field "webcam_blob" Decode.value)
         (Decode.field "pointer_blob" (Decode.nullable Decode.value))
         (Decode.field "matted" (Decode.nullable Capsule.decodeTaskStatus))
+        (Decode.field "downsampling" (Decode.nullable Decode.float))
         (Decode.succeed False)
 
 
@@ -87,6 +90,7 @@ type alias Submodel =
     , uploading : Maybe Float
     , status : Status
     , mattingEnabled : Bool
+    , downsampling : Float
     }
 
 
@@ -105,11 +109,12 @@ toSubmodel devices model =
     , uploading = model.uploading
     , status = model.status
     , mattingEnabled = model.mattingEnabled
+    , downsampling = model.downsampling
     }
 
 
-init : Bool -> Maybe Devices -> { a | videoDeviceId : Maybe String, resolution : Maybe String, audioDeviceId : Maybe String } -> Capsule -> Int -> ( Model, Cmd Msg )
-init matting devices chosenDeviceIds capsule id =
+init : Bool -> Float -> Maybe Devices -> { a | videoDeviceId : Maybe String, resolution : Maybe String, audioDeviceId : Maybe String } -> Capsule -> Int -> ( Model, Cmd Msg )
+init matting downsampling devices chosenDeviceIds capsule id =
     let
         records =
             let
@@ -126,6 +131,7 @@ init matting devices chosenDeviceIds capsule id =
                                 |> Maybe.map Encode.string
                       , events = g.events
                       , matted = r.matted
+                      , downsampling = r.downsampling
                       , old = True
                       }
                     ]
@@ -159,6 +165,7 @@ init matting devices chosenDeviceIds capsule id =
                         DetectingDevices
             , status = Status.NotSent
             , mattingEnabled = matting
+            , downsampling = downsampling
             }
     in
     ( model

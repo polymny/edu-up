@@ -1898,6 +1898,16 @@ activateMatting lang =
             "Activate virtual green screen"
 
 
+downsampling : Lang -> String
+downsampling lang =
+    case lang of
+        FrFr ->
+            "Taux de sous-échantillonnage"
+
+        _ ->
+            "Downsampling ratio"
+
+
 activateFade : Lang -> String
 activateFade lang =
     case lang of

@@ -251,16 +251,18 @@ type alias Record =
     , pointerUuid : Maybe String
     , size : Maybe ( Int, Int )
     , matted : Maybe TaskStatus
+    , downsampling : Maybe Float
     }
 
 
 decodeRecord : Decoder Record
 decodeRecord =
-    Decode.map4 Record
+    Decode.map5 Record
         (Decode.field "uuid" Decode.string)
         (Decode.maybe (Decode.field "pointer_uuid" Decode.string))
         (Decode.maybe (Decode.field "size" decodeIntPair))
         (Decode.maybe (Decode.field "matted" decodeTaskStatus))
+        (Decode.maybe (Decode.field "downsampling" Decode.float))
 
 
 encodeRecord : Maybe Record -> Encode.Value
@@ -282,6 +284,12 @@ encodeRecord record =
 
                     _ ->
                         ( "matted", Encode.null )
+                , case r.downsampling of
+                    Just ds ->
+                        ( "downsampling", Encode.float ds )
+                    
+                    _ ->
+                        ( "downsampling", Encode.null )
                 ]
 
         Nothing ->

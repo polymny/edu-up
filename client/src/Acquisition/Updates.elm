@@ -159,6 +159,7 @@ update msg model =
                         (Core.Acquisition
                             { p
                                 | mattingEnabled = not p.mattingEnabled
+                                , downsampling = p.downsampling
                                 , records =
                                     p.records
                                         |> Utils.change (List.length p.records - id - 1)
@@ -354,6 +355,12 @@ update msg model =
                         { capsuleId = p.capsule.id
                         , gos = p.gos
                         , matting = record.matted /= Nothing
+                        , downsampling = 
+                            case record.downsampling of
+                                Just ds ->
+                                    ds
+                                _ ->
+                                    0.1
                         , record = Acquisition.encodeRecord record
                         }
                     )

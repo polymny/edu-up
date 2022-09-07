@@ -102,3 +102,4 @@ type Msg
     | VideoProduced
     | CancelProduction
     | ToggleMatting
+    | DownsamplingChanged Float

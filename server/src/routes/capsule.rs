@@ -207,7 +207,7 @@ fn default_green() -> WebcamSettings {
     }
 }
 /// The route that uploads a record to a capsule for a specific gos.
-#[post("/upload-record/<id>/<gos>/<matting>", data = "<data>")]
+#[post("/upload-record/<id>/<gos>/<matting>/<downsampling>", data = "<data>")]
 pub async fn upload_record(
     user: User,
     db: Db,
@@ -215,6 +215,7 @@ pub async fn upload_record(
     id: HashId,
     gos: i32,
     matting: Option<bool>,
+    downsampling: Option<f32>,
     data: Data<'_>,
     socks: &S<WebSockets>,
     sem: &S<Arc<Semaphore>>,
@@ -299,6 +300,7 @@ pub async fn upload_record(
         size,
         pointer_uuid: None,
         matted,
+        downsampling,
     });
 
     if size.is_none() {
@@ -345,12 +347,15 @@ pub async fn run_matting(
         .get_mut(gosid as usize)
         .ok_or(Error(Status::BadRequest))?;
 
-    let record_uuid = gos.record.as_ref().ok_or(Error(Status::BadRequest))?.uuid;
+    let record = gos.record.as_ref().ok_or(Error(Status::BadRequest))?;
+
+    let record_downsampling = record.downsampling.unwrap_or(0.2);
 
     let child = Command::new("../scripts/psh")
         .arg("on-matting")
         .arg(format!("{}", &capsule.id))
-        .arg(format!("{}", record_uuid))
+        .arg(format!("{}", record.uuid))
+        .arg(format!("{}", record_downsampling))
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .spawn();

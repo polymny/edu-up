@@ -29,6 +29,8 @@ subscriptions model =
 
                                         else
                                             Nothing
+                                    , downsampling = Just model.downsampling
+
                                 }
                             )
 

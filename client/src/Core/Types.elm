@@ -40,6 +40,7 @@ type alias Flags =
     , sortBy : ( User.SortBy, Bool )
     , promptSize : Int
     , matting : Bool
+    , downsampling : Float
     }
 
 
@@ -64,6 +65,7 @@ type alias Global =
     , sortBy : ( User.SortBy, Bool )
     , promptSize : Int
     , matting : Bool
+    , downsampling : Float
     }
 
 
@@ -101,6 +103,7 @@ flagsToGlobal key flags =
     , sortBy = flags.sortBy
     , promptSize = flags.promptSize
     , matting = flags.matting
+    , downsampling = flags.downsampling
     }
 
 

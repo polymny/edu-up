@@ -134,6 +134,19 @@ leftColumn global user _ gos =
 
                 _ ->
                     webcamSettings.opacity
+        
+        currentdownsampling =
+            case gos.record of
+                Just r ->
+                    case r.downsampling of
+                        Just ds ->
+                            ds
+
+                        _ -> 0.4
+
+                _ ->
+                    0.4
+            
 
         currentKeyColor =
             case gos.webcamSettings of
@@ -269,6 +282,40 @@ leftColumn global user _ gos =
                 , label = Input.labelRight forceDisabledAttr (Element.text (Lang.activateMatting global.lang))
                 , onChange = \x -> Core.ProductionMsg Production.ToggleMatting
                 }
+
+          else
+            Element.none
+        , if User.isPremium user then
+            Element.row (Ui.wf :: Ui.hf :: Element.spacing 10 :: disabledAttr)
+                [ Input.slider
+                    [ Element.behindContent
+                        (Element.el
+                            [ Element.width Element.fill
+                            , Element.height (Element.px 2)
+                            , Element.centerY
+                            , Background.color Colors.grey
+                            , Border.rounded 2
+                            ]
+                            Element.none
+                        )
+                    ]
+                    { label = Input.labelAbove (disabledAttr ++ Ui.formTitle) (Element.text (Lang.downsampling global.lang))
+                    , min = 0
+                    , max = 1
+                    , onChange = \x -> Core.ProductionMsg (Production.DownsamplingChanged x) |> disableMsg
+                    , step = Just 0.1
+                    , thumb = Input.defaultThumb
+                    , value = currentdownsampling
+                    }
+                    |> Element.el [ Ui.wfp 5 ]
+                , 10 * currentdownsampling
+                    |> floor
+                    |> toFloat
+                    |> \x -> x / 10
+                    |> String.fromFloat
+                    |> Element.text
+                    |> Element.el [ Ui.wfp 1, Element.alignBottom ]
+                ]
 
           else
             Element.none

@@ -7,6 +7,7 @@ import Core.Types as Core
 import Production.Types as Production
 import User
 import Utils exposing (tern)
+import Lang exposing (capsule)
 
 
 update : Production.Msg -> Core.Model -> ( Core.Model, Cmd Core.Msg )
@@ -233,6 +234,23 @@ update msg model =
                                     }
                             in
                             updateModel newGos model m
+
+                        Production.DownsamplingChanged ds ->
+                            let
+                                newRecord =
+                                    case gos.record of
+                                        Just r ->
+                                            Just { r | downsampling = Just ds
+                                                     , matted = Just Capsule.Idle }
+
+                                        Nothing ->
+                                            Nothing
+
+                                newGos =
+                                    { gos | record = newRecord }
+                            in
+                            updateModel newGos model m
+
 
                         Production.ProduceVideo ->
                             let

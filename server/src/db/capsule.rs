@@ -157,6 +157,9 @@ pub struct Record {
     /// The state of the matting.
     #[serde(default = "none")]
     pub matted: Option<TaskStatus>,
+
+    /// The downsampling of the matting
+    pub downsampling: Option<f32>,
 }
 
 /// The type of a record event.

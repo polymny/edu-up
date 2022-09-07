@@ -5,6 +5,7 @@ trap 'kill $(jobs -p)' EXIT SIGINT
 if [ -z "$PYTHON" ]; then
     PYTHON=python
 fi
+source ../../RobustVideoMatting/python39/bin/activate
 
 # USAGE:
 #   header
@@ -451,7 +452,9 @@ params_pip_slide_record() {
 on-matting() {
     cid=$1
     uuid=$2
-    INFERENCE_PATH="../../RobustVideoMatting "
+    downsampling=$3
+    echo -e "\nDOWNSAMPLING = $downsampling\n" >&2
+    INFERENCE_PATH="../../RobustVideoMatting"
 
     capsule_path=$(get_config "data_path")"/$cid"
     tmp_path="${capsule_path}/tmp"
@@ -485,36 +488,39 @@ on-matting() {
 
 
     # extract audio
-    echo "\n EXTRACT AUDIO \n " >&2
+    echo -e "\n EXTRACT AUDIO \n " >&2
     extract_audio $record_mp4 $record_aac
 
+
     current_dir=$PWD
-
-
-    inference=$(echo $PYTHON inference.py \
-    --variant mobilenetv3 \
-    --checkpoint "checkpoints/rvm_mobilenetv3.pth" \
-    --device cpu \
-    --input-source "$record_mp4" \
-    --output-type video \
-    --output-composition "${tmp_path}/${filename}_composition.mp4" \
-    --downsample-ratio 0.4 \
-    --seq-chunk 4
-    )
-
     cd $INFERENCE_PATH
 
-    echo $inference >&2
-    $inference 1>&2
-    ### TODO test if infererence goes wrong
-
-
+    echo -e "\n INFER \n "
+    matting_path="/home/polymny/RobustVideoMatting/tmp/${cid}"
+    ssh Polymny "mkdir -p ${matting_path}" 1>&2
+    scp ${record_mp4} Polymny:${matting_path}/${filename}.mp4 1>&2
+    ssh Polymny "\
+        cd RobustVideoMatting; \
+        source python39/bin/activate; \
+        python inference_pytorch.py \
+            --variant mobilenetv3 \
+            --checkpoint checkpoints/rvm_mobilenetv3.pth \
+            --device cuda \
+            --input-source ${matting_path}/${filename}.mp4 \
+            --output-composition ${matting_path}/${filename}_composition.mp4 \
+            --downsample-ratio ${downsampling} \
+            --seq-chunk 8 \
+            --num-workers 0 \
+    " 1>&2
+    scp Polymny:${matting_path}/${filename}_composition.mp4 ${tmp_path}/${filename}_composition.mp4 1>&2
+    ssh Polymny "rm ${matting_path}/${filename}.mp4 ${matting_path}/${filename}_composition.mp4" 1>&2
+    
 
     cd $current_dir
-    echo "\n MERGE AUDIO VIDEO \n " >&2
+    echo -e "\n MERGE AUDIO VIDEO \n " >&2
     merge_audio_video "${tmp_path}/${filename}_composition.mp4" $record_aac $output
 
-    echo "\n MATTING \n " >&2
+    echo -e "\n MATTING \n " >&2
     echo $output >&2
 
     # generate thumbmail with matting
