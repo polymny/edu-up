@@ -525,4 +525,15 @@ impl Capsule {
             .filter_map(|x| x.record.as_ref())
             .any(|x| x.matted == Some(TaskStatus::Running))
     }
+
+    /// Retrieves the owner of a capsule.
+    pub async fn owner(&self, db: &Db) -> Result<User> {
+        for (user, role) in self.users(db).await? {
+            if role == Role::Owner {
+                return Ok(user);
+            }
+        }
+
+        Err(Error(Status::NotFound))
+    }
 }
