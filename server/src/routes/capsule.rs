@@ -406,11 +406,15 @@ pub async fn run_matting(
         capsule.save(&db).await.ok();
 
         if !capsule.is_matting_running() {
-            let ret = if capsule.produced == TaskStatus::Waiting {
-                run_produce(user, capsule.id, db, socks, sem, config).await
-            } else {
-                Ok(())
-            };
+            if capsule.produced == TaskStatus::Waiting {
+                run_produce(user, capsule.id, db, socks, sem, config).await?;
+            }
+
+            // let ret = if capsule.produced == TaskStatus::Waiting {
+            //     run_produce(user, capsule.id, db, socks, sem, config).await
+            // } else {
+            //     Ok(())
+            // };
         }
     }
 

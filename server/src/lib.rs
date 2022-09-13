@@ -32,13 +32,13 @@ use tokio::sync::Semaphore;
 
 use ergol::deadpool::managed::Object;
 use ergol::tokio_postgres::Error as TpError;
-use ergol::{tokio, Ergol, Pool};
+use ergol::{tokio, Pool};
 
 use rocket::fairing::AdHoc;
 use rocket::http::Status;
 use rocket::request::{FromParam, FromRequest, Outcome, Request};
 use rocket::response::{self, Responder};
-use rocket::shield::{Frame, NoSniff, Permission, Shield};
+use rocket::shield::{NoSniff, Permission, Shield};
 use rocket::{Ignite, Rocket, State};
 
 use crate::command::run_command;
@@ -101,7 +101,7 @@ impl_from_error!(std::str::Utf8Error);
 impl_from_error!(std::num::ParseIntError);
 
 /// A wrapper for a database connection extrated from a pool.
-pub struct Db(Object<Ergol, TpError>);
+pub struct Db(Object<ergol::pool::Manager>);
 
 impl Db {
     /// Extracts a database from a pool.
@@ -114,7 +114,7 @@ impl Db {
 }
 
 impl std::ops::Deref for Db {
-    type Target = Object<Ergol, TpError>;
+    type Target = Object<ergol::pool::Manager>;
     fn deref(&self) -> &Self::Target {
         &*&self.0
     }
@@ -254,7 +254,7 @@ impl<'a> FromParam<'a> for HashId {
 /// Resets the database.
 pub async fn reset_db() {
     let config = Config::from_figment(&rocket::Config::figment());
-    let pool = ergol::pool(&config.databases.database.url, 32);
+    let pool = ergol::pool(&config.databases.database.url, 32).unwrap();
     let db = Db::from_pool(pool).await.unwrap();
 
     remove_dir_all(&config.data_path).await.ok();
@@ -294,45 +294,47 @@ pub async fn reset_db() {
 /// Calculate disk usage for each user.
 pub async fn user_disk_usage() {
     let config = Config::from_figment(&rocket::Config::figment());
-    let pool = ergol::pool(&config.databases.database.url, 32);
+    let pool = ergol::pool(&config.databases.database.url, 32).unwrap();
     let db = Db::from_pool(pool).await.unwrap();
 
-    use crate::db::user::User;
+    use crate::db::capsule::Capsule;
+    use crate::db::user::Plan;
     use ergol::prelude::*;
 
-    let users = User::select().execute(&db).await.unwrap();
-    for user in users {
-        let capsules = user.capsules(&db).await.unwrap();
-        let mut user_disk_usage = 0;
-        for (mut capsule, _role) in capsules {
-            let path = &config.data_path.join(format!("{}", capsule.id));
+    for mut capsule in Capsule::select().execute(&db).await.unwrap() {
+        let owner = capsule.owner(&db).await.unwrap();
 
-            let output = run_command(&vec!["../scripts/psh", "du", path.to_str().unwrap()]);
-            match &output {
-                Ok(o) => {
-                    for line in std::str::from_utf8(&o.stdout)
-                        .map_err(|_| Error(Status::InternalServerError))
-                        .unwrap()
-                        .lines()
-                    {
-                        let du = line.parse::<i32>().unwrap();
-                        user_disk_usage = user_disk_usage + du;
-                        if du != capsule.disk_usage {
-                            capsule.disk_usage = du;
-                            capsule.save(&db).await.unwrap();
-                        }
+        // Skip capsule if it is stored on the other host.
+        if config.other_host.is_some() && (owner.plan >= Plan::PremiumLvl1) != config.premium_only {
+            continue;
+        }
+
+        let path = &config.data_path.join(format!("{}", capsule.id));
+
+        let output = run_command(&vec!["../scripts/psh", "du", path.to_str().unwrap()]);
+        match &output {
+            Ok(o) => {
+                for line in std::str::from_utf8(&o.stdout)
+                    .map_err(|_| Error(Status::InternalServerError))
+                    .unwrap()
+                    .lines()
+                {
+                    let du = line.parse::<i32>().unwrap();
+                    if du != capsule.disk_usage {
+                        capsule.disk_usage = du;
+                        capsule.save(&db).await.unwrap();
                     }
                 }
-                Err(_) => println!("error"),
-            };
-        }
+            }
+            Err(_) => println!("error"),
+        };
     }
 }
 
 /// update duration of all capsules
 pub async fn update_video_duration() {
     let config = Config::from_figment(&rocket::Config::figment());
-    let pool = ergol::pool(&config.databases.database.url, 32);
+    let pool = ergol::pool(&config.databases.database.url, 32).unwrap();
     let db = Db::from_pool(pool).await.unwrap();
 
     use crate::db::capsule::Capsule;
@@ -412,7 +414,7 @@ pub async fn rocket() -> StdResult<Rocket<Ignite>, rocket::Error> {
         }))
         .attach(AdHoc::on_ignite("Database", |rocket| async move {
             let config = Config::from_rocket(&rocket);
-            let pool = ergol::pool(&config.databases.database.url, 32);
+            let pool = ergol::pool(&config.databases.database.url, 32).unwrap();
             rocket.manage(pool)
         }))
         .attach(AdHoc::on_ignite("WebSockets", |rocket| async move {
