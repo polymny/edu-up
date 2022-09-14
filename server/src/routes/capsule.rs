@@ -227,7 +227,7 @@ pub async fn upload_record(
         .await?;
 
     let gosid = gos;
-    let gos = capsule
+    let _ = capsule
         .structure
         .0
         .get_mut(gos as usize)
@@ -260,6 +260,17 @@ pub async fn upload_record(
     } else {
         None
     };
+
+    // Check that the user has write access to the capsule.
+    let (mut capsule, _) = user
+        .get_capsule_with_permission(*id, Role::Write, &db)
+        .await?;
+
+    let gos = capsule
+        .structure
+        .0
+        .get_mut(gosid as usize)
+        .ok_or(Error(Status::BadRequest))?;
 
     let matted = if user.plan > Plan::Free && matting == Some(true) {
         let webcam_settings = match &gos.webcam_settings {
