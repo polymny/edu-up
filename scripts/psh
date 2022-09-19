@@ -482,39 +482,51 @@ on-matting() {
 
 
     # extract audio
-    echo -e "\n EXTRACT AUDIO \n " >&2
+    echo -e "\n EXTRACT AUDIO \n" >&2
     extract_audio $record_mp4 $record_aac
 
 
     current_dir=$PWD
     cd $INFERENCE_PATH
 
-    echo -e "\n INFER (downsampling=${downsampling}) \n "
-    matting_path="/home/polymny/RobustVideoMatting/tmp/${cid}"
-    ssh Polymny "mkdir -p ${matting_path}" 1>&2
-    scp ${record_mp4} Polymny:${matting_path}/${filename}.mp4 1>&2
-    ssh Polymny "\
-        cd RobustVideoMatting; \
-        source python39/bin/activate; \
-        python inference_pytorch.py \
-            --variant mobilenetv3 \
-            --checkpoint checkpoints/rvm_mobilenetv3.pth \
-            --device cuda \
-            --input-source ${matting_path}/${filename}.mp4 \
-            --output-composition ${matting_path}/${filename}_composition.mp4 \
-            --downsample-ratio ${downsampling} \
-            --seq-chunk 8 \
-            --num-workers 1 \
-    " 1>&2
-    scp Polymny:${matting_path}/${filename}_composition.mp4 ${tmp_path}/${filename}_composition.mp4 1>&2
-    ssh Polymny "rm ${matting_path}/${filename}.mp4 ${matting_path}/${filename}_composition.mp4" 1>&2
+    echo -e "\n INFER (downsampling=${downsampling}) \n" >&2
+    ### Matting on kitt2
+    # matting_path="/home/polymny/RobustVideoMatting/tmp/${cid}"
+    # ssh Polymny "mkdir -p ${matting_path}" 1>&2
+    # scp ${record_mp4} Polymny:${matting_path}/${filename}.mp4 1>&2
+    # ssh Polymny "\
+    #     cd RobustVideoMatting; \
+    #     source .venv_python39/bin/activate; \
+    #     python inference_pytorch.py \
+    #         --variant mobilenetv3 \
+    #         --checkpoint checkpoints/rvm_mobilenetv3.pth \
+    #         --device cuda \
+    #         --input-source ${matting_path}/${filename}.mp4 \
+    #         --output-composition ${matting_path}/${filename}_composition.mp4 \
+    #         --downsample-ratio ${downsampling} \
+    #         --seq-chunk 8 \
+    #         --num-workers 1 \
+    # " 1>&2
+    # scp Polymny:${matting_path}/${filename}_composition.mp4 ${tmp_path}/${filename}_composition.mp4 1>&2
+    # ssh Polymny "rm ${matting_path}/${filename}.mp4 ${matting_path}/${filename}_composition.mp4" 1>&2
+    ### Matting on local
+    source .venv_python39/bin/activate
+    python inference_pytorch.py \
+        --variant mobilenetv3 \
+        --checkpoint checkpoints/rvm_mobilenetv3.pth \
+        --device cpu \
+        --input-source ${record_mp4} \
+        --output-composition ${tmp_path}/${filename}_composition.mp4 \
+        --downsample-ratio ${downsampling} \
+        --seq-chunk 8 \
+        --num-workers 1 1>&2
     
 
     cd $current_dir
-    echo -e "\n MERGE AUDIO VIDEO \n " >&2
+    echo -e "\n MERGE AUDIO VIDEO \n" >&2
     merge_audio_video "${tmp_path}/${filename}_composition.mp4" $record_aac $output
 
-    echo -e "\n MATTING \n " >&2
+    echo -e "\n MATTING \n" >&2
     echo $output >&2
 
     # generate thumbmail with matting
