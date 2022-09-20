@@ -478,6 +478,8 @@ pub async fn rocket() -> StdResult<Rocket<Ignite>, rocket::Error> {
                 routes::capsule::get_capsule,
                 routes::capsule::empty_capsule,
                 routes::capsule::new_capsule,
+                routes::capsule::change_background,
+                routes::capsule::delete_background,
                 routes::capsule::edit_capsule,
                 routes::capsule::delete_capsule,
                 routes::capsule::delete_project,

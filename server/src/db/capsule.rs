@@ -329,6 +329,9 @@ pub struct Capsule {
     /// duration of produced video in ms
     pub duration_ms: i32,
 
+    /// Background of the capsule.
+    pub background: Option<Uuid>,
+
     /// The user that has rights on the capsule.
     #[many_to_many(capsules, Role)]
     pub users: User,
@@ -360,6 +363,7 @@ impl Capsule {
             Utc::now().naive_utc(),
             0,
             0,
+            None,
         )
         .save(&db)
         .await?;
@@ -401,8 +405,9 @@ impl Capsule {
             "last_modified": self.last_modified.timestamp(),
             "users": users,
             "prompt_subtitles": self.prompt_subtitles,
-            "disk_usage":self.disk_usage,
-            "duration_ms":self.duration_ms
+            "disk_usage": self.disk_usage,
+            "duration_ms": self.duration_ms,
+            "background": self.background,
         }))
     }
 

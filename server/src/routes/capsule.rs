@@ -2,6 +2,7 @@
 
 use std::process::Stdio;
 use std::sync::Arc;
+use std::fs::remove_file;
 
 use uuid::Uuid;
 
@@ -57,6 +58,98 @@ pub async fn empty_capsule(
 
     create_dir_all(&path).await?;
 
+    Ok(capsule.to_json(Role::Owner, &db).await?)
+}
+
+/// The route that change capsule's background.
+#[post("/delete-background/<capsule_id>")]
+pub async fn delete_background(
+    user: User,
+    capsule_id: HashId,
+    db: Db,
+    socks: &S<WebSockets>,
+    config: &S<Config>,
+) -> Result<Value> {
+    let (mut capsule, _) = user.get_capsule_with_permission(capsule_id.0, Role::Write, &db).await?;
+    let path = config
+        .data_path
+        .join(format!("{}", capsule.id))
+        .join("assets");
+
+    if let Some(uuid) = capsule.background {
+        let remove_path = path
+            .join(format!("{}.png", uuid))
+            .to_str()
+            .ok_or(Error(Status::InternalServerError))?
+            .to_string();
+        remove_file(remove_path).expect("Delete previous background failed.");
+        capsule.background = None;
+        capsule.set_changed();
+        capsule.save(&db).await?;
+    
+        capsule.notify_change(&db, &socks).await?;
+    }
+    Ok(capsule.to_json(Role::Owner, &db).await?)
+}
+
+/// The route that change capsule's background.
+#[post("/change-background/<capsule_id>/<extension>", data = "<data>")]
+pub async fn change_background(
+    user: User,
+    capsule_id: HashId,
+    extension: String,
+    db: Db,
+    socks: &S<WebSockets>,
+    config: &S<Config>,
+    data: Data<'_>,
+) -> Result<Value> {
+    let (mut capsule, _) = user.get_capsule_with_permission(capsule_id.0, Role::Write, &db).await?;
+    let path = config
+        .data_path
+        .join(format!("{}", capsule.id))
+        .join("assets");
+
+    if let Some(uuid) = capsule.background {
+        let remove_path = path
+            .join(format!("{}.png", uuid))
+            .to_str()
+            .ok_or(Error(Status::InternalServerError))?
+            .to_string();
+        remove_file(remove_path).expect("Delete previous background failed.");
+    }
+
+    let uuid = Uuid::new_v4();
+    let tmp = path.join(format!("{}.{}", uuid, extension));
+
+    data.open(1_i32.gibibytes()).into_file(&tmp).await?;
+    
+    if extension != "png" {
+        let input_path = tmp
+            .to_str()
+            .ok_or(Error(Status::InternalServerError))?
+            .to_string();
+        let output_path = path
+            .join(format!("{}.png", uuid))
+            .to_str()
+            .ok_or(Error(Status::InternalServerError))?
+            .to_string();
+        run_command(&vec![
+            "../scripts/psh",
+            "pdf-to-png",
+            &input_path,
+            &output_path,
+            &config.pdf_target_density,
+            &config.pdf_target_size,
+        ])?;
+        remove_file(input_path).expect("Delete temporary background failed.");
+    }
+    
+
+    capsule.background = Some(uuid);
+    capsule.set_changed();
+    capsule.save(&db).await?;
+
+    capsule.notify_change(&db, &socks).await?;
     Ok(capsule.to_json(Role::Owner, &db).await?)
 }
 

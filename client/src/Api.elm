@@ -9,8 +9,10 @@ import Http
 import Json.Decode as Decode
 import Json.Encode as Encode
 import Log
+import Production.Types as Production
 import RemoteData
 import User
+import Platform.Cmd exposing (none)
 
 
 requestWithMethodAndTracker : String -> Maybe String -> { url : String, body : Http.Body, expect : Http.Expect msg } -> Cmd msg
@@ -180,6 +182,64 @@ uploadSlideShow project file =
         Ok f ->
             post
                 { url = "/api/new-capsule/" ++ project ++ "/" ++ name ++ "/"
+                , expect = Http.expectJson resultToMsg Capsule.decode
+                , body = Http.fileBody f
+                }
+
+        _ ->
+            Cmd.none
+
+
+deleteBackground : String ->  Cmd Core.Msg
+deleteBackground capsule =
+    let
+        resultToMsg result =
+            let
+                r =
+                    case result of
+                        Ok o ->
+                            RemoteData.Success o
+
+                        Err e ->
+                            RemoteData.Failure e
+            in
+            Core.ProductionMsg (Production.DeleteBackgroundResponded r)
+    in
+    post
+        { url = "/api/delete-background/" ++ capsule ++ "/"
+        , expect = Http.expectJson resultToMsg Capsule.decode
+        , body = Http.emptyBody
+        }
+
+
+uploadBackground : String -> FileValue.File -> Cmd Core.Msg
+uploadBackground capsule file =
+    let
+        extension =
+            file.name
+                |> String.split "."
+                |> List.reverse
+                |> List.head
+
+        realFile =
+            Decode.decodeValue File.decoder file.value
+
+        resultToMsg result =
+            let
+                r =
+                    case result of
+                        Ok o ->
+                            RemoteData.Success o
+
+                        Err e ->
+                            RemoteData.Failure e
+            in
+            Core.ProductionMsg (Production.BackgroundUploadResponded r)
+    in
+    case ( extension, realFile ) of
+        ( Just ext, Ok f ) ->
+            post
+                { url = "/api/change-background/" ++ capsule ++ "/" ++ ext ++ "/"
                 , expect = Http.expectJson resultToMsg Capsule.decode
                 , body = Http.fileBody f
                 }

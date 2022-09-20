@@ -287,7 +287,7 @@ encodeRecord record =
                 , case r.downsampling of
                     Just ds ->
                         ( "downsampling", Encode.float ds )
-                    
+
                     _ ->
                         ( "downsampling", Encode.null )
                 ]
@@ -617,6 +617,7 @@ type alias Capsule =
     , promptSubtitles : Bool
     , diskUsage : Int
     , durationMs : Int
+    , background : Maybe String
     }
 
 
@@ -637,6 +638,7 @@ decode =
         |> andMap (Decode.field "prompt_subtitles" Decode.bool)
         |> andMap (Decode.field "disk_usage" Decode.int)
         |> andMap (Decode.field "duration_ms" Decode.int)
+        |> andMap (Decode.maybe (Decode.field "background" Decode.string))
 
 
 encodeGos : Gos -> Encode.Value

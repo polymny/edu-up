@@ -905,6 +905,16 @@ function setupPorts(app) {
         input.click();
     }
 
+    function selectBackground(mimes) {
+        let input = document.createElement('input');
+        input.type = 'file';
+        input.accept = mimes.join(',');
+        input.onchange = function(e) {
+            app.ports.backgroundSelected.send(e.target.files[0]);
+        };
+        input.click();
+    }
+
     function setPointerCapture(args) {
         let id = args[0];
         let pointerId = args[1];
@@ -974,6 +984,7 @@ function setupPorts(app) {
     subscribe(app.ports.exportCapsule, exportCapsule);
     subscribe(app.ports.importCapsule, importCapsule);
     subscribe(app.ports.select, select);
+    subscribe(app.ports.selectBackground, selectBackground);
     subscribe(app.ports.setPointerCapture, setPointerCapture);
     subscribe(app.ports.setCanvas, setCanvas);
 
