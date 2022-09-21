@@ -981,6 +981,7 @@ pub async fn run_produce(
                 .arg("on-produce")
                 .arg(format!("{}", capsule.id))
                 .arg("-1")
+                .arg(if let Some(v) = capsule.background {format!("{}", v)}else{format!("{}", "null")})
                 .stdin(Stdio::piped())
                 .stdout(Stdio::piped())
                 .spawn();
@@ -1199,6 +1200,7 @@ pub async fn produce_gos(
             .arg("on-produce")
             .arg(format!("{}", capsule.id))
             .arg(format!("{}", gos))
+            .arg(if let Some(v) = capsule.background {format!("{}", v)}else{format!("{}", "null")})
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
             .spawn();
