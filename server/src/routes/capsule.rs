@@ -119,32 +119,30 @@ pub async fn change_background(
     }
 
     let uuid = Uuid::new_v4();
-    let tmp = path.join(format!("{}.{}", uuid, extension));
+    let tmp = path.join(format!("tmp{}.{}", uuid, extension));
 
     data.open(1_i32.gibibytes()).into_file(&tmp).await?;
     
-    if extension != "png" {
-        let input_path = tmp
-            .to_str()
-            .ok_or(Error(Status::InternalServerError))?
-            .to_string();
-        let output_path = path
-            .join(format!("{}.png", uuid))
-            .to_str()
-            .ok_or(Error(Status::InternalServerError))?
-            .to_string();
-        run_command(&vec![
-            "../scripts/psh",
-            "pdf-to-png",
-            &input_path,
-            &output_path,
-            &config.pdf_target_density,
-            &config.pdf_target_size,
-        ])?;
-        remove_file(input_path).expect("Delete temporary background failed.");
-    }
+    let input_path = tmp
+        .to_str()
+        .ok_or(Error(Status::InternalServerError))?
+        .to_string();
+    let output_path = path
+        .join(format!("{}.png", uuid))
+        .to_str()
+        .ok_or(Error(Status::InternalServerError))?
+        .to_string();
+    run_command(&vec![
+        "convert",
+        &input_path,
+        "-resize",
+        &format!("{}^", config.pdf_target_size),
+        "-gravity",
+        "center",
+        &output_path
+    ])?;
+    remove_file(input_path).expect("Delete temporary background failed.");
     
-
     capsule.background = Some(uuid);
     capsule.set_changed();
     capsule.save(&db).await?;
