@@ -139,6 +139,8 @@ pub async fn change_background(
         &format!("{}^", config.pdf_target_size),
         "-gravity",
         "center",
+        "-extent",
+        &config.pdf_target_size,
         &output_path
     ])?;
     remove_file(input_path).expect("Delete temporary background failed.");
@@ -440,7 +442,7 @@ pub async fn run_matting(
 
     let record = gos.record.as_ref().ok_or(Error(Status::BadRequest))?;
 
-    let record_downsampling = record.downsampling.unwrap_or(0.2);
+    let record_downsampling = record.downsampling.unwrap_or(0.4);
 
     let child = Command::new("../scripts/psh")
         .arg("on-matting")
