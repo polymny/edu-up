@@ -1027,7 +1027,6 @@ pub async fn produce(
         return Err(Error(Status::Conflict));
     }
 
-    println!("capsule: {:#?}", capsule);
     let capsule_id = capsule.id;
 
     for (gosid, record) in capsule.matting_idle() {
