@@ -353,7 +353,7 @@ update msg model =
                     , Ports.uploadRecord
                         { capsuleId = p.capsule.id
                         , gos = p.gos
-                        , matting = record.matted /= Nothing
+                        , matting = record.matted /= Nothing && Maybe.andThen .video record.device /= Nothing
                         , record = Acquisition.encodeRecord record
                         }
                     )

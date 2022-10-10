@@ -193,7 +193,7 @@ rightColumn global user submodel =
 
                       else
                         Element.none
-                    , if User.isPremium user then
+                    , if User.isPremium user && Maybe.andThen .video record.device /= Nothing then
                         Input.checkbox []
                             { checked = record.matted /= Nothing
                             , icon = Input.defaultCheckbox

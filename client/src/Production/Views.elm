@@ -264,10 +264,16 @@ leftColumn global user _ gos =
             Element.none
         , if User.isPremium user then
             Input.checkbox disabledAttr
-                { checked = Maybe.andThen .matted gos.record /= Nothing
+                { checked = Maybe.andThen .matted gos.record /= Nothing && Maybe.andThen .size gos.record /= Nothing
                 , icon = Input.defaultCheckbox
                 , label = Input.labelRight forceDisabledAttr (Element.text (Lang.activateMatting global.lang))
-                , onChange = \x -> Core.ProductionMsg Production.ToggleMatting
+                , onChange =
+                    \x ->
+                        if Maybe.andThen .size gos.record == Nothing then
+                            Core.Noop
+
+                        else
+                            Core.ProductionMsg Production.ToggleMatting
                 }
 
           else

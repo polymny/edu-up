@@ -50,17 +50,19 @@ type alias Record =
     , webcamBlob : Encode.Value
     , pointerBlob : Maybe Encode.Value
     , matted : Maybe Capsule.TaskStatus
+    , device : Maybe Device
     , old : Bool
     }
 
 
 decodeRecord : Decoder Record
 decodeRecord =
-    Decode.map5 Record
+    Decode.map6 Record
         (Decode.field "events" (Decode.list Capsule.decodeEvent))
         (Decode.field "webcam_blob" Decode.value)
         (Decode.field "pointer_blob" (Decode.nullable Decode.value))
         (Decode.field "matted" (Decode.nullable Capsule.decodeTaskStatus))
+        (Decode.maybe (Decode.field "device" decodeDevice))
         (Decode.succeed False)
 
 
@@ -126,6 +128,7 @@ init matting devices chosenDeviceIds capsule id =
                                 |> Maybe.map Encode.string
                       , events = g.events
                       , matted = r.matted
+                      , device = Nothing
                       , old = True
                       }
                     ]
@@ -410,6 +413,14 @@ encodeDevice device =
         [ ( "video", encodeMaybeVideoDevice device.video device.resolution )
         , ( "audio", encodeMaybeAudioDevice device.audio )
         ]
+
+
+decodeDevice : Decoder Device
+decodeDevice =
+    Decode.map3 Device
+        (Decode.maybe (Decode.field "video" decodeVideoDevice))
+        (Decode.maybe (Decode.field "resolution" decodeResolution))
+        (Decode.maybe (Decode.field "audio" decodeAudioDevice))
 
 
 encodeRecordingOptions : Device -> Encode.Value
