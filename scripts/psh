@@ -312,8 +312,8 @@ get_aspect_ratio() {
 colorkey(){
     colorkey_color="$1"
     # color key params
-    colorkey_similarity="0.3"
-    colorkey_blend="0.2"
+    colorkey_similarity="0.2"
+    colorkey_blend="0.0"
     colorkey="colorkey=$colorkey_color:$colorkey_similarity:$colorkey_blend"
     despill="despill=green"
     echo "$colorkey,$despill"
@@ -323,7 +323,7 @@ pointerkey(){
     colorkey_color="$1"
     # color key params
     colorkey_similarity="0.3"
-    colorkey_blend="0.2"
+    colorkey_blend="0.0"
     colorkey="colorkey=$colorkey_color:$colorkey_similarity:$colorkey_blend"
     despill="despill=$1"
     echo "$colorkey,$despill"
