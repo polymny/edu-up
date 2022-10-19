@@ -850,7 +850,7 @@ function setupPorts(app) {
             if (gos.record !== null) {
                 let blob = await content.file(gos.record).async("blob");
                 blob = blob.slice(0, blob.size, "video/webm");
-                resp = await fetch("/api/upload-record/" + json.id + "/" + gosIndex, {method: "POST", body: blob});
+                resp = await fetch("/api/upload-record/" + json.id + "/" + gosIndex + "/false", {method: "POST", body: blob});
             }
 
             for (let slideIndex = 0; slideIndex < gos.slides.length; slideIndex++) {

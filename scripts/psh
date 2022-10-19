@@ -312,9 +312,9 @@ get_aspect_ratio() {
 colorkey(){
     colorkey_color="$1"
     # color key params
-    colorkey_similarity="0.3"
-    colorkey_blend="0.2"
-    colorkey="colorkey=$colorkey_color:$colorkey_similarity:$colorkey_blend"
+    colorkey_similarity="0.15"
+    colorkey_blend="0.1"
+    local colorkey="colorkey=$colorkey_color:$colorkey_similarity:$colorkey_blend"
     despill="despill=green"
     echo "$colorkey,$despill"
 }
@@ -323,7 +323,7 @@ pointerkey(){
     colorkey_color="$1"
     # color key params
     colorkey_similarity="0.3"
-    colorkey_blend="0.2"
+    colorkey_blend="0.0"
     colorkey="colorkey=$colorkey_color:$colorkey_similarity:$colorkey_blend"
     despill="despill=$1"
     echo "$colorkey,$despill"
@@ -522,8 +522,8 @@ on-matting() {
     --input-source "$record_mp4" \
     --output-type video \
     --output-composition "${tmp_path}/${filename}_composition.mp4" \
-    --downsample-ratio 0.4 \
-    --seq-chunk 4
+    --downsample-ratio 0.25 \
+    --seq-chunk 8
     )
 
     cd $INFERENCE_PATH
