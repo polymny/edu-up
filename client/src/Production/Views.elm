@@ -557,10 +557,11 @@ bottomBar global user model =
                                         ]
                                 , onPress = Nothing
                                 }
-                            , Ui.primaryButton
-                                { label = Element.text (Lang.cancelProduction global.lang)
-                                , onPress = Just (Core.ProductionMsg Production.CancelProduction)
-                                }
+
+                            --, Ui.primaryButton
+                            --    { label = Element.text (Lang.cancelProduction global.lang)
+                            --    , onPress = Just (Core.ProductionMsg Production.CancelProduction)
+                            --    }
                             ]
                         , case msg of
                             Just m ->
@@ -582,10 +583,11 @@ bottomBar global user model =
                                         ]
                                 , onPress = Nothing
                                 }
-                            , Ui.primaryButton
-                                { label = Element.text (Lang.cancelProduction global.lang)
-                                , onPress = Just (Core.ProductionMsg Production.CancelProduction)
-                                }
+
+                            -- , Ui.primaryButton
+                            --     { label = Element.text (Lang.cancelProduction global.lang)
+                            --     , onPress = Just (Core.ProductionMsg Production.CancelProduction)
+                            --     }
                             ]
                         , Element.el [ Element.padding 10, Element.width Element.fill, Ui.hf ]
                             (Element.text (Lang.waitingMattingMsg global.lang))
