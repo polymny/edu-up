@@ -42,6 +42,7 @@ type alias Model =
     , state : State
     , status : Status
     , mattingEnabled : Bool
+    , recordPlaying : Maybe Record
     }
 
 
@@ -89,6 +90,7 @@ type alias Submodel =
     , uploading : Maybe Float
     , status : Status
     , mattingEnabled : Bool
+    , recordPlaying : Maybe Record
     }
 
 
@@ -107,6 +109,7 @@ toSubmodel devices model =
     , uploading = model.uploading
     , status = model.status
     , mattingEnabled = model.mattingEnabled
+    , recordPlaying = model.recordPlaying
     }
 
 
@@ -162,6 +165,7 @@ init matting devices chosenDeviceIds capsule id =
                         DetectingDevices
             , status = Status.NotSent
             , mattingEnabled = matting
+            , recordPlaying = Nothing
             }
     in
     ( model
@@ -271,6 +275,7 @@ type Msg
     | AudioDeviceChanged AudioDevice
     | NextSentence
     | PlayRecord Record
+    | StopPlayingRecord
     | NextSlideReceived
     | PlayRecordFinished
     | UploadRecord Record
