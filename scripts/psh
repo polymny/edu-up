@@ -387,10 +387,6 @@ params_pip_slide_record() {
             webcam_overlay=$(get_overlay "$webcam_settings")
             scale_record="scale=${webcam_size},format=argb,colorchannelmixer=aa=${webcam_alpha}"
             if [[ "$pointer_overlay" == "null" ]] ; then
-<<<<<<< HEAD
-                inputs="-i $slide -i $record "
-                filter_complex="[0]scale=$width_slide:$height_slide[slide];[1]$keying_filter,$scale_record[record];[slide][record]overlay=$webcam_overlay,$fade_filter,fps=fps=$fps[vout]"
-=======
                 if [[ "$use_background" -gt 0 ]]
                 then
                     inputs="-i $slide -i $record -i $background"
@@ -409,7 +405,6 @@ params_pip_slide_record() {
                         [slide][record]overlay=$webcam_overlay,$fade_filter,fps=fps=$fps[vout]\
                         " | sed 's/ //g')
                 fi
->>>>>>> matting_downsampling
             else
                 if [[ "$use_background" -gt 0 ]]
                 then
