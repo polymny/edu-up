@@ -136,11 +136,7 @@ pub async fn change_background(
         "convert",
         &input_path,
         "-resize",
-        &format!("{}^", config.pdf_target_size),
-        "-gravity",
-        "center",
-        "-extent",
-        &config.pdf_target_size,
+        &format!("{}^>", config.pdf_target_size),
         &output_path
     ])?;
     remove_file(input_path).expect("Delete temporary background failed.");
