@@ -100,7 +100,7 @@ leftColumn global user model gos =
                 ]
 
         disabled =
-            forceDisabled || gos.webcamSettings == Capsule.Disabled
+            forceDisabled || gos.webcamSettings == Capsule.Disabled || isProducing model
 
         disabledAttr =
             if disabled then
@@ -317,25 +317,32 @@ leftColumn global user model gos =
                         )
                     ]
                     { label = Input.labelAbove (disabledAttr ++ Ui.formTitle) (Element.text (Lang.downsampling global.lang))
-                    , min = 0
+                    , min = 0.1
                     , max = 1
                     , onChange = \x -> Core.ProductionMsg (Production.DownsamplingChanged x) |> disableMsg
-                    , step = Just 0.1
+                    , step = Just 0.05
                     , thumb = Input.defaultThumb
                     , value = currentdownsampling
                     }
                     |> Element.el [ Ui.wfp 5 ]
-                , 10
-                    * currentdownsampling
-                    |> floor
+                , currentdownsampling
+                    |> (\x -> x * 100)
+                    |> round
                     |> toFloat
+                    |> (\x -> x / 100)
+                    |> String.fromFloat
                     |> (\x ->
-                            x
-                                / 10
-                                |> String.fromFloat
-                                |> Element.text
-                                |> Element.el [ Ui.wfp 1, Element.alignBottom ]
+                            if String.length x == 4 then
+                                x
+
+                            else if String.length x == 3 then
+                                x ++ "0"
+
+                            else
+                                x ++ ".00"
                        )
+                    |> Element.text
+                    |> Element.el [ Ui.wfp 1, Element.alignBottom ]
                 ]
 
           else
@@ -355,9 +362,14 @@ leftColumn global user model gos =
 
                     Nothing ->
                         Element.text (Lang.noBackround global.lang)
-                , Element.el [] (newBackgroundButton global)
+                , Element.el [] (newBackgroundButton global model)
                 , mkButton
-                    { onPress = Just Production.RequestDeleteBackground
+                    { onPress =
+                        if isProducing model then
+                            Nothing
+
+                        else
+                            Just Production.RequestDeleteBackground
                     , icon = Fa.trash
                     , text = Nothing
                     , tooltip = Just (Lang.deleteBackground global.lang)
@@ -408,7 +420,7 @@ leftColumn global user model gos =
                         (Html.input
                             [ Html.Attributes.type_ "color"
                             , Html.Attributes.value (Maybe.withDefault "#00FF00" currentKeyColor)
-                            , Html.Attributes.disabled (not (isJust currentKeyColor))
+                            , Html.Attributes.disabled (not (isJust currentKeyColor) || isProducing model)
                             , Html.Events.onInput
                                 (\x ->
                                     Core.ProductionMsg
@@ -462,6 +474,19 @@ leftColumn global user model gos =
         --  , text = currentKeyColor
         --  }
         ]
+
+
+isProducing : Production.Model -> Bool
+isProducing model =
+    case model.capsule.produced of
+        Capsule.Running _ ->
+            True
+
+        Capsule.Waiting ->
+            True
+
+        _ ->
+            False
 
 
 mainView : Core.Global -> User -> Production.Model -> Capsule.Gos -> Capsule.Slide -> Element Core.Msg
@@ -690,11 +715,19 @@ bottomBar global user model =
     Element.row [ Element.alignRight, Element.spacing 10, Element.padding 10 ] [ produceInfo, produceButton ]
 
 
-newBackgroundButton : Core.Global -> Element Core.Msg
-newBackgroundButton global =
+newBackgroundButton : Core.Global -> Production.Model -> Element Core.Msg
+newBackgroundButton global model =
     let
         newBackgroundMsg =
-            Core.ProductionMsg Production.BackgroundUploadRequested |> Just
+            if isProducing model then
+                Nothing
+
+            else
+                Core.ProductionMsg Production.BackgroundUploadRequested |> Just
     in
     Element.el [ Element.paddingXY 10 0 ]
-        (Ui.simpleButton { onPress = newBackgroundMsg, label = Element.text (Lang.selectBackground global.lang) })
+        (Ui.simpleButton
+            { onPress = newBackgroundMsg
+            , label = Element.text (Lang.selectBackground global.lang)
+            }
+        )
