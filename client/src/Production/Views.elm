@@ -39,7 +39,6 @@ view global user model =
                     [ Element.el [ Ui.wfp 1, Ui.hf ] (leftColumn global user model g)
                     , Element.el [ Ui.wfp 3, Ui.hf ] (mainView global user model g s)
                     ]
-                , bottomBar global user model
                 ]
             , Nothing
             )
@@ -332,15 +331,13 @@ leftColumn global user model gos =
                     |> (\x -> x / 100)
                     |> String.fromFloat
                     |> (\x ->
-                            if String.length x == 4 then
-                                x
-
-                            else if String.length x == 3 then
-                                x ++ "0"
+                            if String.length x == 1 then
+                                x ++ "."
 
                             else
-                                x ++ ".00"
+                                x
                        )
+                    |> String.padRight 4 '0'
                     |> Element.text
                     |> Element.el [ Ui.wfp 1, Element.alignBottom ]
                 ]
@@ -352,8 +349,7 @@ leftColumn global user model gos =
                 [ case model.capsule.background of
                     Just uuid ->
                         Element.image
-                            [ Element.width (Element.px 160)
-                            , Element.height (Element.px 90)
+                            [ Element.height (Element.px 90)
                             , Element.centerY
                             , Border.width 1
                             , Border.color Colors.greyLighter
@@ -560,29 +556,45 @@ mainView global user model gos slide =
                         , Element.htmlAttribute (Html.Attributes.style "bottom" (String.fromFloat bp ++ "%"))
                         ]
                         (Element.image
-                            [ Element.htmlAttribute (Html.Attributes.id "webcam-miniature")
-                            , Element.alpha s.opacity
-                            , Ui.wf
-                            , Ui.hf
-                            , Decode.map3 (\z pageX pageY -> Core.ProductionMsg (Production.HoldingImageChanged (Just ( z, pageX, pageY ))))
-                                (Decode.field "pointerId" Decode.int)
-                                (Decode.field "pageX" Decode.float)
-                                (Decode.field "pageY" Decode.float)
-                                |> Html.Events.on "pointerdown"
-                                |> Element.htmlAttribute
-                            , Decode.succeed (Core.ProductionMsg (Production.HoldingImageChanged Nothing))
-                                |> Html.Events.on "pointerup"
-                                |> Element.htmlAttribute
-                            , Element.htmlAttribute
-                                (Html.Events.custom "dragstart"
-                                    (Decode.succeed
-                                        { message = Core.Noop
-                                        , preventDefault = True
-                                        , stopPropagation = True
-                                        }
+                            (Element.htmlAttribute (Html.Attributes.id "webcam-miniature")
+                                :: Element.alpha s.opacity
+                                :: Ui.wf
+                                :: Ui.hf
+                                :: (Decode.map3 (\z pageX pageY -> Core.ProductionMsg (Production.HoldingImageChanged (Just ( z, pageX, pageY ))))
+                                        (Decode.field "pointerId" Decode.int)
+                                        (Decode.field "pageX" Decode.float)
+                                        (Decode.field "pageY" Decode.float)
+                                        |> Html.Events.on "pointerdown"
+                                        |> Element.htmlAttribute
+                                   )
+                                :: (Decode.succeed (Core.ProductionMsg (Production.HoldingImageChanged Nothing))
+                                        |> Html.Events.on "pointerup"
+                                        |> Element.htmlAttribute
+                                   )
+                                :: Element.htmlAttribute
+                                    (Html.Events.custom "dragstart"
+                                        (Decode.succeed
+                                            { message = Core.Noop
+                                            , preventDefault = True
+                                            , stopPropagation = True
+                                            }
+                                        )
                                     )
-                                )
-                            ]
+                                :: (case model.capsule.background of
+                                        Just path ->
+                                            [ path
+                                                |> Capsule.assetPath model.capsule
+                                                |> (\tmp -> "url(\"" ++ tmp ++ ".png\")")
+                                                |> Html.Attributes.style "background-image"
+                                                |> Element.htmlAttribute
+                                            , Element.htmlAttribute (Html.Attributes.style "background-size" "cover")
+                                            , Element.htmlAttribute (Html.Attributes.style "background-position" "center")
+                                            ]
+
+                                        _ ->
+                                            []
+                                   )
+                            )
                             { src =
                                 if r.matted == Just Capsule.Done then
                                     Capsule.assetPath model.capsule (r.uuid ++ "_matted.png")
@@ -633,6 +645,7 @@ mainView global user model gos slide =
     Element.column []
         [ Element.el [ Ui.wf, Element.centerY, Element.inFront overlay, Element.clip ] image
         , Element.row [ Element.alignRight, Element.spacing 10, Element.padding 10 ] [ produceInfo, produceButton ]
+        , bottomBar global user model
         ]
 
 
