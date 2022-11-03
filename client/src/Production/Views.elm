@@ -5,8 +5,9 @@ import Core.Types as Core
 import Element exposing (Element)
 import Element.Background as Background
 import Element.Border as Border
-import Element.Events as Events
+import Element.Font as Font
 import Element.Input as Input
+import FontAwesome as Fa
 import Html
 import Html.Attributes
 import Html.Events
@@ -48,7 +49,7 @@ view global user model =
 
 
 leftColumn : Core.Global -> User -> Production.Model -> Capsule.Gos -> Element Core.Msg
-leftColumn global user _ gos =
+leftColumn global user model gos =
     let
         webcamSettings =
             case gos.webcamSettings of
@@ -135,6 +136,19 @@ leftColumn global user _ gos =
                 _ ->
                     webcamSettings.opacity
 
+        currentdownsampling =
+            case gos.record of
+                Just r ->
+                    case r.downsampling of
+                        Just ds ->
+                            ds
+
+                        _ ->
+                            0.4
+
+                _ ->
+                    0.4
+
         currentKeyColor =
             case gos.webcamSettings of
                 Capsule.Pip { keycolor } ->
@@ -166,6 +180,16 @@ leftColumn global user _ gos =
 
             else
                 disabledAttr
+
+        mkButton data =
+            Ui.iconButton
+                [ Font.color Colors.navbar
+                , Element.padding 5
+                , Background.color Colors.greyLighter
+                , Border.rounded 5
+                ]
+                data
+                |> Element.map Core.ProductionMsg
     in
     Element.column [ Ui.wf, Element.centerY, Element.spacing 30 ]
         [ Input.checkbox []
@@ -275,6 +299,70 @@ leftColumn global user _ gos =
                         else
                             Core.ProductionMsg Production.ToggleMatting
                 }
+
+          else
+            Element.none
+        , if User.isPremium user then
+            Element.row (Ui.wf :: Ui.hf :: Element.spacing 10 :: disabledAttr)
+                [ Input.slider
+                    [ Element.behindContent
+                        (Element.el
+                            [ Element.width Element.fill
+                            , Element.height (Element.px 2)
+                            , Element.centerY
+                            , Background.color Colors.grey
+                            , Border.rounded 2
+                            ]
+                            Element.none
+                        )
+                    ]
+                    { label = Input.labelAbove (disabledAttr ++ Ui.formTitle) (Element.text (Lang.downsampling global.lang))
+                    , min = 0
+                    , max = 1
+                    , onChange = \x -> Core.ProductionMsg (Production.DownsamplingChanged x) |> disableMsg
+                    , step = Just 0.1
+                    , thumb = Input.defaultThumb
+                    , value = currentdownsampling
+                    }
+                    |> Element.el [ Ui.wfp 5 ]
+                , 10
+                    * currentdownsampling
+                    |> floor
+                    |> toFloat
+                    |> (\x ->
+                            x
+                                / 10
+                                |> String.fromFloat
+                                |> Element.text
+                                |> Element.el [ Ui.wfp 1, Element.alignBottom ]
+                       )
+                ]
+
+          else
+            Element.none
+        , if User.isPremium user then
+            Element.row (Ui.wf :: Ui.hf :: Element.spacing 10 :: disabledAttr)
+                [ case model.capsule.background of
+                    Just uuid ->
+                        Element.image
+                            [ Element.width (Element.px 160)
+                            , Element.height (Element.px 90)
+                            , Element.centerY
+                            , Border.width 1
+                            , Border.color Colors.greyLighter
+                            ]
+                            { src = Capsule.assetPath model.capsule (uuid ++ ".png"), description = "" }
+
+                    Nothing ->
+                        Element.text (Lang.noBackround global.lang)
+                , Element.el [] (newBackgroundButton global)
+                , mkButton
+                    { onPress = Just Production.RequestDeleteBackground
+                    , icon = Fa.trash
+                    , text = Nothing
+                    , tooltip = Just (Lang.deleteBackground global.lang)
+                    }
+                ]
 
           else
             Element.none
@@ -600,3 +688,13 @@ bottomBar global user model =
                         }
     in
     Element.row [ Element.alignRight, Element.spacing 10, Element.padding 10 ] [ produceInfo, produceButton ]
+
+
+newBackgroundButton : Core.Global -> Element Core.Msg
+newBackgroundButton global =
+    let
+        newBackgroundMsg =
+            Core.ProductionMsg Production.BackgroundUploadRequested |> Just
+    in
+    Element.el [ Element.paddingXY 10 0 ]
+        (Ui.simpleButton { onPress = newBackgroundMsg, label = Element.text (Lang.selectBackground global.lang) })

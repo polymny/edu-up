@@ -1,6 +1,9 @@
 module Production.Types exposing (..)
 
 import Capsule exposing (Capsule)
+import FileValue exposing (File)
+import RemoteData exposing (WebData)
+import Http
 
 
 type alias Model =
@@ -102,3 +105,9 @@ type Msg
     | VideoProduced
     | CancelProduction
     | ToggleMatting
+    | DownsamplingChanged Float
+    | BackgroundUploadRequested
+    | BackgroundUploaded File
+    | BackgroundUploadResponded (WebData Capsule)
+    | RequestDeleteBackground
+    | DeleteBackgroundResponded (WebData Capsule)

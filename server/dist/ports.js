@@ -130,6 +130,10 @@ function setupPorts(app) {
         localStorage.setItem('matting', arg);
     }
 
+    function setDownsampling(arg) {
+        localStorage.setItem('downsampling', arg);
+    }
+
     function setOnBeforeUnloadValue(arg) {
         onbeforeunloadvalue = arg;
     }
@@ -346,6 +350,7 @@ function setupPorts(app) {
             pointer_blob: (isPremium && pointerExists) ? pointerArrived : null,
             events: recordingPointerForRecord === null ? currentEvents : recordingPointerForRecord.events,
             matted: 'idle',
+            downsampling: 0.9,
         });
 
         recordArrived = null;
@@ -672,6 +677,7 @@ function setupPorts(app) {
         let capsuleId = args.capsuleId;
         let gos = args.gos;
         let matting = args.matting;
+        let downsampling = args.downsampling;
         let record = args.record;
 
         if (typeof record.webcam_blob === "string" || record.webcam_blob instanceof String) {
@@ -704,7 +710,7 @@ function setupPorts(app) {
 
             try {
                 let factor = record.pointer_blob === null ? 1 : 2;
-                let xhr = await makeRequest("POST", "/api/upload-record/" + capsuleId + "/" + gos+ "/" + matting, record.webcam_blob, (e) => {
+                let xhr = await makeRequest("POST", "/api/upload-record/" + capsuleId + "/" + gos+ "/" + matting + "/" + downsampling, record.webcam_blob, (e) => {
                     app.ports.progressReceived.send(e.loaded / (factor * e.total));
                 });
 
@@ -917,6 +923,16 @@ function setupPorts(app) {
         input.click();
     }
 
+    function selectBackground(mimes) {
+        let input = document.createElement('input');
+        input.type = 'file';
+        input.accept = mimes.join(',');
+        input.onchange = function(e) {
+            app.ports.backgroundSelected.send(e.target.files[0]);
+        };
+        input.click();
+    }
+
     function setPointerCapture(args) {
         let id = args[0];
         let pointerId = args[1];
@@ -967,6 +983,7 @@ function setupPorts(app) {
     subscribe(app.ports.setSortBy, setSortBy);
     subscribe(app.ports.setPromptSize, setPromptSize);
     subscribe(app.ports.setMatting, setMatting);
+    subscribe(app.ports.setDownsampling, setDownsampling);
     subscribe(app.ports.setOnBeforeUnloadValue, setOnBeforeUnloadValue);
     subscribe(app.ports.findDevices, findDevices);
     subscribe(app.ports.playWebcam, playWebcam);
@@ -986,6 +1003,7 @@ function setupPorts(app) {
     subscribe(app.ports.exportCapsule, exportCapsule);
     subscribe(app.ports.importCapsule, importCapsule);
     subscribe(app.ports.select, select);
+    subscribe(app.ports.selectBackground, selectBackground);
     subscribe(app.ports.setPointerCapture, setPointerCapture);
     subscribe(app.ports.setCanvas, setCanvas);
 

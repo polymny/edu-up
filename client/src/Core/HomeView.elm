@@ -473,6 +473,8 @@ newCapsulePrimary global =
         (Ui.primaryButton { onPress = newCapsuleMsg, label = Element.text (Lang.selectPdf global.lang) })
 
 
+
+
 roleView : Core.Global -> ProjectOrCapsule -> Element Core.Msg
 roleView global projectOrCapsule =
     let

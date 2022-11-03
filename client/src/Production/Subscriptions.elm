@@ -5,6 +5,8 @@ import Capsule
 import Core.Types as Core
 import Json.Decode as Decode
 import Production.Types as Production
+import Production.Ports as Ports
+import FileValue
 
 
 type alias Event =
@@ -31,6 +33,16 @@ toMsg ( w, h ) event =
 
 subscriptions : Production.Model -> Sub Core.Msg
 subscriptions model =
+    Sub.batch [
+        Ports.backgroundSelected
+            (\ x  ->
+                case Decode.decodeValue FileValue.decoder x of
+                    Ok y ->
+                        Core.ProductionMsg (Production.BackgroundUploaded y)
+
+                    _ ->
+                        Core.Noop
+            ),
     case model.holdingImage of
         Nothing ->
             Sub.none
@@ -59,3 +71,4 @@ subscriptions model =
                 (Decode.field "target" (Decode.field "clientHeight" Decode.float))
                 |> Decode.map (toMsg imageSize)
                 |> Browser.Events.onMouseMove
+    ]

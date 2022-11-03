@@ -30,6 +30,7 @@ subscriptions model =
                                         else
                                             Nothing
                                     , device = Just model.chosenDevice
+                                    , downsampling = Just model.downsampling
                                 }
                             )
 

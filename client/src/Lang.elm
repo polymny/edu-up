@@ -824,6 +824,16 @@ deleteSlide lang =
             "Delete slide"
 
 
+deleteBackground : Lang -> String
+deleteBackground lang =
+    case lang of
+        FrFr ->
+            "Supprimer l'arrière plan"
+
+        _ ->
+            "Delete background"
+
+
 deleteSlideConfirm : Lang -> String
 deleteSlideConfirm lang =
     case lang of
@@ -1072,6 +1082,26 @@ selectPdf lang =
 
         _ ->
             "Select a PDF file"
+
+
+selectBackground : Lang -> String
+selectBackground lang =
+    case lang of
+        FrFr ->
+            "Choisir un arrière plan"
+
+        _ ->
+            "Select a background"
+
+
+noBackround : Lang -> String
+noBackround lang =
+    case lang of
+        FrFr ->
+            "Pas d'arrière plan"
+        
+        _ ->
+            "No background"
 
 
 replaceSlideOrAddExternalResource : Lang -> String
@@ -1916,6 +1946,26 @@ activateMatting lang =
 
         _ ->
             "Activate virtual green screen"
+
+
+downsampling : Lang -> String
+downsampling lang =
+    case lang of
+        FrFr ->
+            "Taux de sous-échantillonnage"
+
+        _ ->
+            "Downsampling ratio"
+
+
+background : Lang -> String
+background lang =
+    case lang of
+        FrFr ->
+            "Arrière plan"
+
+        _ ->
+            "Background"
 
 
 activateFade : Lang -> String

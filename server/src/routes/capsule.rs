@@ -2,6 +2,7 @@
 
 use std::process::Stdio;
 use std::sync::Arc;
+use std::fs::remove_file;
 
 use uuid::Uuid;
 
@@ -57,6 +58,98 @@ pub async fn empty_capsule(
 
     create_dir_all(&path).await?;
 
+    Ok(capsule.to_json(Role::Owner, &db).await?)
+}
+
+/// The route that change capsule's background.
+#[post("/delete-background/<capsule_id>")]
+pub async fn delete_background(
+    user: User,
+    capsule_id: HashId,
+    db: Db,
+    socks: &S<WebSockets>,
+    config: &S<Config>,
+) -> Result<Value> {
+    let (mut capsule, _) = user.get_capsule_with_permission(capsule_id.0, Role::Write, &db).await?;
+    let path = config
+        .data_path
+        .join(format!("{}", capsule.id))
+        .join("assets");
+
+    if let Some(uuid) = capsule.background {
+        let remove_path = path
+            .join(format!("{}.png", uuid))
+            .to_str()
+            .ok_or(Error(Status::InternalServerError))?
+            .to_string();
+        remove_file(remove_path).expect("Delete previous background failed.");
+        capsule.background = None;
+        capsule.set_changed();
+        capsule.save(&db).await?;
+    
+        capsule.notify_change(&db, &socks).await?;
+    }
+    Ok(capsule.to_json(Role::Owner, &db).await?)
+}
+
+/// The route that change capsule's background.
+#[post("/change-background/<capsule_id>/<extension>", data = "<data>")]
+pub async fn change_background(
+    user: User,
+    capsule_id: HashId,
+    extension: String,
+    db: Db,
+    socks: &S<WebSockets>,
+    config: &S<Config>,
+    data: Data<'_>,
+) -> Result<Value> {
+    let (mut capsule, _) = user.get_capsule_with_permission(capsule_id.0, Role::Write, &db).await?;
+    let path = config
+        .data_path
+        .join(format!("{}", capsule.id))
+        .join("assets");
+
+    if let Some(uuid) = capsule.background {
+        let remove_path = path
+            .join(format!("{}.png", uuid))
+            .to_str()
+            .ok_or(Error(Status::InternalServerError))?
+            .to_string();
+        remove_file(remove_path).expect("Delete previous background failed.");
+    }
+
+    let uuid = Uuid::new_v4();
+    let tmp = path.join(format!("tmp{}.{}", uuid, extension));
+
+    data.open(1_i32.gibibytes()).into_file(&tmp).await?;
+    
+    let input_path = tmp
+        .to_str()
+        .ok_or(Error(Status::InternalServerError))?
+        .to_string();
+    let output_path = path
+        .join(format!("{}.png", uuid))
+        .to_str()
+        .ok_or(Error(Status::InternalServerError))?
+        .to_string();
+    run_command(&vec![
+        "convert",
+        &input_path,
+        "-resize",
+        &format!("{}^", config.pdf_target_size),
+        "-gravity",
+        "center",
+        "-extent",
+        &config.pdf_target_size,
+        &output_path
+    ])?;
+    remove_file(input_path).expect("Delete temporary background failed.");
+    
+    capsule.background = Some(uuid);
+    capsule.set_changed();
+    capsule.save(&db).await?;
+
+    capsule.notify_change(&db, &socks).await?;
     Ok(capsule.to_json(Role::Owner, &db).await?)
 }
 
@@ -207,7 +300,7 @@ fn default_green() -> WebcamSettings {
     }
 }
 /// The route that uploads a record to a capsule for a specific gos.
-#[post("/upload-record/<id>/<gos>/<matting>", data = "<data>")]
+#[post("/upload-record/<id>/<gos>/<matting>/<downsampling>", data = "<data>")]
 pub async fn upload_record(
     user: User,
     db: Db,
@@ -215,6 +308,7 @@ pub async fn upload_record(
     id: HashId,
     gos: i32,
     matting: Option<bool>,
+    downsampling: Option<f32>,
     data: Data<'_>,
     socks: &S<WebSockets>,
     sem: &S<Arc<Semaphore>>,
@@ -310,6 +404,7 @@ pub async fn upload_record(
         size,
         pointer_uuid: None,
         matted,
+        downsampling,
     });
 
     if size.is_none() {
@@ -356,12 +451,15 @@ pub async fn run_matting(
         .get_mut(gosid as usize)
         .ok_or(Error(Status::BadRequest))?;
 
-    let record_uuid = gos.record.as_ref().ok_or(Error(Status::BadRequest))?.uuid;
+    let record = gos.record.as_ref().ok_or(Error(Status::BadRequest))?;
+
+    let record_downsampling = record.downsampling.unwrap_or(0.4);
 
     let child = Command::new("../scripts/psh")
         .arg("on-matting")
         .arg(format!("{}", &capsule.id))
-        .arg(format!("{}", record_uuid))
+        .arg(format!("{}", record.uuid))
+        .arg(format!("{}", record_downsampling))
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .spawn();
@@ -894,6 +992,7 @@ pub async fn run_produce(
                 .arg("on-produce")
                 .arg(format!("{}", capsule.id))
                 .arg("-1")
+                .arg(if let Some(v) = capsule.background {format!("{}", v)}else{format!("{}", "null")})
                 .stdin(Stdio::piped())
                 .stdout(Stdio::piped())
                 .spawn();
@@ -1111,6 +1210,7 @@ pub async fn produce_gos(
             .arg("on-produce")
             .arg(format!("{}", capsule.id))
             .arg(format!("{}", gos))
+            .arg(if let Some(v) = capsule.background {format!("{}", v)}else{format!("{}", "null")})
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
             .spawn();

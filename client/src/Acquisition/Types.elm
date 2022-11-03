@@ -43,6 +43,7 @@ type alias Model =
     , status : Status
     , mattingEnabled : Bool
     , recordPlaying : Maybe Record
+    , downsampling : Float
     }
 
 
@@ -52,18 +53,20 @@ type alias Record =
     , pointerBlob : Maybe Encode.Value
     , matted : Maybe Capsule.TaskStatus
     , device : Maybe Device
+    , downsampling : Maybe Float
     , old : Bool
     }
 
 
 decodeRecord : Decoder Record
 decodeRecord =
-    Decode.map6 Record
+    Decode.map7 Record
         (Decode.field "events" (Decode.list Capsule.decodeEvent))
         (Decode.field "webcam_blob" Decode.value)
         (Decode.field "pointer_blob" (Decode.nullable Decode.value))
         (Decode.field "matted" (Decode.nullable Capsule.decodeTaskStatus))
         (Decode.maybe (Decode.field "device" decodeDevice))
+        (Decode.field "downsampling" (Decode.nullable Decode.float))
         (Decode.succeed False)
 
 
@@ -91,6 +94,7 @@ type alias Submodel =
     , status : Status
     , mattingEnabled : Bool
     , recordPlaying : Maybe Record
+    , downsampling : Float
     }
 
 
@@ -110,11 +114,12 @@ toSubmodel devices model =
     , status = model.status
     , mattingEnabled = model.mattingEnabled
     , recordPlaying = model.recordPlaying
+    , downsampling = model.downsampling
     }
 
 
-init : Bool -> Maybe Devices -> { a | videoDeviceId : Maybe String, resolution : Maybe String, audioDeviceId : Maybe String } -> Capsule -> Int -> ( Model, Cmd Msg )
-init matting devices chosenDeviceIds capsule id =
+init : Bool -> Float -> Maybe Devices -> { a | videoDeviceId : Maybe String, resolution : Maybe String, audioDeviceId : Maybe String } -> Capsule -> Int -> ( Model, Cmd Msg )
+init matting downsampling devices chosenDeviceIds capsule id =
     let
         records =
             let
@@ -132,6 +137,7 @@ init matting devices chosenDeviceIds capsule id =
                       , events = g.events
                       , matted = r.matted
                       , device = Nothing
+                      , downsampling = r.downsampling
                       , old = True
                       }
                     ]
@@ -166,6 +172,7 @@ init matting devices chosenDeviceIds capsule id =
             , status = Status.NotSent
             , mattingEnabled = matting
             , recordPlaying = Nothing
+            , downsampling = downsampling
             }
     in
     ( model
