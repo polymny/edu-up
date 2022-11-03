@@ -509,6 +509,8 @@ pub async fn run_matting(
         capsule.set_changed();
         capsule.save(&db).await.ok();
 
+        capsule.notify(socks, &db).await.ok();
+
         if !capsule.is_matting_running() {
             if capsule.produced == TaskStatus::Waiting {
                 run_produce(user, capsule.id, db, socks, sem, config).await?;
