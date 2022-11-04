@@ -24,22 +24,22 @@ update msg model =
 
                         Production.WebcamSizeChanged Production.Fullscreen ->
                             let
-                                newOpacity =
+                                (newOpacity, newKeycolor) =
                                     case gos.webcamSettings of
-                                        Capsule.Pip { opacity } ->
-                                            opacity
+                                        Capsule.Pip { opacity, keycolor } ->
+                                            (opacity, keycolor)
 
-                                        Capsule.Fullscreen { opacity } ->
-                                            opacity
+                                        Capsule.Fullscreen { opacity, keycolor } ->
+                                            (opacity, keycolor)
 
                                         _ ->
-                                            1.0
+                                            (1.0, Nothing)
 
                                 defaultFullscreen =
                                     Capsule.defaultFullscreen
 
                                 newSettings =
-                                    Capsule.Fullscreen { defaultFullscreen | opacity = newOpacity }
+                                    Capsule.Fullscreen { defaultFullscreen | opacity = newOpacity, keycolor = newKeycolor }
                             in
                             updateModel { gos | webcamSettings = newSettings } model m
 
@@ -56,12 +56,17 @@ update msg model =
                                                 , keycolor = keycolor
                                                 }
 
-                                        Capsule.Fullscreen { opacity } ->
+                                        Capsule.Fullscreen { opacity, keycolor } ->
                                             let
                                                 defaultPip =
                                                     Capsule.defaultPip
                                             in
-                                            Capsule.Pip { defaultPip | opacity = opacity, size = Production.sizeToInt gos.record s }
+                                            Capsule.Pip
+                                                { defaultPip
+                                                    | opacity = opacity
+                                                    , size = Production.sizeToInt gos.record s
+                                                    , keycolor = keycolor
+                                                }
 
                                         x ->
                                             x
