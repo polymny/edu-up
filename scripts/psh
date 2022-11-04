@@ -1193,11 +1193,20 @@ compose_gos(){
         $cmd
 
     else
-        background_path="$capsule_path/assets/$background.png"
-        cmd=$(header_progress && params_pip_slide_record $video_slides $input_record $background_path "${duration_ms}ms" "$webcam_settings" $input_pointer "${tmp_path}/$output_gos")
+        # Prepare background to be used
+        record_dimensions=$(ffprobe -v error -select_streams v:0 -show_entries stream=width,height -of csv=s=x:p=0 $input_record)
+        background_path="${capsule_path}/assets/${background}.png"
+        tmp_background_path="${tmp_path}/${background}_${gos_i}.png"
+        convert ${background_path} -resize ${record_dimensions}^ -gravity center -extent ${record_dimensions} ${tmp_background_path}
+
+        # Compose slide with record
+        cmd=$(header_progress && params_pip_slide_record $video_slides $input_record ${tmp_background_path} "${duration_ms}ms" "$webcam_settings" $input_pointer "${tmp_path}/$output_gos")
         total_frames=$(echo "($slide_duration*25)/1000" | bc)
 
         run_ffmpeg_slide "$cmd" "$duration_ms" $gos_i $nb_gos 1 2
+
+        # Remove tmp background
+        rm -f ${tmp_background_path}
     fi
     echo "file '$output_gos'" >> $seq_file
 }
