@@ -34,11 +34,9 @@ view global user model =
     in
     case ( gos, firstSlide ) of
         ( Just g, Just s ) ->
-            ( Element.column [ Ui.wf, Ui.hf, Element.padding 10 ]
-                [ Element.row [ Ui.wf, Ui.hf, Element.spacing 10 ]
-                    [ Element.el [ Ui.wfp 1, Ui.hf ] (leftColumn global user model g)
-                    , Element.el [ Ui.wfp 3, Ui.hf ] (mainView global user model g s)
-                    ]
+            ( Element.row [ Ui.wf, Ui.hf, Element.spacing 10, Element.padding 10 ]
+                [ Element.column [ Ui.wfp 1, Ui.hf ] [ leftColumn global user model g ]
+                , Element.column [ Ui.wfp 3, Ui.hf ] [ mainView global user model g s ]
                 ]
             , Nothing
             )
@@ -190,14 +188,16 @@ leftColumn global user model gos =
                 data
                 |> Element.map Core.ProductionMsg
     in
-    Element.column [ Ui.wf, Element.centerY, Element.spacing 30 ]
-        [ Input.checkbox []
-            { checked = gos.webcamSettings /= Capsule.Disabled && not forceDisabled
-            , icon = Input.defaultCheckbox
-            , label = Input.labelRight forceDisabledAttr (Element.text (Lang.useVideo global.lang))
-            , onChange = \x -> Core.ProductionMsg (Production.SetVideo x) |> forceDisableMsg
-            }
-        , forceDisableInfo
+    Element.column [ Ui.wf, Ui.hf, Element.spacing 30, Element.scrollbarY ]
+        [ Element.column (Element.spacing 10 :: disabledAttr)
+            [ Input.checkbox []
+                { checked = gos.webcamSettings /= Capsule.Disabled && not forceDisabled
+                , icon = Input.defaultCheckbox
+                , label = Input.labelRight forceDisabledAttr (Element.text (Lang.useVideo global.lang))
+                , onChange = \x -> Core.ProductionMsg (Production.SetVideo x) |> forceDisableMsg
+                }
+            , forceDisableInfo
+            ]
         , Input.radio (Element.spacing 10 :: disabledAttr)
             { onChange = \s -> Core.ProductionMsg (Production.WebcamSizeChanged s) |> disableMsg
             , selected =
