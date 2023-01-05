@@ -57,6 +57,7 @@ decodeRole =
 
 type TaskStatus
     = Idle
+    | Waiting
     | Running (Maybe Float)
     | Done
 
@@ -67,11 +68,30 @@ printTaskStatus ts =
         Idle ->
             "Idle"
 
+        Waiting ->
+            "Waiting"
+
         Running _ ->
             "Running"
 
         Done ->
             "Done"
+
+
+encodeTaskStatus : TaskStatus -> String
+encodeTaskStatus ts =
+    case ts of
+        Idle ->
+            "idle"
+
+        Waiting ->
+            "waiting"
+
+        Running _ ->
+            "running"
+
+        Done ->
+            "done"
 
 
 decodeTaskStatus : Decoder TaskStatus
@@ -82,6 +102,9 @@ decodeTaskStatus =
                 case str of
                     "idle" ->
                         Decode.succeed Idle
+
+                    "waiting" ->
+                        Decode.succeed Waiting
 
                     "running" ->
                         Decode.succeed (Running Nothing)
@@ -227,15 +250,19 @@ type alias Record =
     { uuid : String
     , pointerUuid : Maybe String
     , size : Maybe ( Int, Int )
+    , matted : Maybe TaskStatus
+    , downsampling : Maybe Float
     }
 
 
 decodeRecord : Decoder Record
 decodeRecord =
-    Decode.map3 Record
+    Decode.map5 Record
         (Decode.field "uuid" Decode.string)
         (Decode.maybe (Decode.field "pointer_uuid" Decode.string))
         (Decode.maybe (Decode.field "size" decodeIntPair))
+        (Decode.maybe (Decode.field "matted" decodeTaskStatus))
+        (Decode.maybe (Decode.field "downsampling" Decode.float))
 
 
 encodeRecord : Maybe Record -> Encode.Value
@@ -251,6 +278,18 @@ encodeRecord record =
 
                     _ ->
                         ( "size", Encode.null )
+                , case r.matted of
+                    Just m ->
+                        ( "matted", Encode.string <| encodeTaskStatus m )
+
+                    _ ->
+                        ( "matted", Encode.null )
+                , case r.downsampling of
+                    Just ds ->
+                        ( "downsampling", Encode.float ds )
+
+                    _ ->
+                        ( "downsampling", Encode.null )
                 ]
 
         Nothing ->
@@ -578,6 +617,7 @@ type alias Capsule =
     , promptSubtitles : Bool
     , diskUsage : Int
     , durationMs : Int
+    , background : Maybe String
     }
 
 
@@ -598,6 +638,7 @@ decode =
         |> andMap (Decode.field "prompt_subtitles" Decode.bool)
         |> andMap (Decode.field "disk_usage" Decode.int)
         |> andMap (Decode.field "duration_ms" Decode.int)
+        |> andMap (Decode.maybe (Decode.field "background" Decode.string))
 
 
 encodeGos : Gos -> Encode.Value

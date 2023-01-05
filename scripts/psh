@@ -47,11 +47,71 @@ params_black_video(){
 
 }
 
+
+
 generate_black_video(){
     duration=$1
     output=$2
     command=$(header && params_black_video $duration $output)
     $command
+    if (( $? != 0 )); then
+        echo "error with $1" >&2
+        return $1
+    fi
+
+}
+
+
+
+params_extract_audio(){
+    local input=$1
+    local output=$2
+
+    echo -n \
+        -i $input \
+        -vn \
+        -acodec copy \
+        $output
+
+}
+
+
+
+extract_audio(){
+    local input=$1
+    local output=$2
+    cmd=$(header && params_extract_audio $input $output)
+    echo $cmd >&2
+    $cmd
+    if (( $? != 0 )); then
+        echo "error with $1" >&2
+        return $1
+    fi
+
+}
+
+merge_audio_video(){
+    params_merge_audio_video(){
+
+        local input_video=$1
+        local input_audio=$2
+        local output=$3
+
+        echo -n \
+            -i $input_video \
+            -i $input_audio \
+            -c:v copy \
+            -c:a aac \
+            $output
+        }
+
+
+    local input_video=$1
+    local input_audio=$2
+    local output=$3
+    cmd=$(header && params_merge_audio_video  $input_video $input_audio $output)
+    echo $cmd >&2
+    $cmd
     if (( $? != 0 )); then
         echo "error with $1" >&2
         return $1
@@ -85,16 +145,42 @@ transcode_with_silent_audio_track() {
 
 }
 # USAGE:
+#   transcode_with_silent_audio_track  <input_path> <output_path>
+#
+# EXAMPLE:
+#   transcode_video  invideo.mp4   outvideo.mp4
+transcode_with_silent_audio_track() {
+
+    local input=$1
+    local output=$2
+
+    acodec="aac"
+    arate="48000"
+    abitrate="128k"
+
+    echo "-i $input \
+        -f lavfi -i anullsrc=channel_layout=stereo:sample_rate=48000 \
+        -shortest \
+        -acodec $acodec  \
+        -ar $arate \
+        -ac 2 \
+        -b:a $abitrate \
+        -max_muxing_queue_size 2048 \
+        $output"
+
+}
+# USAGE:
 #   transocode_video  <input_path> <output_path>
 #
 # EXAMPLE:
 #   transcode_video  invideo.mp4  mode  tmp/video.mp4
 transcode_video() {
 
-    input=$1
-    mode=$2
-    output=$3
+    local input=$1
+    local mode=$2
+    local output=$3
 
+    echo "input = $input, mode = $mode, output=$output" >&2
     fps="25"
     vcodec="$vcodec264"
     vcodec_opts="-crf 15"
@@ -188,6 +274,11 @@ get_alpha()
 get_keycolor()
 {
 
+if (( $? != 0 )); then
+            echo "error with $1" >&2
+            return $1
+        fi
+
     echo  $(echo $1| jq -cr ".keycolor")
 }
 
@@ -241,9 +332,9 @@ get_aspect_ratio() {
 colorkey(){
     colorkey_color="$1"
     # color key params
-    colorkey_similarity="0.3"
-    colorkey_blend="0.2"
-    colorkey="colorkey=$colorkey_color:$colorkey_similarity:$colorkey_blend"
+    colorkey_similarity="0.15"
+    colorkey_blend="0.1"
+    local colorkey="colorkey=$colorkey_color:$colorkey_similarity:$colorkey_blend"
     despill="despill=green"
     echo "$colorkey,$despill"
 }
@@ -252,7 +343,7 @@ pointerkey(){
     colorkey_color="$1"
     # color key params
     colorkey_similarity="0.3"
-    colorkey_blend="0.2"
+    colorkey_blend="0.0"
     colorkey="colorkey=$colorkey_color:$colorkey_similarity:$colorkey_blend"
     despill="despill=$1"
     echo "$colorkey,$despill"
@@ -269,6 +360,9 @@ params_pip_slide_record() {
     shift
 
     record=$1
+    shift
+
+    background=$1
     shift
 
     duration=$1
@@ -298,12 +392,18 @@ params_pip_slide_record() {
     keying_filter="null"
     color=$(get_keycolor "$webcam_settings")
 
+
     if [[  "$color" != "null" ]]; then
         keying_filter=$(colorkey $color)
     fi
+
+
     pointer_filter=$(colorkey black)
 
     fade_filter=$(get_fadefilter "$gos" "$duration")
+
+    use_background="$( [[ $background == *"null"* ]]; echo $? )"
+
     case $composition_type in
          "pip" )
             webcam_alpha=$(get_alpha "$webcam_settings")
@@ -312,11 +412,47 @@ params_pip_slide_record() {
             webcam_overlay=$(get_overlay "$webcam_settings")
             scale_record="scale=${webcam_size},format=argb,colorchannelmixer=aa=${webcam_alpha}"
             if [[ "$pointer_overlay" == "null" ]] ; then
-                inputs="-i $slide -i $record "
-                filter_complex="[0]scale=$width_slide:$height_slide[slide];[1]$keying_filter,$scale_record[record];[slide][record]overlay=$webcam_overlay,$fade_filter,fps=fps=$fps[vout]"
+                if [[ "$use_background" -gt 0 ]]
+                then
+                    inputs="-i $slide -i $record -i $background"
+                    filter_complex=$(echo "
+                        [0]scale=$width_slide:$height_slide[slide];\
+                        [1]$keying_filter,$scale_record[record];\
+                        [2]$scale_record[background];\
+                        [slide][background]overlay=$webcam_overlay[slide_back];\
+                        [slide_back][record]overlay=$webcam_overlay,$fade_filter,fps=fps=$fps[vout]\
+                        " | sed 's/ //g')
+                else
+                    inputs="-i $slide -i $record"
+                    filter_complex=$(echo "
+                        [0]scale=$width_slide:$height_slide[slide];\
+                        [1]$keying_filter,$scale_record[record];\
+                        [slide][record]overlay=$webcam_overlay,$fade_filter,fps=fps=$fps[vout]\
+                        " | sed 's/ //g')
+                fi
             else
-                inputs="-i $slide -i $record -i $pointer_overlay "
-                filter_complex="[0]scale=$width_slide:$height_slide[slide];[1]$keying_filter,$scale_record[record];[2]$pointer_filter[pointer];[slide][record]overlay=$webcam_overlay[pip];[pip][pointer]overlay=0:0,$fade_filter,fps=fps=$fps[vout]"
+                if [[ "$use_background" -gt 0 ]]
+                then
+                    inputs="-i $slide -i $record -i $background -i $pointer_overlay"
+                    filter_complex=$(echo "
+                        [0]scale=$width_slide:$height_slide[slide];\
+                        [1]$keying_filter,$scale_record[record];\
+                        [2]$scale_record[background];\
+                        [3]$pointer_filter[pointer];\
+                        [slide][background]overlay=$webcam_overlay[slide_back];\
+                        [slide_back][record]overlay=$webcam_overlay[pip];\
+                        [pip][pointer]overlay=0:0,$fade_filter,fps=fps=$fps[vout]\
+                        " | sed 's/ //g')
+                else
+                    inputs="-i $slide -i $record -i $pointer_overlay"
+                    filter_complex=$(echo "
+                        [0]scale=$width_slide:$height_slide[slide];\
+                        [1]$keying_filter,$scale_record[record];\
+                        [2]$pointer_filter[pointer];\
+                        [slide][record]overlay=$webcam_overlay[pip];\
+                        [pip][pointer]overlay=0:0,$fade_filter,fps=fps=$fps[vout]\
+                        " | sed 's/ //g')
+                fi
 
             fi
             echo -n -fflags \
@@ -331,28 +467,50 @@ params_pip_slide_record() {
             record_alpha=$(get_alpha "$webcam_settings")
             overlay="0:0"
             aspect_ratio=$(get_aspect_ratio $record)
+
+            if [[ "$use_background" -gt 0 ]]
+            then
+                inputs="-i $slide -i $record -i $background"
+            else
+                inputs="-i $slide -i $record"
+            fi
             case $aspect_ratio in
                 "4:3")
                     record_filter="[1]$keying_filter,scale=1440:-1:flags=lanczos,format=argb,colorchannelmixer=aa=${record_alpha}[record]"
+                    if [[ "$use_background" -gt 0 ]]
+                    then
+                        background_filter="[2]scale=1440:-1:flags=lanczos,format=argb,colorchannelmixer=aa=${record_alpha}[background]"
+                    fi
                     overlay="(W-w)/2:0"
                     ;;
                 "16/9")
                     record_filter="[1]$keying_filter,scale=${width_slide}:-1:flags=lanczos,format=argb,colorchannelmixer=aa=${record_alpha}[record]"
+                    if [[ "$use_background" -gt 0 ]]
+                    then
+                        background_filter="[2]scale=${width_slide}:-1:flags=lanczos,format=argb,colorchannelmixer=aa=${record_alpha}[background]"
+                    fi
                     overlay="0:0"
                     ;;
 
                 *)
                     record_filter="[1]$keying_filter,scale=${width_slide}:-1:flags=lanczos,format=argb,colorchannelmixer=aa=${record_alpha}[record]"
+                    if [[ "$use_background" -gt 0 ]]
+                    then
+                        background_filter="[2]scale=${width_slide}:-1:flags=lanczos,format=argb,colorchannelmixer=aa=${record_alpha}[background]"
+                    fi
                     overlay="(W-w)/2:(H-h)/2"
                     ;;
 
             esac
-            filter_complex="[0]scale=$width_slide:$height_slide[slide];${record_filter};[slide][record]overlay=$overlay,$fade_filter,fps=fps=$fps[vout]"
-
+            if [[ "$use_background" -gt 0 ]]
+            then
+                filter_complex="[0]scale=$width_slide:$height_slide[slide];${record_filter};${background_filter};[slide][background]overlay=$overlay[slide_back];[slide_back][record]overlay=$overlay,$fade_filter,fps=fps=$fps[vout]"
+            else     
+                filter_complex="[0]scale=$width_slide:$height_slide[slide];${record_filter};[slide][record]overlay=$overlay,$fade_filter,fps=fps=$fps[vout]"
+            fi
             echo -n -fflags \
                  +genpts \
-                 -i $slide \
-                 -i $record \
+                 $inputs \
                  -filter_complex "$filter_complex"\
                  -map [vout] \
                  -map 1:a
@@ -360,6 +518,7 @@ params_pip_slide_record() {
 
 
         "disabled" )
+                echo DISABLED >&2
                  echo -n -fflags \
                  +genpts \
                  -i $slide \
@@ -369,6 +528,7 @@ params_pip_slide_record() {
              ;;
 
         "slide" )
+                echo SLIDE >&2
                  echo -n -fflags \
                  +genpts \
                  -f lavfi \
@@ -395,6 +555,108 @@ params_pip_slide_record() {
          $output
 
 
+}
+
+
+
+
+on-matting() {
+    cid=$1
+    uuid=$2
+    downsampling=$3
+    
+    INFERENCE_PATH="../../RobustVideoMatting"
+
+    capsule_path=$(get_config "data_path")"/$cid"
+    tmp_path="${capsule_path}/tmp"
+    if [ ! -d "$tmp_path" ]; then
+        mkdir $tmp_path
+    fi
+
+    record="${capsule_path}/assets/${uuid}.webm"
+    filename=$(basename -- "$record")
+    extension="${filename##*.}"
+    filename="${filename%.*}"
+    record_basedir="${record%/*}"
+    record_mp4="${tmp_path}/${filename}.mp4"
+    record_aac="${tmp_path}/${filename}.aac"
+
+    local output="${capsule_path}/assets/${uuid}_matted.mp4"
+    local output_png="${capsule_path}/assets/${uuid}_matted.png"
+
+
+
+    ### Convert webm record to mp4
+    ### TODO convert on more efficient way ? no trnscode of video
+    cmd=$(header && transcode_video $record "blob" $record_mp4)
+    echo $cmd >&2
+    $cmd
+
+    if (( $? != 0 )); then
+            echo "error with $1" >&2
+            return $1
+        fi
+
+
+    # extract audio
+    echo -e "\n EXTRACT AUDIO \n" >&2
+    extract_audio $record_mp4 $record_aac
+
+
+    current_dir=$PWD
+    cd $INFERENCE_PATH
+
+    echo -e "\n INFER (downsampling=${downsampling}) \n" >&2
+    ### Matting on kitt2
+    # matting_path="/home/polymny/RobustVideoMatting/tmp/${cid}"
+    # ssh Polymny "mkdir -p ${matting_path}" 1>&2
+    # scp ${record_mp4} Polymny:${matting_path}/${filename}.mp4 1>&2
+    # ssh Polymny "\
+    #     cd RobustVideoMatting; \
+    #     source .venv_python39/bin/activate; \
+    #     python inference_pytorch.py \
+    #         --variant mobilenetv3 \
+    #         --checkpoint checkpoints/rvm_mobilenetv3.pth \
+    #         --device cuda \
+    #         --input-source ${matting_path}/${filename}.mp4 \
+    #         --output-composition ${matting_path}/${filename}_composition.mp4 \
+    #         --downsample-ratio ${downsampling} \
+    #         --seq-chunk 8 \
+    #         --num-workers 1 \
+    # " 1>&2
+    # scp Polymny:${matting_path}/${filename}_composition.mp4 ${tmp_path}/${filename}_composition.mp4 1>&2
+    # ssh Polymny "rm ${matting_path}/${filename}.mp4 ${matting_path}/${filename}_composition.mp4" 1>&2
+    ### Matting on local
+    source .venv_python39/bin/activate
+    python inference_pytorch.py \
+        --variant mobilenetv3 \
+        --checkpoint checkpoints/rvm_mobilenetv3.pth \
+        --device cpu \
+        --input-source ${record_mp4} \
+        --output-composition ${tmp_path}/${filename}_composition.mp4 \
+        --downsample-ratio ${downsampling} \
+        --seq-chunk 8 \
+        --num-workers 1 1>&2
+    
+
+    cd $current_dir
+    echo -e "\n MERGE AUDIO VIDEO \n" >&2
+    merge_audio_video "${tmp_path}/${filename}_composition.mp4" $record_aac $output
+
+    echo -e "\n MATTING \n" >&2
+    echo $output >&2
+
+    # generate thumbmail with matting
+    duration="0.000000"
+    command=$(header && miniatures  $output "0x00ff00" $duration $output_png)
+    $command
+    if (( $? != 0 )); then
+        echo "error with $output_png" >&2
+        return $1
+    fi
+
+
+    echo $output
 }
 
 
@@ -592,21 +854,28 @@ get_fadefilter() {
 #   miniatures video.mkv 12233 video
 miniatures() {
     input=$1
-    duration=$2
-    output=$3
+    color=$2
+    duration=$3
+    output=$4
     middle=$(echo 'scale=6;' $duration ' / 2' | bc)
     if [ "${middle:0:1}" = "." ] ; then
         middle="0"
     fi
 
+    keying_filter="null"
+    if [[  "$color" != "null" ]]; then
+        keying_filter=$(colorkey $color)
+    fi
+
     width="400"
-    filter="scale=$width:-1"
+    filter="scale=$width:-1,$keying_filter"
     echo -i $input \
         -vf $filter \
         -ss $middle \
         -vframes 1 \
         $output
 }
+
 
 # Get vars from Config.toml
 # USAGE:
@@ -724,7 +993,7 @@ transcode_records(){
         printf 'trancode duration = %s - record duration =%s  \n' "$ELAPSED_TIME" "$duration"
 
         output="$tmp_path/$i.png"
-        command=$(header && miniatures $input  $duration $output)
+        command=$(header && miniatures $input "null" $duration $output)
         echo $command
         $command
         if (( $? != 0 )); then
@@ -802,6 +1071,7 @@ compose_gos(){
     local gos_i=$2
     local nb_gos=$3
     local seq_file_gos=$4
+    local background=$5
     SLIDE_DEFAULT_DURATION="3"
 
 
@@ -817,10 +1087,16 @@ compose_gos(){
         webcam_settings=$( echo '{"type" :"slide"}' | jq  ".")
         transitions=( 0 )
         input_record="${assets_path}/null.webm"
+        matting="null"
     else
         transitions=( 0 $(echo "$gos" | jq -cr ".events[] | select(.ty==\"next_slide\" or .ty==\"end\") | .time") )
         webcam_settings=$(echo "$gos" | jq  ".webcam_settings")
         input_record="${assets_path}/$record.webm"
+        matting=$(echo "$gos" | jq -cr ".record.matted")
+        echo "matting = $matting" >&2
+        if [[ "$matting" == "done" ]] ; then
+            input_record="${assets_path}/${record}_matted.mp4"
+        fi
     fi
 
     pointer=$(echo "$gos" | jq -cr ".record.pointer_uuid")
@@ -944,10 +1220,20 @@ compose_gos(){
         $cmd
 
     else
-        cmd=$(header_progress && params_pip_slide_record $video_slides $input_record "${duration_ms}ms" "$webcam_settings" $input_pointer "${tmp_path}/$output_gos")
+        # Prepare background to be used
+        record_dimensions=$(ffprobe -v error -select_streams v:0 -show_entries stream=width,height -of csv=s=x:p=0 $input_record)
+        background_path="${capsule_path}/assets/${background}.png"
+        tmp_background_path="${tmp_path}/${background}_${gos_i}.png"
+        convert ${background_path} -resize ${record_dimensions}^ -gravity center -extent ${record_dimensions} ${tmp_background_path}
+
+        # Compose slide with record
+        cmd=$(header_progress && params_pip_slide_record $video_slides $input_record ${tmp_background_path} "${duration_ms}ms" "$webcam_settings" $input_pointer "${tmp_path}/$output_gos")
         total_frames=$(echo "($slide_duration*25)/1000" | bc)
 
         run_ffmpeg_slide "$cmd" "$duration_ms" $gos_i $nb_gos 1 2
+
+        # Remove tmp background
+        rm -f ${tmp_background_path}
     fi
     echo "file '$output_gos'" >> $seq_file
 }
@@ -962,6 +1248,7 @@ compose_gos(){
 compose_goss(){
     local cid=$1
     local gosid=$2
+    local background=$3
 
     local start=`date +%s`
     capsule_path=$(get_config "data_path")"/$cid"
@@ -978,7 +1265,7 @@ compose_goss(){
         len=$(echo $capsule_structure | jq  '.|length')
         for (( gos_i = 0 ; gos_i < $len ; gos_i++ ));
         do
-            compose_gos $cid $gos_i $len $seq_file
+            compose_gos $cid $gos_i $len $seq_file $background
         done
         output="$capsule_path/output.mp4"
         command=$(header && concat_goss $seq_file $output)
@@ -998,7 +1285,7 @@ compose_goss(){
         echo "runtime = $runtime s -- video duration = $duration s"  >&2
         echo "compute_ratio $compute_ratio -- Time passed to produced 1 min of video $compute_ratio_by_min s" >&2
     else
-        compose_gos $cid $gosid -1 $seq_file
+        compose_gos $cid $gosid -1 $seq_file $background
     fi
 
 
@@ -1029,7 +1316,7 @@ on-record() {
             output="${capsule_path}/assets/${uuid}.png"
             duration="0.000000"
 
-            command=$(header && miniatures $input  $duration $output)
+            command=$(header && miniatures $input "null" $duration $output)
             $command
             if (( $? != 0 )); then
                 echo "error with $1" >&2
@@ -1044,6 +1331,37 @@ on-record() {
 }
 
 
+
+is-matting-active() {
+
+
+    test_matting() {
+        local mattings="$(echo "$capsule_structure" | jq -r '.[] | .record.matted')"
+        echo "mattings \n $mattings" >&2
+        local running='false'
+        for i in $mattings
+        do
+            if  [[ "$i" == "running" ]]; then
+                running="true"
+            fi
+        done
+        echo $running
+    }
+
+    while true
+    do
+        local running=$(test_matting)
+        echo "Is matting active/running: $running " >&2
+        if [[ "$running" == "true" ]]; then
+            sleep 3;
+        else
+            break;
+        fi
+
+    done
+
+}
+
 # USAGE:
 #   on-produce <capule_id>
 #     and stdin
@@ -1053,10 +1371,14 @@ on-record() {
 on-produce() {
     local cid=$1
     local gosid=$2
+    local background=$3
+
+    #is-matting-active
+
 
     #transcode_records $cid
     echo "Composition start for capsule $cid and gos $gosid" >&2
-    compose_goss $cid $gosid
+    compose_goss $cid $gosid $background
     echo "Composition end for capsule $cid and gos $gosid" >&2
 }
 
@@ -1232,12 +1554,17 @@ main() {
         "on-record")
             on-record "$@"
             ;;
+
+        "on-matting")
+            on-matting "$@"
+            ;;
+
         "on-video-upload")
             on-video-upload "$@"
             ;;
         "on-produce")
             read -r capsule_structure
-            #DEBUG echo "$capsule_structure" | jq . >&2
+            # echo "$capsule_structure" | jq . >&2
             on-produce "$@"
             ;;
         "on-publish")

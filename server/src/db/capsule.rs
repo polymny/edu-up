@@ -135,6 +135,13 @@ impl Default for WebcamSettings {
     }
 }
 
+/// The disabled task status.
+///
+/// This is a helper function for default value for matting in records.
+fn none() -> Option<TaskStatus> {
+    None
+}
+
 /// A record, with an uuid, a resolution and a duration.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Record {
@@ -146,6 +153,13 @@ pub struct Record {
 
     /// The size of the record, if it contains video.
     pub size: Option<(u32, u32)>,
+
+    /// The state of the matting.
+    #[serde(default = "none")]
+    pub matted: Option<TaskStatus>,
+
+    /// The downsampling of the matting
+    pub downsampling: Option<f32>,
 }
 
 /// The type of a record event.
@@ -253,7 +267,7 @@ impl Gos {
 }
 
 /// Privacy settings for a video.
-#[derive(PgEnum, Serialize, Deserialize, Debug, PartialEq, Eq)]
+#[derive(PgEnum, Serialize, Deserialize, Debug, PartialEq, Eq, Copy, Clone)]
 #[serde(rename_all = "snake_case")]
 pub enum Privacy {
     /// Public video.
@@ -315,6 +329,9 @@ pub struct Capsule {
     /// duration of produced video in ms
     pub duration_ms: i32,
 
+    /// Background of the capsule.
+    pub background: Option<Uuid>,
+
     /// The user that has rights on the capsule.
     #[many_to_many(capsules, Role)]
     pub users: User,
@@ -346,6 +363,7 @@ impl Capsule {
             Utc::now().naive_utc(),
             0,
             0,
+            None,
         )
         .save(&db)
         .await?;
@@ -387,8 +405,9 @@ impl Capsule {
             "last_modified": self.last_modified.timestamp(),
             "users": users,
             "prompt_subtitles": self.prompt_subtitles,
-            "disk_usage":self.disk_usage,
-            "duration_ms":self.duration_ms
+            "disk_usage": self.disk_usage,
+            "duration_ms": self.duration_ms,
+            "background": self.background,
         }))
     }
 
@@ -494,6 +513,25 @@ impl Capsule {
         }
 
         Ok(())
+    }
+
+    /// Returns the list of matting processes to run.
+    pub fn matting_idle(&mut self) -> impl Iterator<Item = (i32, &mut Record)> {
+        self.structure
+            .0
+            .iter_mut()
+            .enumerate()
+            .filter_map(|(x, y)| y.record.as_mut().map(|z| (x as i32, z)))
+            .filter(|(_, x)| x.matted == Some(TaskStatus::Idle))
+    }
+
+    /// Sets the last modified to now.
+    pub fn is_matting_running(&self) -> bool {
+        self.structure
+            .0
+            .iter()
+            .filter_map(|x| x.record.as_ref())
+            .any(|x| x.matted == Some(TaskStatus::Running))
     }
 
     /// Retrieves the owner of a capsule.

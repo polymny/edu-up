@@ -41,7 +41,9 @@ type alias Model =
     , uploading : Maybe Float
     , state : State
     , status : Status
+    , mattingEnabled : Bool
     , recordPlaying : Maybe Record
+    , downsampling : Float
     }
 
 
@@ -49,16 +51,22 @@ type alias Record =
     { events : List Capsule.Event
     , webcamBlob : Encode.Value
     , pointerBlob : Maybe Encode.Value
+    , matted : Maybe Capsule.TaskStatus
+    , device : Maybe Device
+    , downsampling : Maybe Float
     , old : Bool
     }
 
 
 decodeRecord : Decoder Record
 decodeRecord =
-    Decode.map4 Record
+    Decode.map7 Record
         (Decode.field "events" (Decode.list Capsule.decodeEvent))
         (Decode.field "webcam_blob" Decode.value)
         (Decode.field "pointer_blob" (Decode.nullable Decode.value))
+        (Decode.field "matted" (Decode.nullable Capsule.decodeTaskStatus))
+        (Decode.maybe (Decode.field "device" decodeDevice))
+        (Decode.field "downsampling" (Decode.nullable Decode.float))
         (Decode.succeed False)
 
 
@@ -84,7 +92,9 @@ type alias Submodel =
     , showSettings : Bool
     , uploading : Maybe Float
     , status : Status
+    , mattingEnabled : Bool
     , recordPlaying : Maybe Record
+    , downsampling : Float
     }
 
 
@@ -102,13 +112,39 @@ toSubmodel devices model =
     , showSettings = model.showSettings
     , uploading = model.uploading
     , status = model.status
+    , mattingEnabled = model.mattingEnabled
     , recordPlaying = model.recordPlaying
+    , downsampling = model.downsampling
     }
 
 
-init : Maybe Devices -> { a | videoDeviceId : Maybe String, resolution : Maybe String, audioDeviceId : Maybe String } -> Capsule -> Int -> ( Model, Cmd Msg )
-init devices chosenDeviceIds capsule id =
+init : Bool -> Float -> Maybe Devices -> { a | videoDeviceId : Maybe String, resolution : Maybe String, audioDeviceId : Maybe String } -> Capsule -> Int -> ( Model, Cmd Msg )
+init matting downsampling devices chosenDeviceIds capsule id =
     let
+        records =
+            let
+                gos =
+                    List.head (List.drop id capsule.structure)
+            in
+            case ( Maybe.map .record gos, gos ) of
+                ( Just (Just r), Just g ) ->
+                    [ { webcamBlob = Encode.string (Capsule.assetPath capsule (r.uuid ++ ".webm"))
+                      , pointerBlob =
+                            r.pointerUuid
+                                |> Maybe.map (\x -> x ++ ".webm")
+                                |> Maybe.map (Capsule.assetPath capsule)
+                                |> Maybe.map Encode.string
+                      , events = g.events
+                      , matted = r.matted
+                      , device = Nothing
+                      , downsampling = r.downsampling
+                      , old = True
+                      }
+                    ]
+
+                _ ->
+                    []
+
         model =
             { capsule = capsule
             , gos = id
@@ -116,26 +152,7 @@ init devices chosenDeviceIds capsule id =
             , currentSlide = 0
             , recording = False
             , webcamBound = False
-            , records =
-                let
-                    gos =
-                        List.head (List.drop id capsule.structure)
-                in
-                case ( Maybe.map .record gos, gos ) of
-                    ( Just (Just r), Just g ) ->
-                        [ { webcamBlob = Encode.string (Capsule.assetPath capsule (r.uuid ++ ".webm"))
-                          , pointerBlob =
-                                r.pointerUuid
-                                    |> Maybe.map (\x -> x ++ ".webm")
-                                    |> Maybe.map (Capsule.assetPath capsule)
-                                    |> Maybe.map Encode.string
-                          , events = g.events
-                          , old = True
-                          }
-                        ]
-
-                    _ ->
-                        []
+            , records = records
             , showSettings = False
             , chosenDevice =
                 case devices of
@@ -153,7 +170,9 @@ init devices chosenDeviceIds capsule id =
                     _ ->
                         DetectingDevices
             , status = Status.NotSent
+            , mattingEnabled = matting
             , recordPlaying = Nothing
+            , downsampling = downsampling
             }
     in
     ( model
@@ -276,6 +295,7 @@ type Msg
     | IncreasePromptSize
     | DecreasePromptSize
     | SetCanvas SetCanvas
+    | ToggleMatting Int
 
 
 defaultDevice : Devices -> Device
@@ -405,6 +425,14 @@ encodeDevice device =
         [ ( "video", encodeMaybeVideoDevice device.video device.resolution )
         , ( "audio", encodeMaybeAudioDevice device.audio )
         ]
+
+
+decodeDevice : Decoder Device
+decodeDevice =
+    Decode.map3 Device
+        (Decode.maybe (Decode.field "video" decodeVideoDevice))
+        (Decode.maybe (Decode.field "resolution" decodeResolution))
+        (Decode.maybe (Decode.field "audio" decodeAudioDevice))
 
 
 encodeRecordingOptions : Device -> Encode.Value

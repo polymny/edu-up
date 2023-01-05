@@ -2,9 +2,12 @@ module Production.Updates exposing (..)
 
 import Api
 import Capsule exposing (Capsule)
-import Core.Ports as Ports
+import Core.Ports
 import Core.Types as Core
+import Lang exposing (capsule)
+import Production.Ports as Ports
 import Production.Types as Production
+import RemoteData
 import User
 import Utils exposing (tern)
 
@@ -21,22 +24,22 @@ update msg model =
 
                         Production.WebcamSizeChanged Production.Fullscreen ->
                             let
-                                newOpacity =
+                                (newOpacity, newKeycolor) =
                                     case gos.webcamSettings of
-                                        Capsule.Pip { opacity } ->
-                                            opacity
+                                        Capsule.Pip { opacity, keycolor } ->
+                                            (opacity, keycolor)
 
-                                        Capsule.Fullscreen { opacity } ->
-                                            opacity
+                                        Capsule.Fullscreen { opacity, keycolor } ->
+                                            (opacity, keycolor)
 
                                         _ ->
-                                            1.0
+                                            (1.0, Nothing)
 
                                 defaultFullscreen =
                                     Capsule.defaultFullscreen
 
                                 newSettings =
-                                    Capsule.Fullscreen { defaultFullscreen | opacity = newOpacity }
+                                    Capsule.Fullscreen { defaultFullscreen | opacity = newOpacity, keycolor = newKeycolor }
                             in
                             updateModel { gos | webcamSettings = newSettings } model m
 
@@ -53,12 +56,17 @@ update msg model =
                                                 , keycolor = keycolor
                                                 }
 
-                                        Capsule.Fullscreen { opacity } ->
+                                        Capsule.Fullscreen { opacity, keycolor } ->
                                             let
                                                 defaultPip =
                                                     Capsule.defaultPip
                                             in
-                                            Capsule.Pip { defaultPip | opacity = opacity, size = Production.sizeToInt gos.record s }
+                                            Capsule.Pip
+                                                { defaultPip
+                                                    | opacity = opacity
+                                                    , size = Production.sizeToInt gos.record s
+                                                    , keycolor = keycolor
+                                                }
 
                                         x ->
                                             x
@@ -151,7 +159,7 @@ update msg model =
 
                                 Just ( id, _, _ ) ->
                                     ( mkModel model (Core.Production { m | holdingImage = b })
-                                    , Ports.setPointerCapture ( "webcam-miniature", id )
+                                    , Core.Ports.setPointerCapture ( "webcam-miniature", id )
                                     )
 
                         Production.ImageMoved x y newPageX newPageY ->
@@ -185,6 +193,73 @@ update msg model =
                                             m
                             in
                             ( mkModel model (Core.Production newModel), Cmd.none )
+
+                        Production.ToggleMatting ->
+                            let
+                                changeKeyColor : Maybe String -> Capsule.WebcamSettings -> Capsule.WebcamSettings
+                                changeKeyColor newcolor settings =
+                                    case settings of
+                                        Capsule.Pip { anchor, opacity, position, size } ->
+                                            Capsule.Pip
+                                                { anchor = anchor
+                                                , opacity = opacity
+                                                , position = position
+                                                , size = size
+                                                , keycolor = newcolor
+                                                }
+
+                                        Capsule.Fullscreen { opacity } ->
+                                            Capsule.Fullscreen { opacity = opacity, keycolor = newcolor }
+
+                                        x ->
+                                            x
+
+                                ( newmatted, newkeycolor ) =
+                                    case gos.record of
+                                        Just r ->
+                                            if r.matted == Nothing then
+                                                ( Just Capsule.Idle, Just "#00FF00" )
+
+                                            else
+                                                ( Nothing, Nothing )
+
+                                        Nothing ->
+                                            ( Nothing, Nothing )
+
+                                newRecord =
+                                    case gos.record of
+                                        Just r ->
+                                            Just { r | matted = newmatted }
+
+                                        Nothing ->
+                                            Nothing
+
+                                newGos =
+                                    { gos
+                                        | record = newRecord
+                                        , webcamSettings = changeKeyColor newkeycolor gos.webcamSettings
+                                    }
+                            in
+                            updateModel newGos model m
+
+                        Production.DownsamplingChanged ds ->
+                            let
+                                newRecord =
+                                    case gos.record of
+                                        Just r ->
+                                            Just
+                                                { r
+                                                    | downsampling = Just ds
+                                                    , matted = Just Capsule.Idle
+                                                }
+
+                                        Nothing ->
+                                            Nothing
+
+                                newGos =
+                                    { gos | record = newRecord }
+                            in
+                            updateModel newGos model m
 
                         Production.ProduceVideo ->
                             let
@@ -229,6 +304,21 @@ update msg model =
                             )
 
                         Production.VideoProduced ->
+                            ( model, Cmd.none )
+
+                        Production.BackgroundUploadRequested ->
+                            ( model, Ports.selectBackground [ "image/*" ] )
+
+                        Production.BackgroundUploaded file ->
+                            ( model, Api.uploadBackground m.capsule.id file )
+
+                        Production.BackgroundUploadResponded response ->
+                            ( model, Cmd.none )
+
+                        Production.RequestDeleteBackground ->
+                            ( model, Api.deleteBackground m.capsule.id )
+
+                        Production.DeleteBackgroundResponded response ->
                             ( model, Cmd.none )
 
                 _ ->

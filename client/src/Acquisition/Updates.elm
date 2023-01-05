@@ -9,6 +9,7 @@ import Core.Types as Core
 import Route
 import Status
 import User
+import Utils
 
 
 update : Acquisition.Msg -> Core.Model -> ( Core.Model, Cmd Core.Msg )
@@ -147,6 +148,36 @@ update msg model =
             case model.page of
                 Core.Acquisition p ->
                     ( mkModel model (Core.Acquisition { p | showSettings = not p.showSettings }), Ports.playWebcam () )
+
+                _ ->
+                    ( model, Cmd.none )
+
+        Acquisition.ToggleMatting id ->
+            case model.page of
+                Core.Acquisition p ->
+                    ( mkModel { model | global = { global | matting = not p.mattingEnabled } }
+                        (Core.Acquisition
+                            { p
+                                | mattingEnabled = not p.mattingEnabled
+                                , downsampling = p.downsampling
+                                , records =
+                                    p.records
+                                        |> Utils.change (List.length p.records - id - 1)
+                                            (\x ->
+                                                { x
+                                                    | matted =
+                                                        case x.matted of
+                                                            Nothing ->
+                                                                Just Capsule.Idle
+
+                                                            _ ->
+                                                                Nothing
+                                                }
+                                            )
+                            }
+                        )
+                    , Ports.setMatting (not p.mattingEnabled)
+                    )
 
                 _ ->
                     ( model, Cmd.none )
@@ -330,7 +361,19 @@ update msg model =
             case model.page of
                 Core.Acquisition p ->
                     ( mkModel model (Core.Acquisition { p | uploading = Just 0.0, status = Status.Sent })
-                    , Ports.uploadRecord ( p.capsule.id, p.gos, Acquisition.encodeRecord record )
+                    , Ports.uploadRecord
+                        { capsuleId = p.capsule.id
+                        , gos = p.gos
+                        , matting = record.matted /= Nothing && Maybe.andThen .video record.device /= Nothing
+                        , downsampling =
+                            case record.downsampling of
+                                Just ds ->
+                                    ds
+
+                                _ ->
+                                    0.1
+                        , record = Acquisition.encodeRecord record
+                        }
                     )
 
                 _ ->

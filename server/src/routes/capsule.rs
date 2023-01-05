@@ -2,6 +2,7 @@
 
 use std::process::Stdio;
 use std::sync::Arc;
+use std::fs::remove_file;
 
 use uuid::Uuid;
 
@@ -21,11 +22,13 @@ use rocket::{Data, State as S};
 
 use crate::command::{export_slides, run_command};
 use crate::config::Config;
-use crate::db::capsule::{Capsule, Fade, Gos, Privacy, Record, Role, Slide, WebcamSettings};
+use crate::db::capsule::{
+    Anchor, Capsule, Fade, Gos, Privacy, Record, Role, Slide, WebcamSettings,
+};
 use crate::db::task_status::TaskStatus;
-use crate::db::user::User;
+use crate::db::user::{Plan, User};
 use crate::websockets::WebSockets;
-use crate::{Db, Error, HashId, Result};
+use crate::{Db, Error, HashId, Pool, Result};
 
 /// The route that gives the capsule information.
 #[get("/capsule/<capsule_id>")]
@@ -55,6 +58,94 @@ pub async fn empty_capsule(
 
     create_dir_all(&path).await?;
 
+    Ok(capsule.to_json(Role::Owner, &db).await?)
+}
+
+/// The route that change capsule's background.
+#[post("/delete-background/<capsule_id>")]
+pub async fn delete_background(
+    user: User,
+    capsule_id: HashId,
+    db: Db,
+    socks: &S<WebSockets>,
+    config: &S<Config>,
+) -> Result<Value> {
+    let (mut capsule, _) = user.get_capsule_with_permission(capsule_id.0, Role::Write, &db).await?;
+    let path = config
+        .data_path
+        .join(format!("{}", capsule.id))
+        .join("assets");
+
+    if let Some(uuid) = capsule.background {
+        let remove_path = path
+            .join(format!("{}.png", uuid))
+            .to_str()
+            .ok_or(Error(Status::InternalServerError))?
+            .to_string();
+        remove_file(remove_path).expect("Delete previous background failed.");
+        capsule.background = None;
+        capsule.set_changed();
+        capsule.save(&db).await?;
+    
+        capsule.notify_change(&db, &socks).await?;
+    }
+    Ok(capsule.to_json(Role::Owner, &db).await?)
+}
+
+/// The route that change capsule's background.
+#[post("/change-background/<capsule_id>/<extension>", data = "<data>")]
+pub async fn change_background(
+    user: User,
+    capsule_id: HashId,
+    extension: String,
+    db: Db,
+    socks: &S<WebSockets>,
+    config: &S<Config>,
+    data: Data<'_>,
+) -> Result<Value> {
+    let (mut capsule, _) = user.get_capsule_with_permission(capsule_id.0, Role::Write, &db).await?;
+    let path = config
+        .data_path
+        .join(format!("{}", capsule.id))
+        .join("assets");
+
+    if let Some(uuid) = capsule.background {
+        let remove_path = path
+            .join(format!("{}.png", uuid))
+            .to_str()
+            .ok_or(Error(Status::InternalServerError))?
+            .to_string();
+        remove_file(remove_path).expect("Delete previous background failed.");
+    }
+
+    let uuid = Uuid::new_v4();
+    let tmp = path.join(format!("tmp{}.{}", uuid, extension));
+
+    data.open(1_i32.gibibytes()).into_file(&tmp).await?;
+    
+    let input_path = tmp
+        .to_str()
+        .ok_or(Error(Status::InternalServerError))?
+        .to_string();
+    let output_path = path
+        .join(format!("{}.png", uuid))
+        .to_str()
+        .ok_or(Error(Status::InternalServerError))?
+        .to_string();
+    run_command(&vec![
+        "convert",
+        &input_path,
+        "-resize",
+        &format!("{}^>", config.pdf_target_size),
+        &output_path
+    ])?;
+    remove_file(input_path).expect("Delete temporary background failed.");
+    
+    capsule.background = Some(uuid);
+    capsule.set_changed();
+    capsule.save(&db).await?;
+
+    capsule.notify_change(&db, &socks).await?;
     Ok(capsule.to_json(Role::Owner, &db).await?)
 }
 
@@ -195,29 +286,45 @@ pub async fn delete_project(user: User, db: Db, config: &S<Config>, name: String
     Ok(())
 }
 
+fn default_green() -> WebcamSettings {
+    WebcamSettings::Pip {
+        anchor: Anchor::default(),
+        size: (533, 300),
+        position: (4, 4),
+        opacity: 1.0,
+        keycolor: Some("#00FF00".to_string()),
+    }
+}
 /// The route that uploads a record to a capsule for a specific gos.
-#[post("/upload-record/<id>/<gos>", data = "<data>")]
+#[post("/upload-record/<id>/<gos>/<matting>/<downsampling>", data = "<data>")]
 pub async fn upload_record(
     user: User,
     db: Db,
     config: &S<Config>,
     id: HashId,
     gos: i32,
+    matting: Option<bool>,
+    downsampling: Option<f32>,
     data: Data<'_>,
+    socks: &S<WebSockets>,
+    sem: &S<Arc<Semaphore>>,
 ) -> Result<Value> {
+    println!("matting: {:?}", matting);
+
     // Check that the user has write access to the capsule.
     let (mut capsule, role) = user
         .get_capsule_with_permission(*id, Role::Write, &db)
         .await?;
 
-    let gos = capsule
+    let gosid = gos;
+    let _ = capsule
         .structure
         .0
         .get_mut(gos as usize)
         .ok_or(Error(Status::BadRequest))?;
 
     let uuid = Uuid::new_v4();
-    let output = config
+    let output = &config
         .data_path
         .join(format!("{}", *id))
         .join("assets")
@@ -244,10 +351,56 @@ pub async fn upload_record(
         None
     };
 
+    // Check that the user has write access to the capsule.
+    let (mut capsule, _) = user
+        .get_capsule_with_permission(*id, Role::Write, &db)
+        .await?;
+
+    let gos = capsule
+        .structure
+        .0
+        .get_mut(gosid as usize)
+        .ok_or(Error(Status::BadRequest))?;
+
+    let matted = if user.plan > Plan::Free && matting == Some(true) {
+        let webcam_settings = match &gos.webcam_settings {
+            WebcamSettings::Pip {
+                anchor,
+                opacity,
+                position,
+                size,
+                keycolor: _,
+            } => WebcamSettings::Pip {
+                anchor: *anchor,
+                opacity: *opacity,
+                position: *position,
+                size: *size,
+                keycolor: Some("#00FF00".to_string()),
+            },
+
+            WebcamSettings::Fullscreen {
+                opacity,
+                keycolor: _,
+            } => WebcamSettings::Fullscreen {
+                opacity: *opacity,
+                keycolor: Some("#00FF00".to_string()),
+            },
+
+            _ => default_green(),
+        };
+        gos.webcam_settings = webcam_settings;
+
+        Some(TaskStatus::Running)
+    } else {
+        None
+    };
+
     gos.record = Some(Record {
         uuid,
         size,
         pointer_uuid: None,
+        matted,
+        downsampling,
     });
 
     if size.is_none() {
@@ -256,7 +409,118 @@ pub async fn upload_record(
     capsule.set_changed();
     capsule.save(&db).await?;
 
-    Ok(capsule.to_json(role, &db).await?)
+    let res = capsule.to_json(role, &db).await?;
+
+    let socks = S::inner(socks).clone();
+    let sem = S::inner(sem).clone();
+    let config = config.inner().clone();
+
+    if matted.is_some() {
+        // launch async matting
+        tokio::spawn(async move {
+            run_matting(user, capsule.id, gosid, sem, socks, config, db)
+                .await
+                .ok();
+        });
+    };
+
+    Ok(res)
+}
+
+/// Runs the matting on a specific gos.
+pub async fn run_matting(
+    user: User,
+    capsule_id: i32,
+    gosid: i32,
+    sem: Arc<Semaphore>,
+    socks: WebSockets,
+    config: Config,
+    db: Db,
+) -> Result<()> {
+    let mut capsule = Capsule::get_by_id(capsule_id, &db)
+        .await?
+        .ok_or(Error(Status::BadRequest))?;
+
+    let gos = capsule
+        .structure
+        .0
+        .get_mut(gosid as usize)
+        .ok_or(Error(Status::BadRequest))?;
+
+    let record = gos.record.as_ref().ok_or(Error(Status::BadRequest))?;
+
+    let record_downsampling = record.downsampling.unwrap_or(0.4);
+
+    let child = Command::new("../scripts/psh")
+        .arg("on-matting")
+        .arg(format!("{}", &capsule.id))
+        .arg(format!("{}", record.uuid))
+        .arg(format!("{}", record_downsampling))
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .spawn();
+
+    let succeed = if let Ok(mut child) = child {
+        if let Ok(_) = sem.acquire().await {
+            child.stdin.unwrap();
+            let stdout = child.stdout.take().unwrap();
+            let reader = BufReader::new(stdout);
+
+            let mut lines = reader.lines();
+            while let Some(line) = lines.next_line().await.unwrap() {
+                debug!("line = {}", line);
+            }
+            true
+        } else {
+            false
+        }
+    } else {
+        false
+    };
+
+    let capsule = Capsule::get_by_id(capsule.id, &db).await.unwrap();
+    if let Some(mut capsule) = capsule {
+        let gos = capsule
+            .structure
+            .0
+            .get_mut(gosid as usize)
+            .ok_or(Error(Status::BadRequest));
+
+        if succeed {
+            if let Ok(gos) = gos {
+                if let Some(record) = &mut gos.record {
+                    record.matted = Some(TaskStatus::Done);
+                }
+            };
+        } else {
+            error!("Matting fails");
+            if let Ok(gos) = gos {
+                if let Some(record) = &mut gos.record {
+                    record.matted = Some(TaskStatus::Failed);
+                }
+            };
+        }
+
+        println!("capsule produced: {:#?}", capsule.produced);
+        capsule.set_changed();
+        capsule.save(&db).await.ok();
+
+        capsule.notify_change(&db, &socks).await.ok();
+
+        if !capsule.is_matting_running() {
+            if capsule.produced == TaskStatus::Waiting {
+                run_produce(user, capsule.id, db, socks, sem, config).await?;
+            }
+
+            // let ret = if capsule.produced == TaskStatus::Waiting {
+            //     run_produce(user, capsule.id, db, socks, sem, config).await
+            // } else {
+            //     Ok(())
+            // };
+        }
+    }
+
+    Ok(())
 }
 
 /// The route that uploads a pointer to a capsule for a specific gos.
@@ -704,6 +968,137 @@ pub async fn add_gos(
     Ok(capsule.to_json(role, &db).await?)
 }
 
+/// laucnhe psh script for capsule production
+pub async fn run_produce(
+    user: User,
+    id: i32,
+    db: Db,
+    socks: WebSockets,
+    sem: Arc<Semaphore>,
+    config: Config,
+) -> Result<()> {
+    let capsule = Capsule::get_by_id(id, &db).await?;
+    let hid = HashId(id);
+    let output_path = config
+        .data_path
+        .join(format!("{}", *hid))
+        .join("output.mp4");
+
+    if let Some(mut capsule) = capsule {
+        tokio::spawn(async move {
+            let child = Command::new("../scripts/psh")
+                .arg("on-produce")
+                .arg(format!("{}", capsule.id))
+                .arg("-1")
+                .arg(if let Some(v) = capsule.background {format!("{}", v)}else{format!("{}", "null")})
+                .stdin(Stdio::piped())
+                .stdout(Stdio::piped())
+                .spawn();
+
+            let succeed = if let Ok(mut child) = child {
+                capsule.produced = TaskStatus::Running;
+                capsule.published = TaskStatus::Idle;
+                capsule.production_pid = child.id().map(|x| x as i32);
+                capsule.save(&db).await.ok();
+
+                if let Some(stdin) = child.stdin.as_mut() {
+                    stdin
+                        .write_all(json!(capsule.structure.0).to_string().as_bytes())
+                        .await
+                        .unwrap();
+
+                    if let Ok(_) = sem.acquire().await {
+                        child.stdin.unwrap();
+                        let stdout = child.stdout.take().unwrap();
+                        let reader = BufReader::new(stdout);
+
+                        let mut lines = reader.lines();
+                        while let Some(line) = lines.next_line().await.unwrap() {
+                            capsule
+                                .notify_production_progress(
+                                    &hid.hash(),
+                                    &format!("{}", line),
+                                    &db,
+                                    &socks,
+                                )
+                                .await
+                                .ok();
+                        }
+                        true
+                    } else {
+                        false
+                    }
+                } else {
+                    false
+                }
+            } else {
+                false
+            };
+
+            capsule.produced = if succeed {
+                TaskStatus::Done
+            } else {
+                TaskStatus::Failed
+            };
+
+            if succeed {
+                let output = run_command(&vec![
+                    "../scripts/psh",
+                    "duration",
+                    output_path.to_str().unwrap(),
+                ]);
+
+                match &output {
+                    Ok(o) => {
+                        let line = ((std::str::from_utf8(&o.stdout)
+                            .map_err(|_| Error(Status::InternalServerError))
+                            .unwrap()
+                            .trim()
+                            .parse::<f32>()
+                            .unwrap())
+                            * 1000.) as i32;
+
+                        capsule.duration_ms = line;
+                        capsule.save(&db).await.ok();
+                    }
+                    Err(_) => error!("Impossible to get duration"),
+                };
+            }
+            capsule.production_pid = None;
+            capsule.save(&db).await.ok();
+
+            if succeed {
+                capsule
+                    .notify_production(&hid.hash(), &db, &socks)
+                    .await
+                    .ok();
+
+                user.notify(
+                    &socks,
+                    "Production terminée",
+                    &format!(
+                        "La capsule \"{}\" a été correctement produite.",
+                        capsule.name
+                    ),
+                    &db,
+                )
+                .await
+                .ok();
+            } else {
+                user.notify(
+                    &socks,
+                    "Production terminée",
+                    &format!("La production de la capsule \"{}\" a échoué.", capsule.name),
+                    &db,
+                )
+                .await
+                .ok();
+            };
+        });
+    };
+    Ok(())
+}
+
 /// The route that triggers the production of a capsule.
 #[post("/produce/<id>")]
 pub async fn produce(
@@ -712,131 +1107,79 @@ pub async fn produce(
     socks: &S<WebSockets>,
     sem: &S<Arc<Semaphore>>,
     config: &S<Config>,
-    db: Db,
+    pool: &S<Pool>,
 ) -> Result<()> {
+    let pool = S::inner(pool);
+    let db = Db(pool
+        .get()
+        .await
+        .map_err(|_| Error(Status::InternalServerError))?);
+
     let (mut capsule, _) = user
         .get_capsule_with_permission(*id, Role::Write, &db)
         .await?;
+    let mut ret = Ok(());
 
-    if capsule.produced == TaskStatus::Running {
+    if capsule.produced == TaskStatus::Running || capsule.produced == TaskStatus::Waiting {
         return Err(Error(Status::Conflict));
     }
 
-    let socks = socks.inner().clone();
-    let sem = sem.inner().clone();
+    let capsule_id = capsule.id;
 
-    let output_path = config.data_path.join(format!("{}", *id)).join("output.mp4");
+    for (gosid, record) in capsule.matting_idle() {
+        record.matted = Some(TaskStatus::Running);
+        // launch async matting
+        let user = user.clone();
+        let sem = S::inner(sem).clone();
+        let socks = S::inner(socks).clone();
+        let config = config.inner().clone();
+        let db = Db(pool
+            .get()
+            .await
+            .map_err(|_| Error(Status::InternalServerError))?);
 
-    tokio::spawn(async move {
-        let child = Command::new("../scripts/psh")
-            .arg("on-produce")
-            .arg(format!("{}", capsule.id))
-            .arg("-1")
-            .stdin(Stdio::piped())
-            .stdout(Stdio::piped())
-            .spawn();
-
-        let succeed = if let Ok(mut child) = child {
-            capsule.produced = TaskStatus::Running;
-            capsule.published = TaskStatus::Idle;
-            capsule.production_pid = child.id().map(|x| x as i32);
-            capsule.save(&db).await.ok();
-
-            if let Some(stdin) = child.stdin.as_mut() {
-                stdin
-                    .write_all(json!(capsule.structure.0).to_string().as_bytes())
-                    .await
-                    .unwrap();
-
-                if let Ok(_) = sem.acquire().await {
-                    child.stdin.unwrap();
-                    let stdout = child.stdout.take().unwrap();
-                    let reader = BufReader::new(stdout);
-
-                    let mut lines = reader.lines();
-                    while let Some(line) = lines.next_line().await.unwrap() {
-                        capsule
-                            .notify_production_progress(
-                                &id.hash(),
-                                &format!("{}", line),
-                                &db,
-                                &socks,
-                            )
-                            .await
-                            .ok();
-                    }
-                    true
-                } else {
-                    false
-                }
-            } else {
-                false
-            }
-        } else {
-            false
-        };
-
-        capsule.produced = if succeed {
-            TaskStatus::Done
-        } else {
-            TaskStatus::Idle
-        };
-
-        let output = run_command(&vec![
-            "../scripts/psh",
-            "duration",
-            output_path.to_str().unwrap(),
-        ]);
-
-        match &output {
-            Ok(o) => {
-                let line = ((std::str::from_utf8(&o.stdout)
-                    .map_err(|_| Error(Status::InternalServerError))
-                    .unwrap()
-                    .trim()
-                    .parse::<f32>()
-                    .unwrap())
-                    * 1000.) as i32;
-
-                capsule.duration_ms = line;
-                capsule.save(&db).await.ok();
-            }
-            Err(_) => error!("Impossible to get duration"),
-        };
-
-        capsule.production_pid = None;
-        capsule.save(&db).await.ok();
-
-        if succeed {
-            capsule
-                .notify_production(&id.hash(), &db, &socks)
+        tokio::spawn(async move {
+            run_matting(user, capsule_id, gosid, sem, socks, config, db)
                 .await
                 .ok();
+        });
+    }
+    capsule.set_changed();
+    capsule.save(&db).await?;
 
-            user.notify(
-                &socks,
-                "Production terminée",
-                &format!(
-                    "La capsule \"{}\" a été correctement produite.",
-                    capsule.name
-                ),
-                &db,
-            )
-            .await
-            .ok();
-        } else {
-            user.notify(
-                &socks,
-                "Production terminée",
-                &format!("La production de la capsule \"{}\" a échoué.", capsule.name),
-                &db,
-            )
-            .await
-            .ok();
-        };
-    });
+    if capsule.is_matting_running() {
+        println!("matting is active");
+        capsule.produced = TaskStatus::Waiting;
+        user.notify(
+            &socks,
+            "Attente fin fond vert virtuel ",
+            &format!(
+                "Le traitement du fond vert virtuel est en cours sur la capsule \"{}\" .",
+                capsule.name
+            ),
+            &db,
+        )
+        .await
+        .ok();
 
-    Ok(())
+        capsule.set_changed();
+        capsule.save(&db).await.ok();
+        capsule.notify_change(&db, &socks).await?;
+    } else {
+        println!("matting is not active");
+        ret = run_produce(
+            user,
+            capsule.id,
+            db,
+            S::inner(socks).clone(),
+            S::inner(sem).clone(),
+            config.inner().clone(),
+        )
+        .await;
+    };
+
+    println!("capsule Produced: {:#?}", capsule.produced);
+    ret
 }
 
 /// The route that triggers the production of one gos.
@@ -865,6 +1208,7 @@ pub async fn produce_gos(
             .arg("on-produce")
             .arg(format!("{}", capsule.id))
             .arg(format!("{}", gos))
+            .arg(if let Some(v) = capsule.background {format!("{}", v)}else{format!("{}", "null")})
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
             .spawn();

@@ -19,7 +19,20 @@ subscriptions model =
             (\x ->
                 case Decode.decodeValue Acquisition.decodeRecord x of
                     Ok o ->
-                        Core.AcquisitionMsg (Acquisition.RecordArrived o)
+                        Core.AcquisitionMsg
+                            (Acquisition.RecordArrived
+                                { o
+                                    | matted =
+                                        if model.mattingEnabled then
+                                            Just
+                                                Capsule.Idle
+
+                                        else
+                                            Nothing
+                                    , device = Just model.chosenDevice
+                                    , downsampling = Just model.downsampling
+                                }
+                            )
 
                     Err e ->
                         let

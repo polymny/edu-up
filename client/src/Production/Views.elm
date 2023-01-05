@@ -5,8 +5,9 @@ import Core.Types as Core
 import Element exposing (Element)
 import Element.Background as Background
 import Element.Border as Border
-import Element.Events as Events
+import Element.Font as Font
 import Element.Input as Input
+import FontAwesome as Fa
 import Html
 import Html.Attributes
 import Html.Events
@@ -33,12 +34,9 @@ view global user model =
     in
     case ( gos, firstSlide ) of
         ( Just g, Just s ) ->
-            ( Element.column [ Ui.wf, Ui.hf, Element.padding 10 ]
-                [ Element.row [ Ui.wf, Ui.hf, Element.spacing 10 ]
-                    [ Element.el [ Ui.wfp 1, Ui.hf ] (leftColumn global user model g)
-                    , Element.el [ Ui.wfp 3, Ui.hf ] (mainView global user model g s)
-                    ]
-                , bottomBar global user model
+            ( Element.row [ Ui.wf, Ui.hf, Element.spacing 10, Element.padding 10 ]
+                [ Element.column [ Ui.wfp 1, Ui.hf ] [ leftColumn global user model g ]
+                , Element.column [ Ui.wfp 3, Ui.hf ] [ mainView global user model g s ]
                 ]
             , Nothing
             )
@@ -48,7 +46,7 @@ view global user model =
 
 
 leftColumn : Core.Global -> User -> Production.Model -> Capsule.Gos -> Element Core.Msg
-leftColumn global user _ gos =
+leftColumn global user model gos =
     let
         webcamSettings =
             case gos.webcamSettings of
@@ -59,7 +57,7 @@ leftColumn global user _ gos =
                     Capsule.defaultPip
 
         forceDisabled =
-            Maybe.andThen .size gos.record == Nothing
+            Maybe.andThen .size gos.record == Nothing || isProducing model
 
         forceDisabledAttr =
             if forceDisabled then
@@ -75,14 +73,6 @@ leftColumn global user _ gos =
 
             else
                 msg
-
-        forceDisableSelected : Maybe a -> Maybe a
-        forceDisableSelected x =
-            if forceDisabled then
-                Nothing
-
-            else
-                x
 
         forceDisableInfo : Element Core.Msg
         forceDisableInfo =
@@ -116,14 +106,6 @@ leftColumn global user _ gos =
             else
                 msg
 
-        disableSelected : Maybe a -> Maybe a
-        disableSelected x =
-            if disabled then
-                Nothing
-
-            else
-                x
-
         currentOpacity =
             case gos.webcamSettings of
                 Capsule.Pip { opacity } ->
@@ -134,6 +116,19 @@ leftColumn global user _ gos =
 
                 _ ->
                     webcamSettings.opacity
+
+        currentdownsampling =
+            case gos.record of
+                Just r ->
+                    case r.downsampling of
+                        Just ds ->
+                            ds
+
+                        _ ->
+                            0.4
+
+                _ ->
+                    0.4
 
         currentKeyColor =
             case gos.webcamSettings of
@@ -156,20 +151,32 @@ leftColumn global user _ gos =
 
                 Capsule.Fullscreen _ ->
                     Nothing
+
+        keyDisabled =
+            User.isPremium user && Maybe.andThen .matted gos.record /= Nothing
+
+        keyDisabledAttr =
+            if keyDisabled then
+                Ui.disabled
+
+            else
+                disabledAttr
     in
-    Element.column [ Ui.wf, Element.centerY, Element.spacing 30 ]
-        [ Input.checkbox []
-            { checked = gos.webcamSettings /= Capsule.Disabled && not forceDisabled
-            , icon = Input.defaultCheckbox
-            , label = Input.labelRight forceDisabledAttr (Element.text (Lang.useVideo global.lang))
-            , onChange = \x -> Core.ProductionMsg (Production.SetVideo x) |> forceDisableMsg
-            }
-        , forceDisableInfo
+    Element.column [ Ui.wf, Ui.hf, Element.spacing 30, Element.paddingXY 10 0, Element.scrollbarY ]
+        [ Element.column (Element.spacing 10 :: disabledAttr)
+            [ Input.checkbox []
+                { checked = gos.webcamSettings /= Capsule.Disabled && Maybe.andThen .size gos.record /= Nothing
+                , icon = Input.defaultCheckbox
+                , label = Input.labelRight forceDisabledAttr (Element.text (Lang.useVideo global.lang))
+                , onChange = \x -> Core.ProductionMsg (Production.SetVideo x) |> forceDisableMsg
+                }
+            , forceDisableInfo
+            ]
         , Input.radio (Element.spacing 10 :: disabledAttr)
             { onChange = \s -> Core.ProductionMsg (Production.WebcamSizeChanged s) |> disableMsg
             , selected =
                 case gos.webcamSettings of
-                    Capsule.Fullscreen { opacity } ->
+                    Capsule.Fullscreen _ ->
                         Just Production.Fullscreen
 
                     _ ->
@@ -186,7 +193,7 @@ leftColumn global user _ gos =
                                 \v ->
                                     case String.toInt v of
                                         Just val ->
-                                            Core.ProductionMsg (Production.WebcamSizeChanged (Production.Custom val))
+                                            Core.ProductionMsg (Production.WebcamSizeChanged (Production.Custom val)) |> disableMsg
 
                                         _ ->
                                             Core.Noop
@@ -205,7 +212,7 @@ leftColumn global user _ gos =
             }
         , Input.radio (Element.spacing 10 :: disabledAttr)
             { onChange = \s -> Core.ProductionMsg (Production.WebcamAnchorChanged s) |> disableMsg
-            , selected = Just webcamSettings.anchor |> disableSelected
+            , selected = Just webcamSettings.anchor
             , label =
                 Input.labelAbove
                     (Element.paddingXY 0 10 :: disabledAttr ++ Ui.formTitle)
@@ -217,7 +224,7 @@ leftColumn global user _ gos =
                 , Input.option Capsule.BottomRight (Element.text (Lang.bottomRight global.lang))
                 ]
             }
-        , Element.row (Ui.wf :: Ui.hf :: Element.spacing 10 :: disabledAttr)
+        , Element.row (Ui.wf :: Element.spacing 10 :: disabledAttr)
             [ Input.slider
                 [ Element.behindContent
                     (Element.el
@@ -248,34 +255,127 @@ leftColumn global user _ gos =
                 |> Element.el [ Ui.wfp 1, Element.alignBottom ]
             ]
         , if User.isPremium user then
-            Element.el (Ui.formTitle ++ disabledAttr) (Element.text (Lang.key global.lang))
+            Element.el (Ui.formTitle ++ disabledAttr) (Element.text (Lang.matting global.lang))
 
           else
             Element.none
         , if User.isPremium user then
             Input.checkbox disabledAttr
-                { checked = isJust currentKeyColor
+                { checked = Maybe.andThen .matted gos.record /= Nothing && Maybe.andThen .size gos.record /= Nothing
                 , icon = Input.defaultCheckbox
-                , label = Input.labelRight forceDisabledAttr (Element.text (Lang.activateKeying global.lang))
+                , label = Input.labelRight forceDisabledAttr (Element.text (Lang.activateMatting global.lang))
                 , onChange =
-                    \x ->
-                        Core.ProductionMsg
-                            (Production.WebcamKeyColorChanged
-                                (case currentKeyColor of
-                                    Just _ ->
-                                        Nothing
-
-                                    Nothing ->
-                                        Just "#00FF00"
-                                )
-                            )
-                            |> forceDisableMsg
+                    \_ -> Core.ProductionMsg Production.ToggleMatting |> disableMsg
                 }
 
           else
             Element.none
         , if User.isPremium user then
-            Element.row disabledAttr
+            Element.row (Ui.wf :: Element.spacing 10 :: disabledAttr)
+                [ Input.slider
+                    [ Element.behindContent
+                        (Element.el
+                            [ Element.width Element.fill
+                            , Element.height (Element.px 2)
+                            , Element.centerY
+                            , Background.color Colors.grey
+                            , Border.rounded 2
+                            ]
+                            Element.none
+                        )
+                    ]
+                    { label = Input.labelAbove (disabledAttr ++ Ui.formTitle) (Element.text (Lang.downsampling global.lang))
+                    , min = 0.1
+                    , max = 1
+                    , onChange = \x -> Core.ProductionMsg (Production.DownsamplingChanged x) |> disableMsg
+                    , step = Just 0.05
+                    , thumb = Input.defaultThumb
+                    , value = currentdownsampling
+                    }
+                    |> Element.el [ Ui.wfp 5 ]
+                , currentdownsampling
+                    |> (\x -> x * 100)
+                    |> round
+                    |> toFloat
+                    |> (\x -> x / 100)
+                    |> String.fromFloat
+                    |> (\x ->
+                            if String.length x == 1 then
+                                x ++ "."
+
+                            else
+                                x
+                       )
+                    |> String.padRight 4 '0'
+                    |> Element.text
+                    |> Element.el [ Ui.wfp 1, Element.alignBottom ]
+                ]
+
+          else
+            Element.none
+        , if User.isPremium user then
+            Element.row (Ui.wf :: Ui.hf :: Element.spacing 10 :: disabledAttr)
+                [ case model.capsule.background of
+                    Just uuid ->
+                        Element.image
+                            [ Element.height (Element.px 90)
+                            , Element.centerY
+                            , Border.width 1
+                            , Border.color Colors.greyLighter
+                            ]
+                            { src = Capsule.assetPath model.capsule (uuid ++ ".png"), description = "" }
+
+                    Nothing ->
+                        Element.text (Lang.noBackround global.lang)
+                , Element.el [] (newBackgroundButton global model)
+                , Ui.iconButton
+                    [ Font.color Colors.navbar
+                    , Element.padding 5
+                    , Background.color Colors.greyLighter
+                    , Border.rounded 5
+                    ]
+                    { onPress = Just (Core.ProductionMsg Production.RequestDeleteBackground |> disableMsg)
+                    , icon = Fa.trash
+                    , text = Nothing
+                    , tooltip = Just (Lang.deleteBackground global.lang)
+                    }
+                ]
+
+          else
+            Element.none
+        , if User.isPremium user then
+            Element.el (Ui.formTitle ++ keyDisabledAttr) (Element.text (Lang.key global.lang))
+
+          else
+            Element.none
+        , if User.isPremium user then
+            Input.checkbox keyDisabledAttr
+                { checked = isJust currentKeyColor
+                , icon = Input.defaultCheckbox
+                , label = Input.labelRight forceDisabledAttr (Element.text (Lang.activateKeying global.lang))
+                , onChange =
+                    \_ ->
+                        if Maybe.andThen .matted gos.record /= Nothing && Maybe.andThen .size gos.record /= Nothing |> not then
+                            Core.ProductionMsg
+                                (Production.WebcamKeyColorChanged
+                                    (case currentKeyColor of
+                                        Just _ ->
+                                            Nothing
+
+                                        Nothing ->
+                                            Just "#00FF00"
+                                    )
+                                )
+                                |> disableMsg
+
+                        else
+                            Core.Noop
+                }
+
+          else
+            Element.none
+        , if User.isPremium user then
+            Element.row keyDisabledAttr
                 [ Element.el
                     (if isJust currentKeyColor then
                         []
@@ -289,7 +389,7 @@ leftColumn global user _ gos =
                         (Html.input
                             [ Html.Attributes.type_ "color"
                             , Html.Attributes.value (Maybe.withDefault "#00FF00" currentKeyColor)
-                            , Html.Attributes.disabled (not (isJust currentKeyColor))
+                            , Html.Attributes.disabled (not (isJust currentKeyColor) || isProducing model || keyDisabled)
                             , Html.Events.onInput
                                 (\x ->
                                     Core.ProductionMsg
@@ -303,6 +403,11 @@ leftColumn global user _ gos =
                         )
                     )
                 ]
+
+          else
+            Element.none
+        , if keyDisabled then
+            Element.paragraph Ui.disabled [ Element.text (Lang.keyDisabledBecauseMatting global.lang) ]
 
           else
             Element.none
@@ -329,7 +434,7 @@ leftColumn global user _ gos =
           --                   )
           --       }
           -- else
-          Element.none
+          Element.el [ Ui.hf ] Element.none
 
         --Input.text []
         --  { label = Input.labelHidden ""
@@ -338,6 +443,19 @@ leftColumn global user _ gos =
         --  , text = currentKeyColor
         --  }
         ]
+
+
+isProducing : Production.Model -> Bool
+isProducing model =
+    case model.capsule.produced of
+        Capsule.Running _ ->
+            True
+
+        Capsule.Waiting ->
+            True
+
+        _ ->
+            False
 
 
 mainView : Core.Global -> User -> Production.Model -> Capsule.Gos -> Capsule.Slide -> Element Core.Msg
@@ -411,30 +529,51 @@ mainView global user model gos slide =
                         , Element.htmlAttribute (Html.Attributes.style "bottom" (String.fromFloat bp ++ "%"))
                         ]
                         (Element.image
-                            [ Element.htmlAttribute (Html.Attributes.id "webcam-miniature")
-                            , Element.alpha s.opacity
-                            , Ui.wf
-                            , Ui.hf
-                            , Decode.map3 (\z pageX pageY -> Core.ProductionMsg (Production.HoldingImageChanged (Just ( z, pageX, pageY ))))
-                                (Decode.field "pointerId" Decode.int)
-                                (Decode.field "pageX" Decode.float)
-                                (Decode.field "pageY" Decode.float)
-                                |> Html.Events.on "pointerdown"
-                                |> Element.htmlAttribute
-                            , Decode.succeed (Core.ProductionMsg (Production.HoldingImageChanged Nothing))
-                                |> Html.Events.on "pointerup"
-                                |> Element.htmlAttribute
-                            , Element.htmlAttribute
-                                (Html.Events.custom "dragstart"
-                                    (Decode.succeed
-                                        { message = Core.Noop
-                                        , preventDefault = True
-                                        , stopPropagation = True
-                                        }
+                            (Element.htmlAttribute (Html.Attributes.id "webcam-miniature")
+                                :: Element.alpha s.opacity
+                                :: Ui.wf
+                                :: Ui.hf
+                                :: (Decode.map3 (\z pageX pageY -> Core.ProductionMsg (Production.HoldingImageChanged (Just ( z, pageX, pageY ))))
+                                        (Decode.field "pointerId" Decode.int)
+                                        (Decode.field "pageX" Decode.float)
+                                        (Decode.field "pageY" Decode.float)
+                                        |> Html.Events.on "pointerdown"
+                                        |> Element.htmlAttribute
+                                   )
+                                :: (Decode.succeed (Core.ProductionMsg (Production.HoldingImageChanged Nothing))
+                                        |> Html.Events.on "pointerup"
+                                        |> Element.htmlAttribute
+                                   )
+                                :: Element.htmlAttribute
+                                    (Html.Events.custom "dragstart"
+                                        (Decode.succeed
+                                            { message = Core.Noop
+                                            , preventDefault = True
+                                            , stopPropagation = True
+                                            }
+                                        )
                                     )
-                                )
-                            ]
-                            { src = Capsule.assetPath model.capsule (r.uuid ++ ".png")
+                                :: (case model.capsule.background of
+                                        Just path ->
+                                            [ path
+                                                |> Capsule.assetPath model.capsule
+                                                |> (\tmp -> "url(\"" ++ tmp ++ ".png\")")
+                                                |> Html.Attributes.style "background-image"
+                                                |> Element.htmlAttribute
+                                            , Element.htmlAttribute (Html.Attributes.style "background-size" "cover")
+                                            , Element.htmlAttribute (Html.Attributes.style "background-position" "center")
+                                            ]
+
+                                        _ ->
+                                            []
+                                   )
+                            )
+                            { src =
+                                if r.matted == Just Capsule.Done then
+                                    Capsule.assetPath model.capsule (r.uuid ++ "_matted.png")
+
+                                else
+                                    Capsule.assetPath model.capsule (r.uuid ++ ".png")
                             , description = ""
                             }
                         )
@@ -479,11 +618,12 @@ mainView global user model gos slide =
     Element.column []
         [ Element.el [ Ui.wf, Element.centerY, Element.inFront overlay, Element.clip ] image
         , Element.row [ Element.alignRight, Element.spacing 10, Element.padding 10 ] [ produceInfo, produceButton ]
+        , bottomBar global user model
         ]
 
 
 bottomBar : Core.Global -> User -> Production.Model -> Element Core.Msg
-bottomBar global user model =
+bottomBar global _ model =
     let
         produceInfo =
             case ( model.capsule.published, Capsule.videoPath model.capsule ) of
@@ -516,10 +656,11 @@ bottomBar global user model =
                                         ]
                                 , onPress = Nothing
                                 }
-                            , Ui.primaryButton
-                                { label = Element.text (Lang.cancelProduction global.lang)
-                                , onPress = Just (Core.ProductionMsg Production.CancelProduction)
-                                }
+
+                            --, Ui.primaryButton
+                            --    { label = Element.text (Lang.cancelProduction global.lang)
+                            --    , onPress = Just (Core.ProductionMsg Production.CancelProduction)
+                            --    }
                             ]
                         , case msg of
                             Just m ->
@@ -529,6 +670,28 @@ bottomBar global user model =
                                 Element.none
                         ]
 
+                Capsule.Waiting ->
+                    Element.column []
+                        [ Element.row [ Element.spacing 10, Element.alignRight ]
+                            [ Ui.primaryButton
+                                { label =
+                                    Element.row []
+                                        [ Element.text (Lang.waitingMatting global.lang)
+                                        , Element.el [ Element.paddingEach { left = 10, right = 0, top = 0, bottom = 0 } ]
+                                            Ui.spinner
+                                        ]
+                                , onPress = Nothing
+                                }
+
+                            -- , Ui.primaryButton
+                            --     { label = Element.text (Lang.cancelProduction global.lang)
+                            --     , onPress = Just (Core.ProductionMsg Production.CancelProduction)
+                            --     }
+                            ]
+                        , Element.el [ Element.padding 10, Element.width Element.fill, Ui.hf ]
+                            (Element.text (Lang.waitingMattingMsg global.lang))
+                        ]
+
                 _ ->
                     Ui.primaryButton
                         { label = Element.text (Lang.produceVideo global.lang)
@@ -536,3 +699,29 @@ bottomBar global user model =
                         }
     in
     Element.row [ Element.alignRight, Element.spacing 10, Element.padding 10 ] [ produceInfo, produceButton ]
+
+
+newBackgroundButton : Core.Global -> Production.Model -> Element Core.Msg
+newBackgroundButton global model =
+    let
+        gos =
+            List.head (List.drop model.gos model.capsule.structure)
+
+        newBackgroundMsg =
+            case gos of
+                Just g ->
+                    if Maybe.andThen .size g.record == Nothing || g.webcamSettings == Capsule.Disabled || isProducing model then
+                        Nothing
+
+                    else
+                        Core.ProductionMsg Production.BackgroundUploadRequested |> Just
+
+                _ ->
+                    Nothing
+    in
+    Element.el [ Element.paddingXY 10 0 ]
+        (Ui.simpleButton
+            { onPress = newBackgroundMsg
+            , label = Element.text (Lang.selectBackground global.lang)
+            }
+        )

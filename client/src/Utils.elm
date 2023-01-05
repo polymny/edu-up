@@ -1,4 +1,4 @@
-module Utils exposing (andMap, checkEmail, formatTime, isJust, tern)
+module Utils exposing (andMap, change, checkEmail, formatTime, isJust, tern)
 
 import Json.Decode as Decode exposing (Decoder)
 
@@ -71,3 +71,16 @@ formatTime milliseconds =
                 String.fromInt minutes
     in
     minutesString ++ ":" ++ secsString
+
+
+change : Int -> (a -> a) -> List a -> List a
+change id changer list =
+    List.indexedMap
+        (\i x ->
+            if i == id then
+                changer x
+
+            else
+                x
+        )
+        list

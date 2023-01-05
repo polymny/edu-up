@@ -76,6 +76,8 @@ decodeGlobal key =
         |> andMap (Decode.maybe (Decode.field "audioDeviceId" Decode.string))
         |> andMap (Decode.field "sortBy" User.decodeSortBy)
         |> andMap (Decode.field "promptSize" Decode.int)
+        |> andMap (Decode.field "matting" Decode.bool)
+        |> andMap (Decode.field "downsampling" Decode.float)
         |> Decode.map (Core.flagsToGlobal key)
 
 
@@ -133,7 +135,7 @@ pageFromRoute global user currentPage route extraCapsule =
                     }
             in
             capsule
-                |> Maybe.map (\x -> Acquisition.init devices chosenDevice x id)
+                |> Maybe.map (\x -> Acquisition.init global.matting global.downsampling devices chosenDevice x id)
                 |> Maybe.map (Tuple.mapFirst Core.Acquisition)
                 |> Maybe.map (Tuple.mapSecond (\x -> Cmd.map Core.AcquisitionMsg x))
                 |> Maybe.withDefault ( Core.Home Core.newHomeModel, cmd )

@@ -824,6 +824,16 @@ deleteSlide lang =
             "Delete slide"
 
 
+deleteBackground : Lang -> String
+deleteBackground lang =
+    case lang of
+        FrFr ->
+            "Supprimer l'arrière plan"
+
+        _ ->
+            "Delete background"
+
+
 deleteSlideConfirm : Lang -> String
 deleteSlideConfirm lang =
     case lang of
@@ -1072,6 +1082,26 @@ selectPdf lang =
 
         _ ->
             "Select a PDF file"
+
+
+selectBackground : Lang -> String
+selectBackground lang =
+    case lang of
+        FrFr ->
+            "Choisir un arrière plan"
+
+        _ ->
+            "Select a background"
+
+
+noBackround : Lang -> String
+noBackround lang =
+    case lang of
+        FrFr ->
+            "Pas d'arrière plan"
+        
+        _ ->
+            "No background"
 
 
 replaceSlideOrAddExternalResource : Lang -> String
@@ -1392,6 +1422,26 @@ watchGosVideo lang gos =
 
         _ ->
             "Watch grain " ++ gos
+
+
+waitingMatting : Lang -> String
+waitingMatting lang =
+    case lang of
+        FrFr ->
+            "Traitements fond vert virtuel en cours"
+
+        _ ->
+            "Virtual background removal in progress"
+
+
+waitingMattingMsg : Lang -> String
+waitingMattingMsg lang =
+    case lang of
+        FrFr ->
+            "La production de la vidéo démarerra une fois les traitements terminés"
+
+        _ ->
+            "The video production will start, when background removal ends"
 
 
 producing : Lang -> String
@@ -1878,6 +1928,46 @@ activateKeying lang =
             "Activate keying"
 
 
+matting : Lang -> String
+matting lang =
+    case lang of
+        FrFr ->
+            "Fond vert virtuel"
+
+        _ ->
+            "Virtual green screen"
+
+
+activateMatting : Lang -> String
+activateMatting lang =
+    case lang of
+        FrFr ->
+            "Activer le font vert virtuel"
+
+        _ ->
+            "Activate virtual green screen"
+
+
+downsampling : Lang -> String
+downsampling lang =
+    case lang of
+        FrFr ->
+            "Taux de sous-échantillonnage"
+
+        _ ->
+            "Downsampling ratio"
+
+
+background : Lang -> String
+background lang =
+    case lang of
+        FrFr ->
+            "Arrière plan"
+
+        _ ->
+            "Background"
+
+
 activateFade : Lang -> String
 activateFade lang =
     case lang of
@@ -2016,3 +2106,23 @@ createGrain lang =
 
         _ ->
             "Create grain"
+
+
+backgroundRemoval : Lang -> String
+backgroundRemoval lang =
+    case lang of
+        FrFr ->
+            "Suppression du fond"
+
+        _ ->
+            "Background removal"
+
+
+keyDisabledBecauseMatting : Lang -> String
+keyDisabledBecauseMatting lang =
+    case lang of
+        FrFr ->
+            "Le keying est réglé par rapport aux paramètres du fond vert virtuel."
+
+        _ ->
+            "Keying is set up to work with virtual green screen."

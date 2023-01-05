@@ -144,6 +144,8 @@ const INDEX_HTML_AFTER_FLAGS: &str = r#";
             flags.global.resolution = localStorage.getItem('resolution');
             flags.global.sortBy = JSON.parse(localStorage.getItem('sortBy')) || ["lastModified", false];
             flags.global.promptSize = parseInt(localStorage.getItem('promptSize'), 10) || 25;
+            flags.global.matting = localStorage.getItem('matting') === "true";
+            flags.global.downsampling = parseFloat(localStorage.getItem('downsampling'));
             var app = Elm.Main.init({
                 flags: flags,
                 node: document.getElementById('root')
@@ -215,6 +217,8 @@ const UNLOGGED_HTML_AFTER_FLAGS: &str = r#";
             flags.global.language = localStorage.getItem('language');
             flags.global.sortBy = JSON.parse(localStorage.getItem('sortBy')) || ["lastModified", false];
             flags.global.promptSize = parseInt(localStorage.getItem('promptSize'), 10) || 25;
+            flags.global.matting = localStorage.getItem('matting') === "true";
+            flags.global.downsampling = parseFloat(localStorage.getItem('downsampling'));
             var app = Elm.Unlogged.init({
                 flags: flags,
                 node: document.getElementById('root')
