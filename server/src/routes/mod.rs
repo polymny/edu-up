@@ -310,12 +310,16 @@ pub async fn capsule_settings(
 #[catch(404)]
 pub async fn not_found<'a>(
     request: &'_ Request<'a>,
-) -> Either<status::Accepted<content::RawHtml<String>>, Redirect> {
+) -> Either<status::NotFound<Option<content::RawHtml<String>>>, Redirect> {
     let db = Db::from_request(request).await.unwrap();
     let config = request.guard::<&S<Config>>().await.unwrap();
     let user = Option::<User>::from_request(request).await.unwrap();
     let lang = Lang::from_request(request).await.unwrap();
-    index_without_cors(config, db, user, lang).await
+    let response = index_without_cors(config, db, user, lang).await;
+    match response {
+        Either::Left(status) => Either::Left(status::NotFound(status.0)),
+        Either::Right(redirect) => Either::Right(redirect),
+    }
 }
 
 /// The route for asset static files that require authorization.
