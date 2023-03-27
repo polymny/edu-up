@@ -44,6 +44,7 @@ use rocket::{Ignite, Rocket, State};
 use crate::command::run_command;
 use crate::config::Config;
 use crate::websockets::{websocket, WebSockets};
+use crate::db::group::populate_db;
 
 lazy_static! {
     /// The harsh encoder and decoder for capsule ids.
@@ -264,8 +265,8 @@ pub async fn reset_db() {
     use crate::db::user::{Plan, User};
 
     let mut user = User::new(
-        "Graydon",
-        "graydon@example.com",
+        "polymny",
+        "contacter@polymny.studio",
         "hashed",
         true,
         &None,
@@ -278,17 +279,8 @@ pub async fn reset_db() {
     user.plan = Plan::Admin;
     user.save(&db).await.unwrap();
 
-    User::new(
-        "Evan",
-        "evan@example.com",
-        "hashed",
-        true,
-        &None,
-        &db,
-        &config,
-    )
-    .await
-    .unwrap();
+    populate_db(&db, &config).await.unwrap();
+    
 }
 
 /// Calculate disk usage for each user.

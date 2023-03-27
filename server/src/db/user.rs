@@ -18,6 +18,7 @@ use rocket::serde::json::{json, Value};
 
 use crate::config::Config;
 use crate::db::capsule::{capsule, Capsule, Role};
+use crate::db::group::ParticipantRole;
 use crate::db::notification::Notification;
 use crate::db::session::Session;
 use crate::mailer::Mailer;
@@ -300,6 +301,17 @@ impl User {
             .map(|x| x.to_json())
             .collect::<Vec<_>>();
 
+        let groups = self.groups(&db).await?;
+        let groups = groups
+            .iter()
+            .filter(|(_, role)| *role == ParticipantRole::Teacher)
+            .map(|(group, _)| {
+                group.to_json(&db)
+            })
+            .collect::<Vec<_>>();
+
+        let groups = try_join_all(groups).await?;
+
         Ok(json!({
             "username": self.username,
             "email": self.email,
@@ -307,7 +319,8 @@ impl User {
             "capsules": capsules,
             "notifications": notifications,
             "plan": self.plan,
-            "disk_quota": self.disk_quota
+            "disk_quota": self.disk_quota,
+            "groups": groups,
         }))
     }
 
