@@ -1,6 +1,7 @@
 //! This module contains everything that manage the capsule in the database.
-use chrono::{NaiveDateTime, Utc};
 use std::default::Default;
+
+use chrono::{NaiveDateTime, Utc};
 
 use ergol::prelude::*;
 use ergol::tokio_postgres::types::Json;
@@ -447,7 +448,13 @@ impl Capsule {
     }
 
     /// Notify the users that a capsule has been publicated.
-    pub async fn notify_video_upload(&self, slide_id: &str, capsule_id: &str, db: &Db, sock: &WebSockets) -> Result<()> {
+    pub async fn notify_video_upload(
+        &self,
+        slide_id: &str,
+        capsule_id: &str,
+        db: &Db,
+        sock: &WebSockets,
+    ) -> Result<()> {
         let text = json!({
             "type": "video_upload_finished",
             "capsule_id": capsule_id,
