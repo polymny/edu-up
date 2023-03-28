@@ -3,10 +3,15 @@
 use serde::{Deserialize, Serialize};
 
 use ergol::prelude::*;
+use ergol::tokio_postgres::types::Json as EJson;
 
 use rocket::serde::json::{json, Value};
 
+use tokio::fs::create_dir_all;
+
+use crate::command::export_slides;
 use crate::config::Config;
+use crate::db::capsule::{Capsule, Fade, Gos, Slide};
 use crate::db::user::User;
 use crate::{Db, Result};
 
@@ -40,13 +45,16 @@ impl Group {
     /// Serializes the group with its participants.
     pub async fn to_json(&self, db: &Db) -> Result<Value> {
         let participants = self.participants(db).await?;
-        let participants = participants.into_iter().map(|(user, role)| {
-            json!({
-                "username": user.username,
-                "email": user.email,
-                "role": role,
+        let participants = participants
+            .into_iter()
+            .map(|(user, role)| {
+                json!({
+                    "username": user.username,
+                    "email": user.email,
+                    "role": role,
+                })
             })
-        }).collect::<Vec<_>>();
+            .collect::<Vec<_>>();
 
         Ok(json!({
             "name": self.name,
@@ -55,11 +63,33 @@ impl Group {
     }
 }
 
+/// An assignment that a teacher will give to a group of students.
+#[ergol]
+pub struct Assignment {
+    /// The id of the assignment.
+    #[id]
+    pub id: i32,
+
+    /// The capsule that contains the subject of the assignment.
+    #[many_to_one(assignments)]
+    pub subject: Capsule,
+
+    /// The capsule that will serve as a template for answers.
+    #[many_to_one(answers)]
+    pub answer: Capsule,
+
+    /// The group of users associated with this assignment.
+    #[many_to_one(assignments)]
+    pub participants: Group,
+}
+
 /// Creates some users in the db.
 #[rustfmt::skip]
 pub async fn populate_db(db: &Db, config: &Config) -> Result<()> {
+    // Find the admin (teacher)
     let polymny = User::get_by_username("polymny", &db).await.unwrap().unwrap();
 
+    // Create a bunch of students
     let iguernon = User::new("iguernon","iguernon@example.com", "hashed", true, &None, &db, &config).await.unwrap();
     let tmarceau = User::new("tmarceau","tmarceau@example.com", "hashed", true, &None, &db, &config).await.unwrap();
     let cbabin = User::new("cbabin",  "cbabin@example.com", "hashed", true, &None, &db, &config).await.unwrap();
@@ -71,6 +101,7 @@ pub async fn populate_db(db: &Db, config: &Config) -> Result<()> {
     let rseguin = User::new("rseguin", "rseguin@example.com", "hashed", true, &None, &db, &config).await.unwrap();
     let xbrodeur = User::new("xbrodeur","xbrodeur@example.com", "hashed", true, &None, &db, &config).await.unwrap();
 
+    // Create a few groups
     let group1 = Group::create("Terminale 1").save(&db).await.unwrap();
     group1.add_participant(&polymny, ParticipantRole::Teacher, &db).await.unwrap();
     group1.add_participant(&iguernon, ParticipantRole::Student, &db).await.unwrap();
@@ -89,6 +120,38 @@ pub async fn populate_db(db: &Db, config: &Config) -> Result<()> {
     group3.add_participant(&ysalois, ParticipantRole::Student, &db).await.unwrap();
     group3.add_participant(&rseguin, ParticipantRole::Student, &db).await.unwrap();
     group3.add_participant(&xbrodeur, ParticipantRole::Student, &db).await.unwrap();
+
+    // Create the subject of the assignment
+    let mut subject = Capsule::new("Mon projet", "Sujet", &polymny, &db).await?;
+
+    let path = config
+        .data_path
+        .join(format!("{}", subject.id))
+        .join("assets");
+
+    create_dir_all(&path).await?;
+
+    let gos = export_slides(&config, "example/slides.pdf", path, None)?
+        .into_iter()
+        .map(|x| Gos {
+            record: None,
+            slides: vec![Slide {
+                uuid: x,
+                extra: None,
+                prompt: String::new(),
+            }],
+            events: vec![],
+            webcam_settings: None,
+            fade: Fade::none(),
+        })
+        .collect::<Vec<_>>();
+
+    subject.structure = EJson(gos);
+    subject.set_changed();
+    subject.save(&db).await?;
+
+    // Create the assignment
+    let assignment = Assignment::create(&subject, &subject, &group1);
 
     Ok(())
 }
