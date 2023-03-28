@@ -43,8 +43,8 @@ use rocket::{Ignite, Rocket, State};
 
 use crate::command::run_command;
 use crate::config::Config;
-use crate::websockets::{websocket, WebSockets};
 use crate::db::group::populate_db;
+use crate::websockets::{websocket, WebSockets};
 
 lazy_static! {
     /// The harsh encoder and decoder for capsule ids.
@@ -280,7 +280,6 @@ pub async fn reset_db() {
     user.save(&db).await.unwrap();
 
     populate_db(&db, &config).await.unwrap();
-    
 }
 
 /// Calculate disk usage for each user.
