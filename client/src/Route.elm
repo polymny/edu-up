@@ -20,6 +20,7 @@ type Route
     | Publication String
     | Options String
     | Profile
+    | NewCourse
     | NotFound
     | Custom String
 
@@ -49,6 +50,9 @@ toUrl route =
 
         Profile ->
             "/profile"
+        
+        NewCourse ->
+            "/courses"
 
         NotFound ->
             "/"
@@ -106,6 +110,9 @@ fromUrl url =
 
         "profile" :: [] ->
             Profile
+        
+        "courses" :: [] ->
+            NewCourse
 
         _ ->
             NotFound
@@ -135,6 +142,9 @@ compareTab r1 r2 =
             True
 
         ( Profile, Profile ) ->
+            True
+        
+        ( NewCourse, NewCourse ) ->
             True
 
         _ ->

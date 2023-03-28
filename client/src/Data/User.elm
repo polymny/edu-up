@@ -1,14 +1,14 @@
-module Data.User exposing (User, decodeUser, isPremium, addCapsule, deleteCapsule, updateUser, sortProjects, getCapsuleById, Project, toggleProject, compareCapsule, compareProject)
+module Data.User exposing (User, Group, Participant, decodeUser, isPremium, addCapsule, deleteCapsule, updateUser, sortProjects, getCapsuleById, Project, toggleProject, compareCapsule, compareProject)
 
 {-| This module contains all the data related to the user.
 
-@docs User, decodeUser, isPremium, addCapsule, deleteCapsule, updateUser, sortProjects, getCapsuleById, Project, toggleProject, compareCapsule, compareProject
+@docs User, Group, Participant, decodeUser, isPremium, addCapsule, deleteCapsule, updateUser, sortProjects, getCapsuleById, Project, toggleProject, compareCapsule, compareProject
 
 -}
 
 import Data.Capsule as Data exposing (Capsule)
 import Data.Types as Data
-import Json.Decode as Decode exposing (Decoder)
+import Json.Decode as Decode exposing (Decoder, field)
 import List.Extra
 
 
@@ -35,7 +35,8 @@ type alias PrivateUser =
     , email : String
     , plan : Data.Plan
     , capsules : List Capsule
-    , quota: Int
+    , quota : Int
+    , groups : List Group
     }
 
 
@@ -43,16 +44,49 @@ type alias PrivateUser =
 -}
 decodePrivateUser : Decoder PrivateUser
 decodePrivateUser =
-    Decode.map5 PrivateUser
+    Decode.map6 PrivateUser
         (Decode.field "username" Decode.string)
         (Decode.field "email" Decode.string)
         (Decode.field "plan" Data.decodePlan)
         (Decode.field "capsules" (Decode.list Data.decodeCapsule))
         (Decode.field "disk_quota" Decode.int)
+        (Decode.field "groups" (Decode.list decodeGroup))
 
 
+{-| This type represents a group with all the info we have on it.
+-}
+type alias Group =
+    { name : String
+    , participants : List Participant
+    }
 
---(Decode.field "notifications" (Decode.list decodeNotification))
+
+{-| JSON decoder for group.
+-}
+decodeGroup : Decoder Group
+decodeGroup =
+    Decode.map2 Group
+        (Decode.field "name" Decode.string)
+        (Decode.field "participants" (Decode.list decodeParticipant))
+
+
+{-| JSON decoder for participant.
+-}
+decodeParticipant : Decoder Participant
+decodeParticipant =
+    Decode.map3 Participant
+        (Decode.field "username" Decode.string)
+        (Decode.field "email" Decode.string)
+        (Decode.field "role" Data.decodeGroupRole)
+
+
+{-| This type represents a participant with all the info we have on it.
+-}
+type alias Participant =
+    { username : String
+    , email : String
+    , role : Data.GroupRole
+    }
 
 
 {-| This type represents a user with all the info we have on them.
@@ -62,7 +96,8 @@ type alias User =
     , email : String
     , plan : Data.Plan
     , projects : List Project
-    , quota: Int
+    , quota : Int
+    , groups : List Group
     }
 
 
@@ -93,6 +128,7 @@ decodeUser sortBy =
                 , plan = user.plan
                 , projects = capsulesToProjects user.capsules |> sortProjects sortBy
                 , quota = user.quota
+                , groups = user.groups
                 }
             )
 

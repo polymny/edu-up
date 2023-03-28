@@ -26,11 +26,12 @@ import Data.User as Data exposing (User)
 import Home.Types as Home
 import Json.Decode as Decode
 import NewCapsule.Types as NewCapsule
+import NewCourse.Types as NewCourse
 import Options.Types as Options
 import Preparation.Types as Preparation
 import Production.Types as Production
-import Publication.Types as Publication
 import Profile.Types as Profile
+import Publication.Types as Publication
 import Unlogged.Types as Unlogged
 import Url
 
@@ -82,6 +83,7 @@ type Page
     | Publication (Publication.Model String)
     | Options (Options.Model String)
     | Profile Profile.Model
+    | NewCourse NewCourse.Model
 
 
 {-| This type represents the errors that can occur when the page starts.
@@ -111,6 +113,7 @@ type Msg
     | PublicationMsg Publication.Msg
     | OptionsMsg Options.Msg
     | ProfileMsg Profile.Msg
+    | NewCourseMsg NewCourse.Msg
     | ConfigMsg Config.Msg
     | WebSocketMsg WebSocketMsg
     | OnUrlChange Url.Url

@@ -21,6 +21,7 @@ import Html
 import Html.Attributes
 import Lang exposing (Lang)
 import Material.Icons
+import NewCourse.Views as NewCourse
 import NewCapsule.Views as NewCapsule
 import Options.Types as Options
 import Options.Views as Options
@@ -182,6 +183,9 @@ viewSuccess model =
 
         ( App.Profile m, _, _ ) ->
             Profile.view model.config model.user m
+        
+        ( App.NewCourse m, _, _ ) ->
+            NewCourse.view model.config model.user m
 
         _ ->
             ( Element.none, Element.none )

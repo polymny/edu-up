@@ -21,18 +21,19 @@ import Home.Updates as Home
 import Json.Decode as Decode exposing (Decoder)
 import NewCapsule.Types as NewCapsule
 import NewCapsule.Updates as NewCapsule
+import NewCourse.Updates as NewCourse
 import Options.Types as Options
 import Options.Updates as Options
 import Preparation.Types as Preparation
 import Preparation.Updates as Preparation
 import Production.Types as Production
 import Production.Updates as Production
+import Profile.Types as Profile
+import Profile.Updates as Profile
 import Publication.Types as Publication
 import Publication.Updates as Publication
 import RemoteData
 import Route
-import Profile.Types as Profile
-import Profile.Updates as Profile
 import Unlogged.Types as Unlogged
 import Unlogged.Updates as Unlogged
 import Utils
@@ -332,6 +333,9 @@ updateModel msg model =
                 App.ProfileMsg sMsg ->
                     Profile.update sMsg model
 
+                App.NewCourseMsg sMsg ->
+                    NewCourse.update sMsg model
+
                 App.WebSocketMsg (App.CapsuleUpdated c) ->
                     let
                         newPage =
@@ -561,6 +565,9 @@ subs m =
 
                     ( App.Profile _, _, _ ) ->
                         Sub.none
+                    
+                    ( App.NewCourse _, _, _ ) ->
+                        NewCourse.subs
 
                     _ ->
                         Sub.none

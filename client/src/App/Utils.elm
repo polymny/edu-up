@@ -20,12 +20,13 @@ import Data.User as Data exposing (User)
 import Home.Types as Home
 import Json.Decode as Decode
 import List exposing (product)
+import NewCourse.Types as NewCourse
 import Options.Types as Options
 import Preparation.Types as Preparation
 import Production.Types as Production
+import Profile.Types as Profile
 import Publication.Types as Publication
 import Route exposing (Route)
-import Profile.Types as Profile
 import Unlogged.Types as Unlogged
 import Url exposing (Url)
 
@@ -235,6 +236,9 @@ pageFromRoute _ user route =
         Route.Profile ->
             ( App.Profile Profile.init, Cmd.none )
 
+        Route.NewCourse ->
+            ( App.NewCourse NewCourse.init, Cmd.none )
+
         _ ->
             ( App.Home Home.init, Cmd.none )
 
@@ -267,3 +271,6 @@ routeFromPage page =
 
         App.Profile _ ->
             Route.Profile
+
+        App.NewCourse _ ->
+            Route.NewCourse

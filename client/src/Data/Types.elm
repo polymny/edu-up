@@ -1,7 +1,7 @@
 module Data.Types exposing
     ( SortBy, encodeSortBy, decodeSortBy, SortKey(..), encodeSortKey, decodeSortKey
     , Plan(..), decodePlan
-    , Role(..), encodeRole, roleFromString, decodeRole
+    , Role(..), encodeRole, roleFromString, decodeRole, GroupRole(..), decodeGroupRole, groupRoleFromString, encodeGroupRole
     , TaskStatus(..), decodeTaskStatus
     , Privacy(..), encodePrivacy, decodePrivacy
     )
@@ -21,7 +21,7 @@ module Data.Types exposing
 
 # Users roles
 
-@docs Role, encodeRole, roleFromString, decodeRole
+@docs Role, encodeRole, roleFromString, decodeRole, GroupRole, decodeGroupRole, groupRoleFromString, encodeGroupRole
 
 
 # Task status
@@ -141,6 +141,56 @@ type Role
     = Read
     | Write
     | Owner
+
+
+{-| This type represents the different roles a particiant can have for a group.
+-}
+type GroupRole
+    = Teacher
+    | Student
+
+
+{-| JSON encoder for group role.
+-}
+encodeGroupRole : GroupRole -> String
+encodeGroupRole role =
+    case role of
+        Teacher ->
+            "teacher"
+
+        Student ->
+            "student"
+
+
+{-| Decode a group role from a string.
+-}
+groupRoleFromString : String -> Maybe GroupRole
+groupRoleFromString role =
+    case role of
+        "teacher" ->
+            Just Teacher
+
+        "student" ->
+            Just Student
+
+        _ ->
+            Nothing
+
+
+{-| JSON decoder for group role.
+-}
+decodeGroupRole : Decoder GroupRole
+decodeGroupRole =
+    Decode.string
+        |> Decode.andThen
+            (\str ->
+                case groupRoleFromString str of
+                    Just x ->
+                        Decode.succeed x
+
+                    _ ->
+                        Decode.fail <| "Unknown group role: " ++ str
+            )
 
 
 {-| JSON encoder for role.

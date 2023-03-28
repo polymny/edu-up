@@ -100,6 +100,13 @@ leftColumn config user =
                 { label = Element.text <| Strings.stepsPreparationSelectPdf config.clientState.lang
                 , action = Ui.Msg <| App.HomeMsg <| Home.SlideUploadClicked Nothing
                 }
+        
+        newCourseButton : Element App.Msg
+        newCourseButton =
+            Ui.primary [ Ui.wf ]
+                { label = Element.text "<| Strings.uiNewCourse lang"
+                , action = Ui.Route Route.NewCourse
+                }
 
         storageBar : Element App.Msg
         storageBar =
@@ -215,6 +222,7 @@ leftColumn config user =
         , Border.color (Colors.grey 6)
         ]
         [ uploadSlidesButton
+        , newCourseButton
         , Element.column [ Ui.ab, Ui.s 4 ]
             [ storageInfo
             , storageBar
