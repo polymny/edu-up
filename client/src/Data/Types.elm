@@ -1,7 +1,7 @@
 module Data.Types exposing
     ( SortBy, encodeSortBy, decodeSortBy, SortKey(..), encodeSortKey, decodeSortKey
     , Plan(..), decodePlan
-    , Role(..), encodeRole, roleFromString, decodeRole, decodeGroupRole, groupRoleFromString, encodeGroupRole
+    , Role(..), encodeRole, roleFromString, decodeRole, decodeGroupRole, groupRoleFromString, encodeParticipantRole
     , TaskStatus(..), decodeTaskStatus
     , Privacy(..), encodePrivacy, decodePrivacy
     , ParticipantRole(..)
@@ -153,8 +153,8 @@ type ParticipantRole
 
 {-| JSON encoder for group role.
 -}
-encodeGroupRole : ParticipantRole -> String
-encodeGroupRole role =
+encodeParticipantRole : ParticipantRole -> String
+encodeParticipantRole role =
     case role of
         Teacher ->
             "teacher"

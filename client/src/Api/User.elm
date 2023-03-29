@@ -145,6 +145,7 @@ deleteCapsule capsule toMsg =
             , toMsg = toMsg
             }
 
+
 {-| Requests to delete a project.
 -}
 deleteProject : String -> (WebData () -> msg) -> Cmd msg
@@ -152,5 +153,64 @@ deleteProject projectId toMsg =
     Api.delete
         { url = "/api/project/" ++ projectId
         , body = Http.emptyBody
+        , toMsg = toMsg
+        }
+
+
+{-| Request to create a group.
+-}
+createGroup : String -> (WebData Data.Group -> msg) -> Cmd msg
+createGroup groupName toMsg =
+    Api.postJson
+        { url = "/api/new-group"
+        , decoder = Data.decodeGroup
+        , body = Http.jsonBody <| Encode.object [ ( "name", Encode.string groupName ) ]
+        , toMsg = toMsg
+        }
+
+
+{-| Request to delete a group.
+-}
+deleteGroup : Int -> (WebData Data.Group -> msg) -> Cmd msg
+deleteGroup groupId toMsg =
+    Api.deleteJson
+        { url = "/api/delete-group/"
+        , decoder = Data.decodeGroup
+        , body = Http.jsonBody <| Encode.object [ ( "group_id", Encode.int groupId ) ]
+        , toMsg = toMsg
+        }
+
+
+{-| Request to add a participant to a group.
+-}
+addParticipant : Int -> String -> Data.ParticipantRole -> (WebData Data.Group -> msg) -> Cmd msg
+addParticipant groupId participantEmail role toMsg =
+    Api.postJson
+        { url = "/api/add-participant"
+        , decoder = Data.decodeGroup
+        , body =
+            Http.jsonBody <|
+                Encode.object
+                    [ ( "group_id", Encode.int groupId )
+                    , ( "participant", Encode.string participantEmail )
+                    , ( "participant_role", Encode.string <| Data.encodeParticipantRole role )
+                    ]
+        , toMsg = toMsg
+        }
+
+
+{-| Request to remove a participant from a group.
+-}
+removeParticipant : Int -> String -> (WebData Data.Group -> msg) -> Cmd msg
+removeParticipant groupId participantEmail toMsg =
+    Api.deleteJson
+        { url = "/api/remove-participant"
+        , decoder = Data.decodeGroup
+        , body =
+            Http.jsonBody <|
+                Encode.object
+                    [ ( "group_id", Encode.int groupId )
+                    , ( "participant", Encode.string participantEmail )
+                    ]
         , toMsg = toMsg
         }

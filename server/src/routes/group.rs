@@ -37,7 +37,7 @@ pub struct DeleteGroupFrom {
 }
 
 /// Route to create a new group of students.
-#[post("/delete-group", data = "<form>")]
+#[delete("/delete-group", data = "<form>")]
 pub async fn delete_group(user: User, db: Db, form: Json<DeleteGroupFrom>) -> Result<()> {
     let form = form.into_inner();
 
@@ -124,7 +124,7 @@ pub struct RemoveParticipantForm {
 }
 
 /// Route to remove a participant to a group of students.
-#[post("/remove-participant", data = "<form>")]
+#[delete("/remove-participant", data = "<form>")]
 pub async fn remove_participant(
     user: User,
     db: Db,

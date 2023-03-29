@@ -1,10 +1,12 @@
 module NewCourse.Updates exposing (..)
 
+import Api.User as Api
 import App.Types as App
 import Data.Types as Data
 import Data.User as Data
 import Keyboard
 import NewCourse.Types as NewCourse exposing (PopupType(..))
+import RemoteData exposing (RemoteData(..))
 import Utils
 
 
@@ -62,8 +64,7 @@ update msg model =
                                 }
                         , user = { user | groups = newGroup :: user.groups }
                       }
-                    , -- TODO: create group in backend
-                      Cmd.none
+                    , Api.createGroup groupName (App.NewCourseMsg << NewCourse.Response)
                     )
 
                 NewCourse.EnterPressed ->
@@ -138,8 +139,7 @@ update msg model =
                                             , popupType = NoPopup
                                         }
                               }
-                            , -- TODO: add participant in backend
-                              Cmd.none
+                            , Api.addParticipant group.id participantEmail participantRole (App.NewCourseMsg << NewCourse.Response)
                             )
 
                         Nothing ->
@@ -162,8 +162,7 @@ update msg model =
                                             | selectedGroup = Just newGroup
                                         }
                               }
-                            , -- TODO: remove participant in backend
-                              Cmd.none
+                            , Api.removeParticipant group.id participant.email (App.NewCourseMsg << NewCourse.Response)
                             )
 
                         Nothing ->
@@ -200,15 +199,47 @@ update msg model =
                                             List.filter (\g -> g.id /= group.id) model.user.groups
                                     }
                               }
-                            , -- TODO: delete group in backend
-                              Cmd.none
+                            , Api.deleteGroup group.id (App.NewCourseMsg << NewCourse.Response)
                             )
 
                         Nothing ->
                             ( model, Cmd.none )
 
+                NewCourse.Response (Success group) ->
+                    let
+                        user : Data.User
+                        user =
+                            model.user
+                    in
+                    ( { model
+                        | user =
+                            { user
+                                | groups =
+                                    updateGroup group user.groups
+                            }
+                      }
+                    , Cmd.none
+                    )
+
+                NewCourse.Response _ ->
+                    ( model, Cmd.none )
+
         _ ->
             ( model, Cmd.none )
+
+
+{-| Update a group in the model.
+-}
+updateGroup : Data.Group -> List Data.Group -> List Data.Group
+updateGroup group groups =
+    List.map
+        (\g ->
+            Utils.tern
+                (g.id == group.id || (g.id == -1 && g.name == group.name))
+                group
+                g
+        )
+        groups
 
 
 {-| Keyboard shortcuts of the new course page.

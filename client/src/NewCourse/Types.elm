@@ -4,6 +4,7 @@ import Data.Types as Data
 import Data.User as Data
 import Http exposing (Part)
 import Utils
+import RemoteData exposing (WebData)
 
 
 {-| The Msg type for the new course page.
@@ -18,6 +19,7 @@ type Msg
     | AddParticipant Utils.Confirmation Data.ParticipantRole String
     | RemoveParticipant Data.Participant
     | DeleteGroup Utils.Confirmation Data.Group
+    | Response (WebData (Data.Group))
 
 
 {-| The model for the new course page.
