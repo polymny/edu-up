@@ -224,6 +224,12 @@ msgid_plural ""
 msgstr[0] "Capsule"
 msgstr[1] "Capsules"
 
+#. The project itself.
+msgid "Data.Capsule.project"
+msgid_plural ""
+msgstr[0] "Project"
+msgstr[1] "Projects"
+
 #. The hash id of a capsule.
 msgid "Data.Capsule.hashid"
 msgstr "Hash id"
@@ -1093,48 +1099,44 @@ msgid "Actions.Confirm.deleteRecord"
 msgstr "Do you really want to delete this record"
 
 #. Profile button.
-msgid "Ui.profile"
+msgid "Ui.Profile"
 msgstr "Profile"
 
 #. Change email.
-msgid "Ui.profile.changeEmail"
+msgid "Ui.Profile.changeEmail"
 msgstr "Change email"
 
 #. Change password.
-msgid "Ui.profile.changePassword"
+msgid "Ui.Profile.changePassword"
 msgstr "Password"
 
 #. DeleteAccount.
-msgid "Ui.profile.deleteAccount"
+msgid "Ui.Profile.deleteAccount"
 msgstr "Delete account"
 
 #. Profile username.
-msgid "Ui.profile.username"
+msgid "Ui.Profile.username"
 msgstr "Username"
 
 #. Profile email.
-msgid "Ui.profile.email"
+msgid "Ui.Profile.email"
 msgstr "Email"
 
 #. Profile projects and capsules.
-msgid "Ui.profile.projectsAndCapsules"
+msgid "Ui.Profile.projectsAndCapsules"
 msgstr "Projects and capsules"
 
-#. Profile projects.
-msgid "Ui.profile.projects"
-msgstr "Projects"
-
-#. Profile capsules.
-msgid "Ui.profile.capsules"
-msgstr "Capsules"
-
 #. Profile produced.
-msgid "Ui.profile.produced"
-msgstr "Produced capsules"
+msgid "Ui.Profile.produced"
+msgid_plural ""
+msgstr[0] "Produced capsule"
+msgstr[1] "Produced capsule"
 
 #. Profile published.
-msgid "Ui.profile.published"
-msgstr "Published capsules"
+msgid "Ui.Profile.published"
+msgid_plural ""
+msgstr[0] "Published capsule"
+msgstr[1] "Published capsules"
 
 #. Client tasks.
 msgid "Ui.tasksClient"
@@ -1165,8 +1167,8 @@ msgid "Ui.Storage"
 msgstr "Storage"
 
 #. Websocket.
-msgid "Ui.webSocketState"
-msgstr "State of the websocket connection"
+msgid "Ui.webSocketNotWorking"
+msgstr "The websocket is disconnected"
 
 #. Connected.
 msgid "Ui.connected"
@@ -1181,12 +1183,16 @@ msgid "Ui.info"
 msgstr "Information"
 
 #. This icon indicates the state of the websocket.
-msgid "Ui.iconIndicatesWebSocketState"
-msgstr "This icon indicates the websocket state"
+msgid "Ui.iconIndicatesWebSocketBroken"
+msgstr "This icon indicates that the websocket is disconnected"
 
 #. If the websocket is not working, Polymny Studio won't work correctly.
 msgid "Ui.noWebSocketWillCauseProblems"
 msgstr "If the websocket is not working, Polymny Studio won't work correctly"
+
+#. Wait, refresh, or contact admin.
+msgid "Ui.webSocketWaitRefreshContactAdmin"
+msgstr "You can wait or try to refresh the page, or contact the administrator if the problem persists"
 
 #. Upload record task.
 msgid "Tasks.uploadRecord"
