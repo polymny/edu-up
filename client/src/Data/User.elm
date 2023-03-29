@@ -87,7 +87,7 @@ decodeParticipant =
 type alias Participant =
     { username : String
     , email : String
-    , role : Data.GroupRole
+    , role : Data.ParticipantRole
     }
 
 

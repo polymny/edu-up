@@ -1,9 +1,10 @@
 module Data.Types exposing
     ( SortBy, encodeSortBy, decodeSortBy, SortKey(..), encodeSortKey, decodeSortKey
     , Plan(..), decodePlan
-    , Role(..), encodeRole, roleFromString, decodeRole, GroupRole(..), decodeGroupRole, groupRoleFromString, encodeGroupRole
+    , Role(..), encodeRole, roleFromString, decodeRole, decodeGroupRole, groupRoleFromString, encodeGroupRole
     , TaskStatus(..), decodeTaskStatus
     , Privacy(..), encodePrivacy, decodePrivacy
+    , ParticipantRole(..)
     )
 
 {-| This module contains the different types that are useful for users and capsules.
@@ -145,14 +146,14 @@ type Role
 
 {-| This type represents the different roles a particiant can have for a group.
 -}
-type GroupRole
+type ParticipantRole
     = Teacher
     | Student
 
 
 {-| JSON encoder for group role.
 -}
-encodeGroupRole : GroupRole -> String
+encodeGroupRole : ParticipantRole -> String
 encodeGroupRole role =
     case role of
         Teacher ->
@@ -164,7 +165,7 @@ encodeGroupRole role =
 
 {-| Decode a group role from a string.
 -}
-groupRoleFromString : String -> Maybe GroupRole
+groupRoleFromString : String -> Maybe ParticipantRole
 groupRoleFromString role =
     case role of
         "teacher" ->
@@ -179,7 +180,7 @@ groupRoleFromString role =
 
 {-| JSON decoder for group role.
 -}
-decodeGroupRole : Decoder GroupRole
+decodeGroupRole : Decoder ParticipantRole
 decodeGroupRole =
     Decode.string
         |> Decode.andThen
