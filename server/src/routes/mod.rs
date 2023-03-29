@@ -18,6 +18,7 @@ use crate::{Db, Error, HashId, Lang, Result};
 
 pub mod admin;
 pub mod capsule;
+pub mod group;
 pub mod notification;
 pub mod user;
 pub mod watch;
