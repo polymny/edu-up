@@ -497,6 +497,7 @@ pub async fn rocket() -> StdResult<Rocket<Ignite>, rocket::Error> {
                 routes::notification::mark_as_read,
                 routes::notification::delete,
                 routes::group::new_group,
+                routes::group::delete_group,
                 routes::group::add_participant,
                 routes::group::remove_participant,
                 routes::admin::get_dashboard,

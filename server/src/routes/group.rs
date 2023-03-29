@@ -18,12 +18,46 @@ pub struct NewGroupFrom {
 
 /// Route to create a new group of students.
 #[post("/new-group", data = "<form>")]
-pub async fn new_group(user: User, db: Db, form: Json<NewGroupFrom>) -> Result<()> {
+pub async fn new_group(user: User, db: Db, form: Json<NewGroupFrom>) -> Result<Value> {
     let form = form.into_inner();
+
     let group = Group::create(form.name).save(&db).await?;
     group
         .add_participant(&user, ParticipantRole::Teacher, &db)
         .await?;
+
+    Ok(group.to_json(&db).await?)
+}
+
+/// The data for the new group form.
+#[derive(Serialize, Deserialize)]
+pub struct DeleteGroupFrom {
+    /// The id of the group.
+    pub group_id: i32,
+}
+
+/// Route to create a new group of students.
+#[post("/delete-group", data = "<form>")]
+pub async fn delete_group(user: User, db: Db, form: Json<DeleteGroupFrom>) -> Result<()> {
+    let form = form.into_inner();
+
+    let group = Group::get_by_id(form.group_id, &db)
+        .await?
+        .ok_or(Error(Status::BadRequest))?;
+
+    let mut found = false;
+    for (participant, role) in group.participants(&db).await? {
+        if participant.id == user.id && role == ParticipantRole::Teacher {
+            found = true;
+        }
+    }
+
+    if !found {
+        return Err(Error(Status::NotFound));
+    }
+
+    group.delete(&db).await?;
+
     Ok(())
 }
 
