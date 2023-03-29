@@ -14,6 +14,7 @@ type Msg
     | EnterPressed
     | EscapePressed
     | ChangeSelectorIndex Int
+    | AddParticipant Utils.Confirmation Data.GroupRole String 
 
 
 {-| The model for the new course page.
@@ -30,6 +31,7 @@ type alias Model =
 type PopupType
     = NoPopup
     | NewGroupPopup String
+    | AddParticipantPopup Data.GroupRole String
 
 
 {-| The initial model for the new course page.

@@ -26,7 +26,15 @@ view : Config -> Data.User -> NewCourse.Model -> ( Element App.Msg, Element App.
 view config user model =
     ( Element.column [ Ui.wf, Ui.p 20, Ui.s 20, Ui.hf ]
         [ Element.row [ Ui.s 10 ] <|
-            List.map (\g -> groupButton g (Just g == model.selectedGroup)) user.groups
+            List.map
+                (\g ->
+                    model.selectedGroup
+                        |> Maybe.map .id
+                        |> Maybe.withDefault -1
+                        |> (==) g.id
+                        |> groupButton g
+                )
+                user.groups
                 ++ [ Ui.secondary []
                         { action = Ui.Msg <| App.NewCourseMsg <| NewCourse.NewGroup Utils.Request ""
                         , label = Ui.icon 18 Icons.add
@@ -64,6 +72,38 @@ popup config user model =
                             }
                         , Ui.primary [ Ui.ar ]
                             { action = Ui.Msg <| App.NewCourseMsg <| NewCourse.NewGroup Utils.Confirm groupName
+                            , label = Element.text <| Strings.uiConfirm config.clientState.lang
+                            }
+                        ]
+                    ]
+
+        NewCourse.AddParticipantPopup participantRole participantEmail ->
+            let
+                title : String
+                title =
+                    case participantRole of
+                        Data.Student ->
+                            "[Nouvel élève]"
+
+                        Data.Teacher ->
+                            "[Nouveau professeur]"
+            in
+            Ui.popup 1 title <|
+                Element.column [ Ui.wf, Ui.hf ]
+                    [ Input.text
+                        [ Ui.wf ]
+                        { onChange = App.NewCourseMsg << NewCourse.AddParticipant Utils.Request participantRole
+                        , text = participantEmail
+                        , placeholder = Just <| Input.placeholder [] <| Element.text "[exemple@exemple.ex]"
+                        , label = Input.labelAbove [] (Ui.title "[Adresse email]")
+                        }
+                    , Element.row [ Ui.wf, Ui.ab ]
+                        [ Ui.secondary []
+                            { action = Ui.Msg <| App.NewCourseMsg <| NewCourse.AddParticipant Utils.Cancel participantRole ""
+                            , label = Element.text <| Strings.uiCancel config.clientState.lang
+                            }
+                        , Ui.primary [ Ui.ar ]
+                            { action = Ui.Msg <| App.NewCourseMsg <| NewCourse.AddParticipant Utils.Confirm participantRole participantEmail
                             , label = Element.text <| Strings.uiConfirm config.clientState.lang
                             }
                         ]
@@ -263,5 +303,20 @@ participantLists group selectorIndex =
             , Border.shadow { offset = ( 0.0, 0.0 ), size = 1, blur = 10, color = Colors.alpha 0.3 }
             ]
           <|
-            List.map participantView <| Utils.tern (selectorIndex == 0) students teachers
+            (List.map participantView <|
+                Utils.tern (selectorIndex == 0) students teachers
+            )
+                ++ Utils.tern
+                    (group == Nothing)
+                    []
+                    [ Ui.secondary []
+                        { action =
+                            Ui.Msg <|
+                                App.NewCourseMsg <|
+                                    NewCourse.AddParticipant Utils.Request
+                                        (Utils.tern (selectorIndex == 0) Data.Student Data.Teacher)
+                                        ""
+                        , label = Ui.icon 18 Icons.add
+                        }
+                    ]
         ]

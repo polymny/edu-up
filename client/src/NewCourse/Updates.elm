@@ -8,6 +8,8 @@ import NewCourse.Types as NewCourse exposing (PopupType(..))
 import Utils
 
 
+{-| Updates of the new course page.
+-}
 update : NewCourse.Msg -> App.Model -> ( App.Model, Cmd App.Msg )
 update msg model =
     case model.page of
@@ -63,7 +65,7 @@ update msg model =
                     , -- TODO: create group in backend
                       Cmd.none
                     )
-                
+
                 NewCourse.EnterPressed ->
                     case m.popupType of
                         NoPopup ->
@@ -71,7 +73,10 @@ update msg model =
 
                         NewGroupPopup groupName ->
                             update (NewCourse.NewGroup Utils.Confirm groupName) model
-                    
+
+                        AddParticipantPopup participantRole participantEmail ->
+                            update (NewCourse.AddParticipant Utils.Confirm participantRole participantEmail) model
+
                 NewCourse.EscapePressed ->
                     case m.popupType of
                         NoPopup ->
@@ -79,12 +84,62 @@ update msg model =
 
                         NewGroupPopup groupName ->
                             update (NewCourse.NewGroup Utils.Cancel groupName) model
-                
+
+                        AddParticipantPopup participantRole participantEmail ->
+                            update (NewCourse.AddParticipant Utils.Cancel participantRole participantEmail) model
+
                 NewCourse.ChangeSelectorIndex index ->
                     ( { model | page = App.NewCourse { m | selectorIndex = index } }
                     , Cmd.none
                     )
-                        
+
+                NewCourse.AddParticipant Utils.Request participantRole participantEmail ->
+                    ( { model
+                        | page =
+                            App.NewCourse
+                                { m
+                                    | popupType = NewCourse.AddParticipantPopup participantRole participantEmail
+                                }
+                      }
+                    , Cmd.none
+                    )
+
+                NewCourse.AddParticipant Utils.Cancel participantEmail participantRole ->
+                    ( { model | page = App.NewCourse { m | popupType = NoPopup } }
+                    , Cmd.none
+                    )
+
+                NewCourse.AddParticipant Utils.Confirm participantRole participantEmail ->
+                    case m.selectedGroup of
+                        Just group ->
+                            let
+                                newParticipant : Data.Participant
+                                newParticipant =
+                                    { username = ""
+                                    , email = participantEmail
+                                    , role = participantRole
+                                    }
+
+                                newGroup : Data.Group
+                                newGroup =
+                                    { group | participants = newParticipant :: group.participants }
+                            in
+                            ( { model
+                                | page =
+                                    App.NewCourse
+                                        { m
+                                            | selectedGroup = Just newGroup
+                                            , popupType = NoPopup
+                                        }
+                              }
+                            , -- TODO: add participant in backend
+                              Cmd.none
+                            )
+
+                        Nothing ->
+                            ( {model | page = App.NewCourse { m | popupType = NoPopup } }
+                            , Cmd.none
+                            )
 
         _ ->
             ( model, Cmd.none )
