@@ -237,7 +237,22 @@ participantLists group selectorIndex =
 
         participantView : Data.Participant -> Element App.Msg
         participantView participant =
-            Element.text <| participant.username ++ " (" ++ participant.email ++ ")"
+            Element.row [ Ui.s 10 ]
+                [ Ui.navigationElement (Ui.Msg <| App.NewCourseMsg <| NewCourse.RemoveParticipant participant) [] <|
+                    Element.el
+                        [ Element.mouseOver [ Background.color <| Colors.alpha 0.1 ]
+                        , Ui.p 5
+                        , Ui.r 30
+                        , Font.color Colors.green1
+                        , Ui.tooltip <| "[Enlever " ++ participant.username ++ "]"
+                        , Element.htmlAttribute <|
+                            Transition.properties [ Transition.backgroundColor 200 [ Transition.easeInOut ] ]
+                        ]
+                    <|
+                        Ui.icon 15 Icons.close
+                , Element.text participant.username
+                , Element.text <| "(" ++ participant.email ++ ")"
+                ]
     in
     Element.column
         [ Ui.p 20
@@ -309,14 +324,29 @@ participantLists group selectorIndex =
                 ++ Utils.tern
                     (group == Nothing)
                     []
-                    [ Ui.secondary []
-                        { action =
-                            Ui.Msg <|
-                                App.NewCourseMsg <|
-                                    NewCourse.AddParticipant Utils.Request
-                                        (Utils.tern (selectorIndex == 0) Data.Student Data.Teacher)
-                                        ""
-                        , label = Ui.icon 18 Icons.add
-                        }
+                    [ Ui.navigationElement
+                        (Ui.Msg <|
+                            App.NewCourseMsg <|
+                                NewCourse.AddParticipant
+                                    Utils.Request
+                                    (Utils.tern (selectorIndex == 0) Data.Student Data.Teacher)
+                                    ""
+                        )
+                        []
+                      <|
+                        Element.row
+                            [ Font.color Colors.green1
+                            , Ui.s 10
+                            , Ui.p 5
+                            , Element.mouseOver [ Font.color <| Colors.black ]
+                            , Element.htmlAttribute <|
+                                Transition.properties [ Transition.color 200 [ Transition.easeInOut ] ]
+                            ]
+                            [ Element.el [] <|
+                                Ui.icon
+                                    18
+                                    Icons.add
+                            , Element.text <| "[Ajouter un " ++ Utils.tern (selectorIndex == 0) "étudiant" "professeur" ++ "]"
+                            ]
                     ]
         ]

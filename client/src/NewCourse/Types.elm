@@ -3,6 +3,7 @@ module NewCourse.Types exposing (..)
 import Data.Types as Data
 import Data.User as Data
 import Utils
+import Http exposing (Part)
 
 
 {-| The Msg type for the new course page.
@@ -14,7 +15,8 @@ type Msg
     | EnterPressed
     | EscapePressed
     | ChangeSelectorIndex Int
-    | AddParticipant Utils.Confirmation Data.GroupRole String 
+    | AddParticipant Utils.Confirmation Data.GroupRole String
+    | RemoveParticipant Data.Participant
 
 
 {-| The model for the new course page.

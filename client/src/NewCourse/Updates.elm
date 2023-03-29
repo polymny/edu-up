@@ -137,9 +137,31 @@ update msg model =
                             )
 
                         Nothing ->
-                            ( {model | page = App.NewCourse { m | popupType = NoPopup } }
+                            ( { model | page = App.NewCourse { m | popupType = NoPopup } }
                             , Cmd.none
                             )
+
+                NewCourse.RemoveParticipant participant ->
+                    case m.selectedGroup of
+                        Just group ->
+                            let
+                                newGroup : Data.Group
+                                newGroup =
+                                    { group | participants = List.filter (\p -> p.email /= participant.email) group.participants }
+                            in
+                            ( { model
+                                | page =
+                                    App.NewCourse
+                                        { m
+                                            | selectedGroup = Just newGroup
+                                        }
+                              }
+                            , -- TODO: remove participant in backend
+                              Cmd.none
+                            )
+
+                        Nothing ->
+                            ( model, Cmd.none )
 
         _ ->
             ( model, Cmd.none )
