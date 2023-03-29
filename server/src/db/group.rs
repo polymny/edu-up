@@ -84,6 +84,55 @@ pub struct Assignment {
     pub participants: Group,
 }
 
+impl Assignment {
+    /// Creates a new criterion and adds it to the assignment.
+    pub async fn add_criterion(&self, criterion: &str, db: &Db) -> Result<Criterion> {
+        Ok(Criterion::create(self, criterion).save(&db).await?)
+    }
+
+    /// Returns a JSON value representing the assignment.
+    pub async fn to_json(&self, db: &Db) -> Result<Value> {
+        Ok(json!({
+            "id": self.id,
+            "subject": self.subject(&db).await?.id,
+            "answer": self.answer(&db).await?.id,
+            "participants": self.participants(&db).await?.participants(&db).await?.into_iter().map(|(user, role)| {
+                json!({
+                    "username": user.username,
+                    "email": user.email,
+                    "role": role,
+                })
+            }).collect::<Vec<_>>(),
+            "criteria": self.criteria(&db).await?.into_iter().map(|x| x.to_json()).collect::<Vec<_>>(),
+        }))
+    }
+}
+
+/// A criterion for student evaluation.
+#[ergol]
+pub struct Criterion {
+    /// The id of the criterion.
+    #[id]
+    pub id: i32,
+
+    /// The correspoding assignment.
+    #[many_to_one(criteria)]
+    pub assignment: Assignment,
+
+    /// The content of the criterion.
+    pub description: String,
+}
+
+impl Criterion {
+    /// Returns a JSON representation of the criterion.
+    pub fn to_json(&self) -> Value {
+        json!({
+            "id": self.id,
+            "description": self.description,
+        })
+    }
+}
+
 /// Creates some users in the db.
 #[rustfmt::skip]
 pub async fn populate_db(db: &Db, config: &Config) -> Result<()> {
@@ -152,7 +201,15 @@ pub async fn populate_db(db: &Db, config: &Config) -> Result<()> {
     subject.save(&db).await?;
 
     // Create the assignment
-    let assignment = Assignment::create(&subject, &subject, &group1);
+    let assignment = Assignment::create(&subject, &subject, &group1).save(&db).await?;
+    assignment.add_criterion("Respect de la consigne", &db).await?;
+    assignment.add_criterion("Clarté du discours", &db).await?;
+    assignment.add_criterion("Structuration du propos", &db).await?;
+    assignment.add_criterion("Débit", &db).await?;
+    assignment.add_criterion("Gestuelle", &db).await?;
+
+    let assignment = Assignment::get_by_id(assignment.id, &db).await?.unwrap();
+    println!("{}", assignment.to_json(&db).await?);
 
     Ok(())
 }
