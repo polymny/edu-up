@@ -42,7 +42,8 @@ update msg model =
 
                         newGroup : Data.Group
                         newGroup =
-                            { name = groupName
+                            { id = -1
+                            , name = groupName
                             , participants = [ selfParticipant ]
                             }
 
@@ -78,6 +79,11 @@ update msg model =
 
                         NewGroupPopup groupName ->
                             update (NewCourse.NewGroup Utils.Cancel groupName) model
+                
+                NewCourse.ChangeSelectorIndex index ->
+                    ( { model | page = App.NewCourse { m | selectorIndex = index } }
+                    , Cmd.none
+                    )
                         
 
         _ ->

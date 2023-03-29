@@ -56,7 +56,8 @@ decodePrivateUser =
 {-| This type represents a group with all the info we have on it.
 -}
 type alias Group =
-    { name : String
+    { id : Int
+    , name : String
     , participants : List Participant
     }
 
@@ -65,7 +66,8 @@ type alias Group =
 -}
 decodeGroup : Decoder Group
 decodeGroup =
-    Decode.map2 Group
+    Decode.map3 Group
+        (Decode.field "id" Decode.int)
         (Decode.field "name" Decode.string)
         (Decode.field "participants" (Decode.list decodeParticipant))
 

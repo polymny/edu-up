@@ -13,6 +13,7 @@ type Msg
     | NewGroup Utils.Confirmation String
     | EnterPressed
     | EscapePressed
+    | ChangeSelectorIndex Int
 
 
 {-| The model for the new course page.
@@ -20,6 +21,7 @@ type Msg
 type alias Model =
     { selectedGroup : Maybe Data.Group
     , popupType : PopupType
+    , selectorIndex : Int
     }
 
 
@@ -36,4 +38,5 @@ init : Model
 init =
     { selectedGroup = Nothing
     , popupType = NoPopup
+    , selectorIndex = 0
     }

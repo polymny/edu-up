@@ -57,6 +57,7 @@ impl Group {
             .collect::<Vec<_>>();
 
         Ok(json!({
+            "id": self.id,
             "name": self.name,
             "participants": participants,
         }))

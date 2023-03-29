@@ -493,7 +493,7 @@ navButtons lang capsuleId page =
     let
         buttonWidth : Int
         buttonWidth =
-            100
+            120
 
         roundRadius : Int
         roundRadius =

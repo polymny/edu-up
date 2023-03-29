@@ -104,7 +104,7 @@ leftColumn config user =
         newCourseButton : Element App.Msg
         newCourseButton =
             Ui.primary [ Ui.wf ]
-                { label = Element.text "<| Strings.uiNewCourse lang"
+                { label = Element.text "[New Course]"
                 , action = Ui.Route Route.NewCourse
                 }
 
@@ -218,7 +218,8 @@ leftColumn config user =
         [ Ui.hf
         , Ui.wf
         , Ui.br 1
-        , Element.padding 10
+        , Ui.s 20
+        , Ui.p 10
         , Border.color (Colors.grey 6)
         ]
         [ uploadSlidesButton

@@ -5,10 +5,16 @@ import Config exposing (Config)
 import Data.Types as Data
 import Data.User as Data
 import Element exposing (Element)
+import Element.Background as Background
+import Element.Border as Border
+import Element.Font as Font
 import Element.Input as Input
+import Html.Attributes exposing (style)
 import Material.Icons as Icons
 import NewCourse.Types as NewCourse
+import Simple.Transition as Transition
 import Strings
+import Ui.Colors as Colors
 import Ui.Elements as Ui
 import Ui.Utils as Ui
 import Utils
@@ -18,15 +24,16 @@ import Utils
 -}
 view : Config -> Data.User -> NewCourse.Model -> ( Element App.Msg, Element App.Msg )
 view config user model =
-    ( Element.column []
-        [ Element.row [ Ui.s 10, Ui.p 10 ] <|
+    ( Element.column [ Ui.wf, Ui.p 20, Ui.s 20, Ui.hf ]
+        [ Element.row [ Ui.s 10 ] <|
             List.map (\g -> groupButton g (Just g == model.selectedGroup)) user.groups
                 ++ [ Ui.secondary []
                         { action = Ui.Msg <| App.NewCourseMsg <| NewCourse.NewGroup Utils.Request ""
                         , label = Ui.icon 18 Icons.add
                         }
                    ]
-        , participantList model.selectedGroup
+        , participantLists model.selectedGroup model.selectorIndex
+        , Element.el [ Ui.hfp 1 ] Element.none
         ]
     , popup config user model
     )
@@ -85,9 +92,17 @@ groupButton group selected =
 
 {-| Participant list view.
 -}
-participantList : Maybe Data.Group -> Element App.Msg
-participantList group =
+participantLists : Maybe Data.Group -> Int -> Element App.Msg
+participantLists group selectorIndex =
     let
+        buttonWidth : Int
+        buttonWidth =
+            150
+
+        roundRadius : Int
+        roundRadius =
+            10
+
         students : List Data.Participant
         students =
             case group of
@@ -108,35 +123,145 @@ participantList group =
                 Nothing ->
                     []
 
+        groupName : String
+        groupName =
+            case group of
+                Just g ->
+                    g.name
+
+                Nothing ->
+                    "[No group selected]"
+
+        selectorMove : Float
+        selectorMove =
+            toFloat <| selectorIndex * buttonWidth - roundRadius
+
+        selector : Element msg
+        selector =
+            Element.row
+                [ Element.htmlAttribute <| Html.Attributes.style "position" "absolute"
+                , Element.htmlAttribute <| Html.Attributes.style "height" "100%"
+                , Ui.zIndex 1
+                , Element.moveRight selectorMove
+                , Ui.wpx (buttonWidth + 2 * roundRadius)
+                , Ui.hf
+                , Element.htmlAttribute <|
+                    Transition.properties [ Transition.transform 200 [ Transition.easeInOut ] ]
+                ]
+                [ Element.el
+                    [ Ui.hf
+                    , Ui.wpx roundRadius
+                    , Background.color Colors.greyBackground
+                    ]
+                  <|
+                    Element.el
+                        [ Ui.hf
+                        , Ui.wpx roundRadius
+                        , Ui.rbr roundRadius
+                        , Background.color Colors.green2
+                        , Border.innerShadow
+                            { offset = ( 0.0, -11.0 )
+                            , size = -10.0
+                            , blur = 10.0
+                            , color = Colors.alpha 0.3
+                            }
+                        ]
+                        Element.none
+                , Element.el
+                    [ Ui.hf
+                    , Ui.wf
+                    , Ui.rt roundRadius
+                    , Background.color Colors.greyBackground
+                    ]
+                    Element.none
+                , Element.el
+                    [ Ui.hf
+                    , Ui.wpx 10
+                    , Background.color Colors.greyBackground
+                    ]
+                  <|
+                    Element.el
+                        [ Ui.hf
+                        , Ui.wpx 10
+                        , Ui.rbl roundRadius
+                        , Background.color Colors.green2
+                        , Border.innerShadow
+                            { offset = ( 0.0, -11.0 )
+                            , size = -10.0
+                            , blur = 10.0
+                            , color = Colors.alpha 0.3
+                            }
+                        ]
+                        Element.none
+                ]
+
         participantView : Data.Participant -> Element App.Msg
         participantView participant =
             Element.text <| participant.username ++ " (" ++ participant.email ++ ")"
     in
-    Element.column [ Ui.s 10, Ui.p 10, Ui.at ] <|
-        case group of
-            Just g ->
-                [ Element.text (g.name ++ ":")
-                , Element.row [ Ui.s 10, Ui.p 10, Ui.at ] <|
-                    [ if not (List.isEmpty students) then
-                        Element.column [ Ui.s 10, Ui.p 10, Ui.at ]
-                            [ Element.text "Students:"
-                            , Element.column [ Ui.s 10, Ui.p 10, Ui.at ] <|
-                                List.map participantView students
-                            ]
-
-                      else
-                        Element.none
-                    , if not (List.isEmpty teachers) then
-                        Element.column [ Ui.s 10, Ui.p 10, Ui.at ]
-                            [ Element.text "Teachers:"
-                            , Element.column [ Ui.s 10, Ui.p 10, Ui.at ] <|
-                                List.map participantView teachers
-                            ]
-
-                      else
-                        Element.none
+    Element.column
+        [ Ui.p 20
+        , Ui.at
+        , Ui.wf
+        , Ui.hfp 1
+        , Background.color Colors.green2
+        , Ui.r 10
+        ]
+        [ Element.row [ Ui.pl (2 * roundRadius), Ui.hpx 40 ]
+            [ selector
+            , Ui.navigationElement (Ui.Msg <| App.NewCourseMsg <| NewCourse.ChangeSelectorIndex 0)
+                [ Ui.wpx buttonWidth
+                , Ui.hf
+                , Element.mouseOver
+                    [ Background.color <|
+                        Colors.alpha <|
+                            Utils.tern (selectorIndex == 0) 0.0 0.1
                     ]
+                , Element.htmlAttribute <|
+                    Transition.properties [ Transition.backgroundColor 200 [ Transition.easeInOut ] ]
+                , Ui.zIndex 1
+                , Ui.r roundRadius
                 ]
-
-            Nothing ->
-                [ Element.text "No group selected" ]
+              <|
+                Element.el
+                    [ Ui.cy
+                    , Ui.cx
+                    , Font.bold
+                    ]
+                <|
+                    Element.text "[Students:]"
+            , Ui.navigationElement (Ui.Msg <| App.NewCourseMsg <| NewCourse.ChangeSelectorIndex 1)
+                [ Ui.wpx buttonWidth
+                , Ui.hf
+                , Element.mouseOver
+                    [ Background.color <|
+                        Colors.alpha <|
+                            Utils.tern (selectorIndex == 1) 0.0 0.1
+                    ]
+                , Element.htmlAttribute <|
+                    Transition.properties [ Transition.backgroundColor 200 [ Transition.easeInOut ] ]
+                , Ui.zIndex 1
+                , Ui.r roundRadius
+                ]
+              <|
+                Element.el
+                    [ Ui.cy
+                    , Ui.cx
+                    , Font.bold
+                    ]
+                <|
+                    Element.text "[Teachers:]"
+            ]
+        , Element.column
+            [ Ui.s 10
+            , Ui.p 10
+            , Ui.at
+            , Ui.wf
+            , Ui.hf
+            , Background.color Colors.greyBackground
+            , Ui.r roundRadius
+            , Border.shadow { offset = ( 0.0, 0.0 ), size = 1, blur = 10, color = Colors.alpha 0.3 }
+            ]
+          <|
+            List.map participantView <| Utils.tern (selectorIndex == 0) students teachers
+        ]
