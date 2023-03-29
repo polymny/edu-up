@@ -40,8 +40,23 @@ view config user model =
                         , label = Ui.icon 18 Icons.add
                         }
                    ]
-        , participantLists model.selectedGroup model.selectorIndex
-        , Element.el [ Ui.hfp 1 ] Element.none
+        , Element.row [ Ui.wf, Ui.hf ]
+            [ Element.el
+                [ Ui.wfp 1
+                , Ui.hf
+                , Element.transparent <| model.selectedGroup == Nothing
+                , Element.htmlAttribute <|
+                    Transition.properties [ Transition.opacity 200 [ Transition.easeInOut ] ]
+                ]
+              <|
+                case model.selectedGroup of
+                    Just group ->
+                        participantLists user group model.selectorIndex
+
+                    Nothing ->
+                        Element.none
+            , Element.el [ Ui.wfp 1, Ui.hf ] Element.none
+            ]
         ]
     , popup config user model
     )
@@ -57,7 +72,7 @@ popup config user model =
 
         NewCourse.NewGroupPopup groupName ->
             Ui.popup 1 "[Nouveau groupe]" <|
-                Element.column [ Ui.wf, Ui.hf ]
+                Element.column [ Ui.wf, Ui.hf, Ui.p 20 ]
                     [ Input.text
                         [ Ui.wf ]
                         { onChange = App.NewCourseMsg << NewCourse.NewGroup Utils.Request
@@ -89,7 +104,7 @@ popup config user model =
                             "[Nouveau professeur]"
             in
             Ui.popup 1 title <|
-                Element.column [ Ui.wf, Ui.hf ]
+                Element.column [ Ui.wf, Ui.hf, Ui.p 20 ]
                     [ Input.text
                         [ Ui.wf ]
                         { onChange = App.NewCourseMsg << NewCourse.AddParticipant Utils.Request participantRole
@@ -104,6 +119,22 @@ popup config user model =
                             }
                         , Ui.primary [ Ui.ar ]
                             { action = Ui.Msg <| App.NewCourseMsg <| NewCourse.AddParticipant Utils.Confirm participantRole participantEmail
+                            , label = Element.text <| Strings.uiConfirm config.clientState.lang
+                            }
+                        ]
+                    ]
+
+        NewCourse.DeleteGroupPopup group ->
+            Ui.popup 1 "[Supprimer le groupe]" <|
+                Element.column [ Ui.wf, Ui.hf, Ui.p 20 ]
+                    [ Element.text <| "[Êtes-vous sûr de vouloir supprimer le groupe " ++ group.name ++ " ?]"
+                    , Element.row [ Ui.wf, Ui.ab ]
+                        [ Ui.secondary []
+                            { action = Ui.Msg <| App.NewCourseMsg <| NewCourse.DeleteGroup Utils.Cancel group
+                            , label = Element.text <| Strings.uiCancel config.clientState.lang
+                            }
+                        , Ui.primary [ Ui.ar ]
+                            { action = Ui.Msg <| App.NewCourseMsg <| NewCourse.DeleteGroup Utils.Confirm group
                             , label = Element.text <| Strings.uiConfirm config.clientState.lang
                             }
                         ]
@@ -132,8 +163,8 @@ groupButton group selected =
 
 {-| Participant list view.
 -}
-participantLists : Maybe Data.Group -> Int -> Element App.Msg
-participantLists group selectorIndex =
+participantLists : Data.User -> Data.Group -> Int -> Element App.Msg
+participantLists user group selectorIndex =
     let
         buttonWidth : Int
         buttonWidth =
@@ -143,34 +174,20 @@ participantLists group selectorIndex =
         roundRadius =
             10
 
+        isTeacher : Bool
+        isTeacher =
+            group.participants
+                |> List.any (\p -> p.role == Data.Teacher && p.email == user.email)
+
         students : List Data.Participant
         students =
-            case group of
-                Just g ->
-                    g.participants
-                        |> List.filter (\p -> p.role == Data.Student)
-
-                Nothing ->
-                    []
+            group.participants
+                |> List.filter (\p -> p.role == Data.Student)
 
         teachers : List Data.Participant
         teachers =
-            case group of
-                Just g ->
-                    g.participants
-                        |> List.filter (\p -> p.role == Data.Teacher)
-
-                Nothing ->
-                    []
-
-        groupName : String
-        groupName =
-            case group of
-                Just g ->
-                    g.name
-
-                Nothing ->
-                    "[No group selected]"
+            group.participants
+                |> List.filter (\p -> p.role == Data.Teacher)
 
         selectorMove : Float
         selectorMove =
@@ -238,18 +255,22 @@ participantLists group selectorIndex =
         participantView : Data.Participant -> Element App.Msg
         participantView participant =
             Element.row [ Ui.s 10 ]
-                [ Ui.navigationElement (Ui.Msg <| App.NewCourseMsg <| NewCourse.RemoveParticipant participant) [] <|
-                    Element.el
-                        [ Element.mouseOver [ Background.color <| Colors.alpha 0.1 ]
-                        , Ui.p 5
-                        , Ui.r 30
-                        , Font.color Colors.green1
-                        , Ui.tooltip <| "[Enlever " ++ participant.username ++ "]"
-                        , Element.htmlAttribute <|
-                            Transition.properties [ Transition.backgroundColor 200 [ Transition.easeInOut ] ]
-                        ]
-                    <|
-                        Ui.icon 15 Icons.close
+                [ Utils.tern
+                    isTeacher
+                    (Ui.navigationElement (Ui.Msg <| App.NewCourseMsg <| NewCourse.RemoveParticipant participant) [] <|
+                        Element.el
+                            [ Element.mouseOver [ Background.color <| Colors.alpha 0.1 ]
+                            , Ui.p 5
+                            , Ui.r 30
+                            , Font.color Colors.green1
+                            , Ui.tooltip <| "[Enlever " ++ participant.username ++ "]"
+                            , Element.htmlAttribute <|
+                                Transition.properties [ Transition.backgroundColor 200 [ Transition.easeInOut ] ]
+                            ]
+                        <|
+                            Ui.icon 15 Icons.close
+                    )
+                    Element.none
                 , Element.text participant.username
                 , Element.text <| "(" ++ participant.email ++ ")"
                 ]
@@ -258,7 +279,7 @@ participantLists group selectorIndex =
         [ Ui.p 20
         , Ui.at
         , Ui.wf
-        , Ui.hfp 1
+        , Ui.hf
         , Background.color Colors.green2
         , Border.shadow
             { offset = ( 0.0, 0.0 )
@@ -268,68 +289,95 @@ participantLists group selectorIndex =
             }
         , Ui.r 10
         ]
-        [ Element.row [ Ui.pl (2 * roundRadius), Ui.hpx 40 ]
-            [ selector
-            , Ui.navigationElement (Ui.Msg <| App.NewCourseMsg <| NewCourse.ChangeSelectorIndex 0)
-                [ Ui.wpx buttonWidth
-                , Ui.hf
-                , Element.mouseOver
-                    [ Background.color <|
-                        Colors.alpha <|
-                            Utils.tern (selectorIndex == 0) 0.0 0.1
+        [ Element.row [ Ui.pl (2 * roundRadius), Ui.wf ]
+            [ Element.row []
+                [ selector
+                , Ui.navigationElement (Ui.Msg <| App.NewCourseMsg <| NewCourse.ChangeSelectorIndex 0)
+                    [ Ui.wpx buttonWidth
+                    , Ui.hf
+                    , Ui.py 20
+                    , Element.mouseOver
+                        [ Background.color <|
+                            Colors.alpha <|
+                                Utils.tern (selectorIndex == 0) 0.0 0.1
+                        ]
+                    , Element.htmlAttribute <|
+                        Transition.properties [ Transition.backgroundColor 200 [ Transition.easeInOut ] ]
+                    , Ui.zIndex 1
+                    , Ui.r roundRadius
                     ]
-                , Element.htmlAttribute <|
-                    Transition.properties [ Transition.backgroundColor 200 [ Transition.easeInOut ] ]
-                , Ui.zIndex 1
-                , Ui.r roundRadius
+                  <|
+                    Element.el
+                        [ Ui.cy
+                        , Ui.cx
+                        , Font.bold
+                        ]
+                    <|
+                        Element.text "[Students:]"
+                , Ui.navigationElement (Ui.Msg <| App.NewCourseMsg <| NewCourse.ChangeSelectorIndex 1)
+                    [ Ui.wpx buttonWidth
+                    , Ui.hf
+                    , Ui.py 20
+                    , Element.mouseOver
+                        [ Background.color <|
+                            Colors.alpha <|
+                                Utils.tern (selectorIndex == 1) 0.0 0.1
+                        ]
+                    , Element.htmlAttribute <|
+                        Transition.properties [ Transition.backgroundColor 200 [ Transition.easeInOut ] ]
+                    , Ui.zIndex 1
+                    , Ui.r roundRadius
+                    ]
+                  <|
+                    Element.el
+                        [ Ui.cy
+                        , Ui.cx
+                        , Font.bold
+                        ]
+                    <|
+                        Element.text "[Teachers:]"
                 ]
-              <|
-                Element.el
-                    [ Ui.cy
-                    , Ui.cx
-                    , Font.bold
-                    ]
-                <|
-                    Element.text "[Students:]"
-            , Ui.navigationElement (Ui.Msg <| App.NewCourseMsg <| NewCourse.ChangeSelectorIndex 1)
-                [ Ui.wpx buttonWidth
-                , Ui.hf
-                , Element.mouseOver
-                    [ Background.color <|
-                        Colors.alpha <|
-                            Utils.tern (selectorIndex == 1) 0.0 0.1
-                    ]
+            , Ui.navigationElement
+                (Ui.Msg <| App.NewCourseMsg <| NewCourse.DeleteGroup Utils.Request group)
+                [ Ui.ar
+                , Font.color <| Colors.alpha 0.5
+                , Element.mouseOver [ Font.color Colors.greyFont ]
+                , Ui.pr 20
                 , Element.htmlAttribute <|
-                    Transition.properties [ Transition.backgroundColor 200 [ Transition.easeInOut ] ]
-                , Ui.zIndex 1
-                , Ui.r roundRadius
+                    Transition.properties [ Transition.color 200 [ Transition.easeInOut ] ]
                 ]
-              <|
-                Element.el
-                    [ Ui.cy
-                    , Ui.cx
-                    , Font.bold
-                    ]
-                <|
-                    Element.text "[Teachers:]"
+                (Element.el [] <| Element.text "[Delete group]")
             ]
         , Element.column
-            [ Ui.s 10
-            , Ui.p 10
+            [ Ui.s 20
+            , Ui.p 20
             , Ui.at
             , Ui.wf
             , Ui.hf
             , Background.color Colors.greyBackground
             , Ui.r roundRadius
-            , Border.shadow { offset = ( 0.0, 0.0 ), size = 1, blur = 10, color = Colors.alpha 0.3 }
+            , Border.shadow
+                { offset = ( 0.0, 0.0 )
+                , size = 1
+                , blur = 10
+                , color = Colors.alpha 0.3
+                }
             ]
           <|
-            (List.map participantView <|
-                Utils.tern (selectorIndex == 0) students teachers
+            (Utils.tern (selectorIndex == 0) students teachers
+                |> List.map participantView
+                |> List.intersperse
+                    (Element.el
+                        [ Ui.hpx 1
+                        , Ui.wf
+                        , Ui.px 10
+                        , Background.color <| Colors.alpha 0.3
+                        ]
+                        Element.none
+                    )
             )
                 ++ Utils.tern
-                    (group == Nothing)
-                    []
+                    isTeacher
                     [ Ui.navigationElement
                         (Ui.Msg <|
                             App.NewCourseMsg <|
@@ -355,4 +403,5 @@ participantLists group selectorIndex =
                             , Element.text <| "[Ajouter un " ++ Utils.tern (selectorIndex == 0) "étudiant" "professeur" ++ "]"
                             ]
                     ]
+                    []
         ]

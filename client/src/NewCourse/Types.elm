@@ -17,6 +17,7 @@ type Msg
     | ChangeSelectorIndex Int
     | AddParticipant Utils.Confirmation Data.GroupRole String
     | RemoveParticipant Data.Participant
+    | DeleteGroup Utils.Confirmation Data.Group
 
 
 {-| The model for the new course page.
@@ -34,6 +35,7 @@ type PopupType
     = NoPopup
     | NewGroupPopup String
     | AddParticipantPopup Data.GroupRole String
+    | DeleteGroupPopup Data.Group
 
 
 {-| The initial model for the new course page.
