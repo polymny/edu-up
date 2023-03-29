@@ -260,6 +260,12 @@ participantLists group selectorIndex =
         , Ui.wf
         , Ui.hfp 1
         , Background.color Colors.green2
+        , Border.shadow
+            { offset = ( 0.0, 0.0 )
+            , size = 1
+            , blur = 10
+            , color = Colors.alpha 0.3
+            }
         , Ui.r 10
         ]
         [ Element.row [ Ui.pl (2 * roundRadius), Ui.hpx 40 ]
