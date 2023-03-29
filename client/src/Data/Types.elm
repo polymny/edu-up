@@ -22,7 +22,7 @@ module Data.Types exposing
 
 # Users roles
 
-@docs Role, encodeRole, roleFromString, decodeRole, GroupRole, decodeGroupRole, groupRoleFromString, encodeGroupRole
+@docs Role, encodeRole, roleFromString, decodeRole, ParticipantRole, decodeGroupRole, groupRoleFromString, encodeGroupRole
 
 
 # Task status

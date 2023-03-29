@@ -77,6 +77,9 @@ update msg model =
                         AddParticipantPopup participantRole participantEmail ->
                             update (NewCourse.AddParticipant Utils.Confirm participantRole participantEmail) model
 
+                        DeleteGroupPopup group ->
+                            update (NewCourse.DeleteGroup Utils.Confirm group) model
+
                 NewCourse.EscapePressed ->
                     case m.popupType of
                         NoPopup ->
@@ -87,6 +90,9 @@ update msg model =
 
                         AddParticipantPopup participantRole participantEmail ->
                             update (NewCourse.AddParticipant Utils.Cancel participantRole participantEmail) model
+
+                        DeleteGroupPopup group ->
+                            update (NewCourse.DeleteGroup Utils.Cancel group) model
 
                 NewCourse.ChangeSelectorIndex index ->
                     ( { model | page = App.NewCourse { m | selectorIndex = index } }
@@ -157,6 +163,44 @@ update msg model =
                                         }
                               }
                             , -- TODO: remove participant in backend
+                              Cmd.none
+                            )
+
+                        Nothing ->
+                            ( model, Cmd.none )
+
+                NewCourse.DeleteGroup Utils.Request group ->
+                    ( { model | page = App.NewCourse { m | popupType = NewCourse.DeleteGroupPopup group } }
+                    , Cmd.none
+                    )
+
+                NewCourse.DeleteGroup Utils.Cancel group ->
+                    ( { model | page = App.NewCourse { m | popupType = NewCourse.NoPopup } }
+                    , Cmd.none
+                    )
+
+                NewCourse.DeleteGroup Utils.Confirm group ->
+                    let
+                        user : Data.User
+                        user =
+                            model.user
+                    in
+                    case m.selectedGroup of
+                        Just selectedGroup ->
+                            ( { model
+                                | page =
+                                    App.NewCourse
+                                        { m
+                                            | selectedGroup = Nothing
+                                            , popupType = NewCourse.NoPopup
+                                        }
+                                , user =
+                                    { user
+                                        | groups =
+                                            List.filter (\g -> g.id /= group.id) model.user.groups
+                                    }
+                              }
+                            , -- TODO: delete group in backend
                               Cmd.none
                             )
 

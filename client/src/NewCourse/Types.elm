@@ -17,6 +17,7 @@ type Msg
     | ChangeSelectorIndex Int
     | AddParticipant Utils.Confirmation Data.ParticipantRole String
     | RemoveParticipant Data.Participant
+    | DeleteGroup Utils.Confirmation Data.Group
 
 
 {-| The model for the new course page.
@@ -33,6 +34,7 @@ type alias Model =
 type PopupType
     = NoPopup
     | NewGroupPopup String
+    | DeleteGroupPopup Data.Group
     | AddParticipantPopup Data.ParticipantRole String
 
 
