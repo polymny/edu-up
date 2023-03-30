@@ -5,15 +5,16 @@ use serde::{Deserialize, Serialize};
 use ergol::prelude::*;
 use ergol::tokio_postgres::types::Json as EJson;
 
+use rocket::http::Status;
 use rocket::serde::json::{json, Value};
 
-use tokio::fs::create_dir_all;
+use tokio::fs::{copy, create_dir_all, read_dir};
 
 use crate::command::export_slides;
 use crate::config::Config;
-use crate::db::capsule::{Capsule, Fade, Gos, Slide};
+use crate::db::capsule::{Capsule, Fade, Gos, Role, Slide};
 use crate::db::user::User;
-use crate::{Db, Result};
+use crate::{Db, Error, Result};
 
 /// The different levels of authorization a user can have.
 #[derive(Debug, Copy, Clone, PgEnum, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord)]
@@ -71,13 +72,16 @@ pub struct Assignment {
     #[id]
     pub id: i32,
 
-    /// The capsule that contains the subject of the assignment.
+    /// The criteria for the evaluation of the assignment, seperated by new lines.
+    pub criteria: String,
+
+    /// The subject that contains the subject of the assignment.
     #[many_to_one(assignments)]
     pub subject: Capsule,
 
-    /// The capsule that will serve as a template for answers.
+    /// The subject that will serve as a template for answers.
     #[many_to_one(answers)]
-    pub answer: Capsule,
+    pub answer_template: Capsule,
 
     /// The group of users associated with this assignment.
     #[many_to_one(assignments)]
@@ -86,8 +90,10 @@ pub struct Assignment {
 
 impl Assignment {
     /// Creates a new criterion and adds it to the assignment.
-    pub async fn add_criterion(&self, criterion: &str, db: &Db) -> Result<Criterion> {
-        Ok(Criterion::create(self, criterion).save(&db).await?)
+    pub async fn add_criterion(&mut self, criterion: &str, db: &Db) -> Result<()> {
+        self.criteria += &format!("\n{}", criterion);
+        self.save(&db).await?;
+        Ok(())
     }
 
     /// Returns a JSON value representing the assignment.
@@ -95,7 +101,7 @@ impl Assignment {
         Ok(json!({
             "id": self.id,
             "subject": self.subject(&db).await?.id,
-            "answer": self.answer(&db).await?.id,
+            "answer": self.answer_template(&db).await?.id,
             "participants": self.participants(&db).await?.participants(&db).await?.into_iter().map(|(user, role)| {
                 json!({
                     "username": user.username,
@@ -103,33 +109,8 @@ impl Assignment {
                     "role": role,
                 })
             }).collect::<Vec<_>>(),
-            "criteria": self.criteria(&db).await?.into_iter().map(|x| x.to_json()).collect::<Vec<_>>(),
+            "criteria": self.criteria.split("\n").collect::<Vec<_>>(),
         }))
-    }
-}
-
-/// A criterion for student evaluation.
-#[ergol]
-pub struct Criterion {
-    /// The id of the criterion.
-    #[id]
-    pub id: i32,
-
-    /// The correspoding assignment.
-    #[many_to_one(criteria)]
-    pub assignment: Assignment,
-
-    /// The content of the criterion.
-    pub description: String,
-}
-
-impl Criterion {
-    /// Returns a JSON representation of the criterion.
-    pub fn to_json(&self) -> Value {
-        json!({
-            "id": self.id,
-            "description": self.description,
-        })
     }
 }
 
@@ -144,9 +125,22 @@ pub struct Answer {
     #[many_to_one(answers)]
     pub assignment: Assignment,
 
-    /// The capsule used as an answer.
-    #[many_to_one(capsule_answers)]
-    pub answer: Capsule,
+    /// The subject used as an answer.
+    #[many_to_one(subject_answers)]
+    pub capsule: Capsule,
+}
+
+impl Answer {
+    /// Returns the owner of the answer.
+    pub async fn owner(&self, db: &Db) -> Result<User> {
+        for (user, role) in self.capsule(&db).await?.users(&db).await? {
+            if role == Role::Owner {
+                return Ok(user);
+            }
+        }
+
+        Err(Error(Status::NotFound))
+    }
 }
 
 /// An eavluation of an answer.
@@ -164,11 +158,10 @@ pub struct Evaluation {
     #[many_to_one(evaluations)]
     pub reviewer: User,
 
-    /// The value for each criterion.
+    /// The score for each criterion.
     ///
-    /// The extra value refenreces the grade that has been made for the criterion.
-    #[many_to_many(criteria, i32)]
-    pub content: Criterion,
+    /// It's a string of integers seperated by new lines.
+    pub scores: String,
 
     /// An optional capsule giving feedback to the assignee.
     #[many_to_one(evaluations)]
@@ -243,7 +236,7 @@ pub async fn populate_db(db: &Db, config: &Config) -> Result<()> {
     subject.save(&db).await?;
 
     // Create the assignment
-    let assignment = Assignment::create(&subject, &subject, &group1).save(&db).await?;
+    let mut assignment = Assignment::create("", &subject, &subject, &group1).save(&db).await?;
     assignment.add_criterion("Respect de la consigne", &db).await?;
     assignment.add_criterion("Clarté du discours", &db).await?;
     assignment.add_criterion("Structuration du propos", &db).await?;
@@ -251,7 +244,74 @@ pub async fn populate_db(db: &Db, config: &Config) -> Result<()> {
     assignment.add_criterion("Gestuelle", &db).await?;
 
     let assignment = Assignment::get_by_id(assignment.id, &db).await?.unwrap();
-    println!("{}", assignment.to_json(&db).await?);
+    let template = assignment.answer_template(&db).await?;
+
+    // Create answers for each student
+    for (user, role) in assignment.participants(&db).await?.participants(&db).await? {
+        if role == ParticipantRole::Teacher {
+            continue;
+        }
+
+        let mut new = Capsule::new(
+            &template.project,
+            format!("{}", template.name),
+            &user,
+            &db,
+        ).await?;
+
+        new.privacy = template.privacy.clone();
+        new.produced = template.produced;
+        new.structure = template.structure.clone();
+        new.webcam_settings = template.webcam_settings.clone();
+        new.sound_track = template.sound_track.clone();
+        new.duration_ms = template.duration_ms;
+
+        for dir in ["assets", "tmp", "output"] {
+            let orig = config.data_path.join(&format!("{}/{}", template.id, dir));
+            let dest = config.data_path.join(&format!("{}/{}", new.id, dir));
+
+            if orig.is_dir() {
+                create_dir_all(&dest).await?;
+
+                let mut iter = read_dir(&orig)
+                    .await
+                    .map_err(|_| Error(Status::InternalServerError))?;
+
+                loop {
+                    let next = iter
+                        .next_entry()
+                        .await
+                        .map_err(|_| Error(Status::InternalServerError))?;
+
+                    let next = match next {
+                        Some(x) => x,
+                        None => break,
+                    };
+
+                    let path = next.path();
+                    let file_name = path.file_name().ok_or(Error(Status::InternalServerError))?;
+
+                    copy(orig.join(&file_name), dest.join(&file_name))
+                        .await
+                        .map_err(|_| Error(Status::InternalServerError))?;
+                    }
+            }
+        }
+
+        let orig = config.data_path.join(&format!("{}/output.mp4", template.id));
+        let dest = config.data_path.join(&format!("{}/output.mp4", new.id));
+
+        if orig.is_file() {
+            copy(orig, dest)
+                .await
+                .map_err(|_| Error(Status::InternalServerError))?;
+        }
+
+        new.set_changed();
+        new.save(&db).await?;
+
+        Answer::create(&assignment, &new).save(&db).await?;
+    }
 
     Ok(())
 }
