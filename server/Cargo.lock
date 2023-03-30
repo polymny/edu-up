@@ -3,6 +3,21 @@
 version = 3
 
 [[package]]
+name = "addr2line"
+version = "0.19.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a76fd60b23679b7d19bd066031410fb7e458ccc5e958eb5c325888ce4baedc97"
+dependencies = [
+ "gimli",
+]
+
+[[package]]
+name = "adler"
+version = "1.0.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f26201604c87b1e01bd3d98f8d5d9a8fcbb815e8cedb41ffccbeb4bf593a35fe"
+
+[[package]]
 name = "aead"
 version = "0.4.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -127,6 +142,21 @@ name = "autocfg"
 version = "1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d468802bab17cbc0cc575e9b053f41e72aa36bfa6b7f55e3529ffa43161b97fa"
+
+[[package]]
+name = "backtrace"
+version = "0.3.67"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "233d376d6d185f2a3093e58f283f60f880315b6c60075b01f36b3b85154564ca"
+dependencies = [
+ "addr2line",
+ "cc",
+ "cfg-if",
+ "libc",
+ "miniz_oxide",
+ "object",
+ "rustc-demangle",
+]
 
 [[package]]
 name = "base64"
@@ -287,6 +317,17 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ddfc5b9aa5d4507acaf872de71051dfd0e309860e88966e1051e462a077aac4f"
 dependencies = [
  "bitflags",
+]
+
+[[package]]
+name = "color-backtrace"
+version = "0.5.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "cd6c04463c99389fff045d2b90ce84f5131332712c7ffbede020f5e9ad1ed685"
+dependencies = [
+ "atty",
+ "backtrace",
+ "termcolor",
 ]
 
 [[package]]
@@ -586,9 +627,9 @@ dependencies = [
 
 [[package]]
 name = "ergol"
-version = "0.1.2"
+version = "0.1.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c420adb02a1c76f772d6c2a25484e6751a11980e7c28dc313a262bc0552ff998"
+checksum = "eb331ee61f02960c8027fe9a1ccc1a8f8efa3ec4179c294fea52f3e8042e4c4b"
 dependencies = [
  "async-trait",
  "bytes",
@@ -602,9 +643,9 @@ dependencies = [
 
 [[package]]
 name = "ergol_cli"
-version = "0.1.2"
+version = "0.1.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "38e66b826b0f98699bd1a2f5fc11df1e7560a135e42a64595d9efe2a5c00ada7"
+checksum = "348abf858a2905927d1816dd4dd955c8816e42f2232c9643fa51ad60fe5a145a"
 dependencies = [
  "case",
  "colored",
@@ -618,9 +659,9 @@ dependencies = [
 
 [[package]]
 name = "ergol_core"
-version = "0.1.2"
+version = "0.1.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bb2bf6017b504709d709e1b5548b959e5291d12bb0f7e1f619725d5bab83f6c8"
+checksum = "66b052c1a68091f555aa5afb6f51a07bac5891d04befae865ce70bc5a107b46c"
 dependencies = [
  "case",
  "serde",
@@ -629,9 +670,9 @@ dependencies = [
 
 [[package]]
 name = "ergol_proc_macro"
-version = "0.1.2"
+version = "0.1.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "38e5de71108350b4fde22bc60f2883800ffdb854c44fae54923aa779314efea8"
+checksum = "9a10ce1612701738e67261fa29e7615d633bd25bdbe972a2db45871ac15de011"
 dependencies = [
  "case",
  "ergol_core",
@@ -859,6 +900,12 @@ dependencies = [
  "opaque-debug",
  "polyval",
 ]
+
+[[package]]
+name = "gimli"
+version = "0.27.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ad0a93d233ebf96623465aad4046a8d3aa4da22d4f4beba5388838c8a434bbb4"
 
 [[package]]
 name = "glob"
@@ -1184,6 +1231,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2a60c7ce501c71e03a9c9c0d35b861413ae925bd979cc7a4e30d060069aaac8d"
 
 [[package]]
+name = "miniz_oxide"
+version = "0.6.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b275950c28b37e794e8c55d88aeb5e139d0ce23fdbbeda68f8d7174abdf9e8fa"
+dependencies = [
+ "adler",
+]
+
+[[package]]
 name = "mio"
 version = "0.8.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1279,6 +1335,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2819ce041d2ee131036f4fc9d6ae7ae125a3a40e97ba64d04fe799ad9dabbb44"
 dependencies = [
  "libc",
+]
+
+[[package]]
+name = "object"
+version = "0.30.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ea86265d3d3dcb6a27fc51bd29a4bf387fae9d2986b823079d4986af253eb439"
+dependencies = [
+ "memchr",
 ]
 
 [[package]]
@@ -1452,6 +1517,7 @@ version = "1.1.2"
 dependencies = [
  "bcrypt",
  "chrono",
+ "color-backtrace",
  "compile-time-run",
  "ergol",
  "ergol_cli",
@@ -1926,6 +1992,12 @@ dependencies = [
  "tokio",
  "uncased",
 ]
+
+[[package]]
+name = "rustc-demangle"
+version = "0.1.22"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d4a36c42d1873f9a77c53bde094f9664d9891bc604a45b4798fd2c389ed12e5b"
 
 [[package]]
 name = "rustversion"

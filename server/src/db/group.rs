@@ -85,7 +85,7 @@ pub struct Assignment {
 
     /// The group of users associated with this assignment.
     #[many_to_one(assignments)]
-    pub participants: Group,
+    pub group: Group,
 }
 
 impl Assignment {
@@ -102,7 +102,7 @@ impl Assignment {
             "id": self.id,
             "subject": self.subject(&db).await?.id,
             "answer": self.answer_template(&db).await?.id,
-            "participants": self.participants(&db).await?.participants(&db).await?.into_iter().map(|(user, role)| {
+            "participants": self.group(&db).await?.participants(&db).await?.into_iter().map(|(user, role)| {
                 json!({
                     "username": user.username,
                     "email": user.email,
@@ -207,16 +207,16 @@ pub async fn populate_db(db: &Db, config: &Config) -> Result<()> {
     group3.add_participant(&xbrodeur, ParticipantRole::Student, &db).await.unwrap();
 
     // Create the subject of the assignment
-    let mut subject = Capsule::new("Mon projet", "Sujet", &polymny, &db).await?;
+    let mut subject = Capsule::new("Mon projet", "Sujet", &polymny, &db).await.unwrap();
 
     let path = config
         .data_path
         .join(format!("{}", subject.id))
         .join("assets");
 
-    create_dir_all(&path).await?;
+    create_dir_all(&path).await.unwrap();
 
-    let gos = export_slides(&config, "example/slides.pdf", path, None)?
+    let gos = export_slides(&config, "example/slides.pdf", path, None).unwrap()
         .into_iter()
         .map(|x| Gos {
             record: None,
@@ -233,21 +233,21 @@ pub async fn populate_db(db: &Db, config: &Config) -> Result<()> {
 
     subject.structure = EJson(gos);
     subject.set_changed();
-    subject.save(&db).await?;
+    subject.save(&db).await.unwrap();
 
     // Create the assignment
-    let mut assignment = Assignment::create("", &subject, &subject, &group1).save(&db).await?;
-    assignment.add_criterion("Respect de la consigne", &db).await?;
-    assignment.add_criterion("Clarté du discours", &db).await?;
-    assignment.add_criterion("Structuration du propos", &db).await?;
-    assignment.add_criterion("Débit", &db).await?;
-    assignment.add_criterion("Gestuelle", &db).await?;
+    let mut assignment = Assignment::create("", &subject, &subject, &group1).save(&db).await.unwrap();
+    assignment.add_criterion("Respect de la consigne", &db).await.unwrap();
+    assignment.add_criterion("Clarté du discours", &db).await.unwrap();
+    assignment.add_criterion("Structuration du propos", &db).await.unwrap();
+    assignment.add_criterion("Débit", &db).await.unwrap();
+    assignment.add_criterion("Gestuelle", &db).await.unwrap();
 
-    let assignment = Assignment::get_by_id(assignment.id, &db).await?.unwrap();
-    let template = assignment.answer_template(&db).await?;
+    let assignment = Assignment::get_by_id(assignment.id, &db).await.unwrap().unwrap();
+    let template = assignment.answer_template(&db).await.unwrap();
 
     // Create answers for each student
-    for (user, role) in assignment.participants(&db).await?.participants(&db).await? {
+    for (user, role) in assignment.group(&db).await.unwrap().participants(&db).await.unwrap() {
         if role == ParticipantRole::Teacher {
             continue;
         }
@@ -257,7 +257,7 @@ pub async fn populate_db(db: &Db, config: &Config) -> Result<()> {
             format!("{}", template.name),
             &user,
             &db,
-        ).await?;
+        ).await.unwrap();
 
         new.privacy = template.privacy.clone();
         new.produced = template.produced;
@@ -271,17 +271,17 @@ pub async fn populate_db(db: &Db, config: &Config) -> Result<()> {
             let dest = config.data_path.join(&format!("{}/{}", new.id, dir));
 
             if orig.is_dir() {
-                create_dir_all(&dest).await?;
+                create_dir_all(&dest).await.unwrap();
 
                 let mut iter = read_dir(&orig)
                     .await
-                    .map_err(|_| Error(Status::InternalServerError))?;
+                    .map_err(|_| Error(Status::InternalServerError)).unwrap();
 
                 loop {
                     let next = iter
                         .next_entry()
                         .await
-                        .map_err(|_| Error(Status::InternalServerError))?;
+                        .map_err(|_| Error(Status::InternalServerError)).unwrap();
 
                     let next = match next {
                         Some(x) => x,
@@ -289,11 +289,11 @@ pub async fn populate_db(db: &Db, config: &Config) -> Result<()> {
                     };
 
                     let path = next.path();
-                    let file_name = path.file_name().ok_or(Error(Status::InternalServerError))?;
+                    let file_name = path.file_name().ok_or(Error(Status::InternalServerError)).unwrap();
 
                     copy(orig.join(&file_name), dest.join(&file_name))
                         .await
-                        .map_err(|_| Error(Status::InternalServerError))?;
+                        .map_err(|_| Error(Status::InternalServerError)).unwrap();
                     }
             }
         }
@@ -304,13 +304,13 @@ pub async fn populate_db(db: &Db, config: &Config) -> Result<()> {
         if orig.is_file() {
             copy(orig, dest)
                 .await
-                .map_err(|_| Error(Status::InternalServerError))?;
+                .map_err(|_| Error(Status::InternalServerError)).unwrap();
         }
 
         new.set_changed();
-        new.save(&db).await?;
+        new.save(&db).await.unwrap();
 
-        Answer::create(&assignment, &new).save(&db).await?;
+        Answer::create(&assignment, &new).save(&db).await.unwrap();
     }
 
     Ok(())
