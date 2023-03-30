@@ -139,7 +139,7 @@ popup config user model =
                             }
                         ]
                     ]
-        
+
         NewCourse.SelfRemovePopup ->
             Ui.popup 1 "[Quitter le groupe]" <|
                 Element.column [ Ui.wf, Ui.hf, Ui.p 20 ]
@@ -155,7 +155,7 @@ popup config user model =
                             }
                         ]
                     ]
-        
+
         NewCourse.LastTeacherPopup ->
             Ui.popup 1 "[Dernier enseignant]" <|
                 Element.column [ Ui.wf, Ui.hf, Ui.p 20 ]
@@ -369,16 +369,20 @@ participantLists user group selectorIndex =
                     <|
                         Element.text "[Teachers:]"
                 ]
-            , Ui.navigationElement
-                (Ui.Msg <| App.NewCourseMsg <| NewCourse.DeleteGroup Utils.Request group)
-                [ Ui.ar
-                , Font.color <| Colors.alpha 0.5
-                , Element.mouseOver [ Font.color Colors.greyFont ]
-                , Ui.pr 20
-                , Element.htmlAttribute <|
-                    Transition.properties [ Transition.color 200 [ Transition.easeInOut ] ]
-                ]
-                (Element.el [] <| Element.text "[Delete group]")
+            , Utils.tern
+                isTeacher
+                (Ui.navigationElement
+                    (Ui.Msg <| App.NewCourseMsg <| NewCourse.DeleteGroup Utils.Request group)
+                    [ Ui.ar
+                    , Font.color <| Colors.alpha 0.5
+                    , Element.mouseOver [ Font.color Colors.greyFont ]
+                    , Ui.pr 20
+                    , Element.htmlAttribute <|
+                        Transition.properties [ Transition.color 200 [ Transition.easeInOut ] ]
+                    ]
+                    (Element.el [] <| Element.text "[Delete group]")
+                )
+                Element.none
             ]
         , Element.column
             [ Ui.s 20
@@ -403,7 +407,7 @@ participantLists user group selectorIndex =
                         [ Ui.hpx 1
                         , Ui.wf
                         , Ui.px 10
-                        , Background.color <| Colors.alpha 0.3
+                        , Background.color <| Colors.alpha 0.1
                         ]
                         Element.none
                     )

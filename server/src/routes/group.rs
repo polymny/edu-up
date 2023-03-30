@@ -38,7 +38,7 @@ pub struct DeleteGroupFrom {
 
 /// Route to create a new group of students.
 #[delete("/delete-group", data = "<form>")]
-pub async fn delete_group(user: User, db: Db, form: Json<DeleteGroupFrom>) -> Result<()> {
+pub async fn delete_group(user: User, db: Db, form: Json<DeleteGroupFrom>) -> Result<Value> {
     let form = form.into_inner();
 
     let group = Group::get_by_id(form.group_id, &db)
@@ -58,7 +58,7 @@ pub async fn delete_group(user: User, db: Db, form: Json<DeleteGroupFrom>) -> Re
 
     group.delete(&db).await?;
 
-    Ok(())
+    Ok(json!({}))
 }
 
 /// The data for the add participant form.
@@ -101,16 +101,20 @@ pub async fn add_participant(user: User, db: Db, form: Json<AddParticipantForm>)
         .await?
         .ok_or(Error(Status::NotFound))?;
 
+    // Check that the participant is not already in the group
+    let participants = group.participants(&db).await?;
+    for (p, _) in &participants {
+        if p.id == participant.id {
+            return Err(Error(Status::BadRequest));
+        }
+    }
+
     // Add the participant
     group
         .add_participant(&participant, form.participant_role, &db)
         .await?;
 
-    Ok(json!({
-        "username": participant.username,
-        "email": participant.email,
-        "role": form.participant_role,
-    }))
+    Ok(group.to_json(&db).await?)
 }
 
 /// The data for the remove participant form.
@@ -129,7 +133,7 @@ pub async fn remove_participant(
     user: User,
     db: Db,
     form: Json<RemoveParticipantForm>,
-) -> Result<()> {
+) -> Result<Value> {
     let form = form.into_inner();
 
     // Fetch the group
@@ -150,7 +154,15 @@ pub async fn remove_participant(
         return Err(Error(Status::NotFound));
     }
 
-    if participants
+    // Fetch the participant and their role
+    let (participant, participant_role) = participants
+        .iter()
+        .find(|(p, _)| p.email == form.participant)
+        .ok_or(Error(Status::NotFound))?;
+
+    
+    if *participant_role == ParticipantRole::Teacher
+        && participants
         .iter()
         .filter(|(_, r)| *r == ParticipantRole::Teacher)
         .count()
@@ -160,14 +172,9 @@ pub async fn remove_participant(
         // We do not allow that.
         return Err(Error(Status::BadRequest));
     }
-
-    // Fetch the participant
-    let participant = User::get_by_email(form.participant, &db)
-        .await?
-        .ok_or(Error(Status::NotFound))?;
-
-    // Add the participant
+    
+    // Remove the participant
     group.remove_participant(&participant, &db).await?;
 
-    Ok(())
+    Ok(group.to_json(&db).await?)
 }

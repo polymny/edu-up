@@ -18,7 +18,6 @@ use rocket::serde::json::{json, Value};
 
 use crate::config::Config;
 use crate::db::capsule::{capsule, Capsule, Role};
-use crate::db::group::ParticipantRole;
 use crate::db::notification::Notification;
 use crate::db::session::Session;
 use crate::mailer::Mailer;
@@ -304,7 +303,6 @@ impl User {
         let groups = self.groups(&db).await?;
         let groups = groups
             .iter()
-            .filter(|(_, role)| *role == ParticipantRole::Teacher)
             .map(|(group, _)| {
                 group.to_json(&db)
             })
