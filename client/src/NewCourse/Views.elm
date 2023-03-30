@@ -140,6 +140,38 @@ popup config user model =
                         ]
                     ]
 
+        NewCourse.SelfRemovePopup ->
+            Ui.popup 1 "[Quitter le groupe]" <|
+                Element.column [ Ui.wf, Ui.hf, Ui.p 20 ]
+                    [ Element.text <| "[Êtes-vous sûr de vouloir quitter le groupe ?]"
+                    , Element.row [ Ui.wf, Ui.ab ]
+                        [ Ui.secondary []
+                            { action = Ui.Msg <| App.NewCourseMsg <| NewCourse.SelfRemove Utils.Cancel
+                            , label = Element.text <| Strings.uiCancel config.clientState.lang
+                            }
+                        , Ui.primary [ Ui.ar ]
+                            { action = Ui.Msg <| App.NewCourseMsg <| NewCourse.SelfRemove Utils.Confirm
+                            , label = Element.text <| Strings.uiConfirm config.clientState.lang
+                            }
+                        ]
+                    ]
+
+        NewCourse.LastTeacherPopup ->
+            Ui.popup 1 "[Dernier enseignant]" <|
+                Element.column [ Ui.wf, Ui.hf, Ui.p 20 ]
+                    [ Element.text <| "[Vous êtes le dernier professeur du groupe.]"
+                    , Element.text <| "[Vous ne pouvez pas quitter le groupe.]"
+                    , Element.text <| "[ - Veuillez ajouter un autre professeur avant de quitter le groupe.]"
+                    , Element.text <| "[Ou]"
+                    , Element.text <| "[ - Supprimer le groupe.]"
+                    , Element.row [ Ui.wf, Ui.ab ]
+                        [ Ui.primary [ Ui.ar ]
+                            { action = Ui.Msg <| App.NewCourseMsg <| NewCourse.SelfRemove Utils.Cancel
+                            , label = Element.text <| Strings.uiConfirm config.clientState.lang
+                            }
+                        ]
+                    ]
+
 
 {-| Group button view.
 -}
@@ -337,16 +369,20 @@ participantLists user group selectorIndex =
                     <|
                         Element.text "[Teachers:]"
                 ]
-            , Ui.navigationElement
-                (Ui.Msg <| App.NewCourseMsg <| NewCourse.DeleteGroup Utils.Request group)
-                [ Ui.ar
-                , Font.color <| Colors.alpha 0.5
-                , Element.mouseOver [ Font.color Colors.greyFont ]
-                , Ui.pr 20
-                , Element.htmlAttribute <|
-                    Transition.properties [ Transition.color 200 [ Transition.easeInOut ] ]
-                ]
-                (Element.el [] <| Element.text "[Delete group]")
+            , Utils.tern
+                isTeacher
+                (Ui.navigationElement
+                    (Ui.Msg <| App.NewCourseMsg <| NewCourse.DeleteGroup Utils.Request group)
+                    [ Ui.ar
+                    , Font.color <| Colors.alpha 0.5
+                    , Element.mouseOver [ Font.color Colors.greyFont ]
+                    , Ui.pr 20
+                    , Element.htmlAttribute <|
+                        Transition.properties [ Transition.color 200 [ Transition.easeInOut ] ]
+                    ]
+                    (Element.el [] <| Element.text "[Delete group]")
+                )
+                Element.none
             ]
         , Element.column
             [ Ui.s 20
@@ -371,7 +407,7 @@ participantLists user group selectorIndex =
                         [ Ui.hpx 1
                         , Ui.wf
                         , Ui.px 10
-                        , Background.color <| Colors.alpha 0.3
+                        , Background.color <| Colors.alpha 0.1
                         ]
                         Element.none
                     )

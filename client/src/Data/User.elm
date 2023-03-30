@@ -1,8 +1,8 @@
-module Data.User exposing (User, Group, Participant, decodeUser, decodeGroup, isPremium, addCapsule, deleteCapsule, updateUser, sortProjects, getCapsuleById, Project, toggleProject, compareCapsule, compareProject)
+module Data.User exposing (User, Group, Participant, decodeParticipant, decodeUser, decodeGroup, isPremium, addCapsule, deleteCapsule, updateUser, sortProjects, getCapsuleById, Project, toggleProject, compareCapsule, compareProject)
 
 {-| This module contains all the data related to the user.
 
-@docs User, Group, Participant, decodeUser, decodeGroup, isPremium, addCapsule, deleteCapsule, updateUser, sortProjects, getCapsuleById, Project, toggleProject, compareCapsule, compareProject
+@docs User, Group, Participant, decodeParticipant, decodeUser, decodeGroup, isPremium, addCapsule, deleteCapsule, updateUser, sortProjects, getCapsuleById, Project, toggleProject, compareCapsule, compareProject
 
 -}
 
