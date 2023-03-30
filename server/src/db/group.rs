@@ -133,6 +133,48 @@ impl Criterion {
     }
 }
 
+/// An answer to an assignment.
+#[ergol]
+pub struct Answer {
+    /// The id of the answer;
+    #[id]
+    pub id: i32,
+
+    /// The coresponding assignment.
+    #[many_to_one(answers)]
+    pub assignment: Assignment,
+
+    /// The capsule used as an answer.
+    #[many_to_one(capsule_answers)]
+    pub answer: Capsule,
+}
+
+/// An eavluation of an answer.
+#[ergol]
+pub struct Evaluation {
+    /// The id of the evaluation.
+    #[id]
+    pub id: i32,
+
+    /// The answer being evaluated.
+    #[many_to_one(evaluations)]
+    pub answer: Answer,
+
+    /// The user performing the evaluation.
+    #[many_to_one(evaluations)]
+    pub reviewer: User,
+
+    /// The value for each criterion.
+    ///
+    /// The extra value refenreces the grade that has been made for the criterion.
+    #[many_to_many(criteria, i32)]
+    pub content: Criterion,
+
+    /// An optional capsule giving feedback to the assignee.
+    #[many_to_one(evaluations)]
+    pub capsule: Capsule,
+}
+
 /// Creates some users in the db.
 #[rustfmt::skip]
 pub async fn populate_db(db: &Db, config: &Config) -> Result<()> {
