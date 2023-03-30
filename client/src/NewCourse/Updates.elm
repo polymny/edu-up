@@ -6,6 +6,7 @@ import Data.Types as Data
 import Data.User as Data
 import Keyboard
 import NewCourse.Types as NewCourse exposing (PopupType(..))
+import NewCourse.Views exposing (popup)
 import RemoteData exposing (RemoteData(..))
 import Utils
 
@@ -81,6 +82,14 @@ update msg model =
                         DeleteGroupPopup group ->
                             update (NewCourse.DeleteGroup Utils.Confirm group) model
 
+                        NewCourse.SelfRemovePopup ->
+                            update (NewCourse.SelfRemove Utils.Confirm) model
+
+                        NewCourse.LastTeacherPopup ->
+                            ( { model | page = App.NewCourse { m | popupType = NewCourse.NoPopup } }
+                            , Cmd.none
+                            )
+
                 NewCourse.EscapePressed ->
                     case m.popupType of
                         NoPopup ->
@@ -94,6 +103,14 @@ update msg model =
 
                         DeleteGroupPopup group ->
                             update (NewCourse.DeleteGroup Utils.Cancel group) model
+
+                        NewCourse.SelfRemovePopup ->
+                            update (NewCourse.SelfRemove Utils.Cancel) model
+
+                        NewCourse.LastTeacherPopup ->
+                            ( { model | page = App.NewCourse { m | popupType = NewCourse.NoPopup } }
+                            , Cmd.none
+                            )
 
                 NewCourse.ChangeSelectorIndex index ->
                     ( { model | page = App.NewCourse { m | selectorIndex = index } }
@@ -148,25 +165,29 @@ update msg model =
                             )
 
                 NewCourse.RemoveParticipant participant ->
-                    case m.selectedGroup of
-                        Just group ->
-                            let
-                                newGroup : Data.Group
-                                newGroup =
-                                    { group | participants = List.filter (\p -> p.email /= participant.email) group.participants }
-                            in
-                            ( { model
-                                | page =
-                                    App.NewCourse
-                                        { m
-                                            | selectedGroup = Just newGroup
-                                        }
-                              }
-                            , Api.removeParticipant group.id participant.email (App.NewCourseMsg << NewCourse.Response)
-                            )
+                    if participant.email == model.user.email then
+                        update (NewCourse.SelfRemove Utils.Request) model
 
-                        Nothing ->
-                            ( model, Cmd.none )
+                    else
+                        case m.selectedGroup of
+                            Just group ->
+                                let
+                                    newGroup : Data.Group
+                                    newGroup =
+                                        { group | participants = List.filter (\p -> p.email /= participant.email) group.participants }
+                                in
+                                ( { model
+                                    | page =
+                                        App.NewCourse
+                                            { m
+                                                | selectedGroup = Just newGroup
+                                            }
+                                  }
+                                , Api.removeParticipant group.id participant.email (App.NewCourseMsg << NewCourse.Response)
+                                )
+
+                            Nothing ->
+                                ( model, Cmd.none )
 
                 NewCourse.DeleteGroup Utils.Request group ->
                     ( { model | page = App.NewCourse { m | popupType = NewCourse.DeleteGroupPopup group } }
@@ -223,6 +244,63 @@ update msg model =
 
                 NewCourse.Response _ ->
                     ( model, Cmd.none )
+
+                NewCourse.SelfRemove Utils.Request ->
+                    let
+                        isLastTeacher : Bool
+                        isLastTeacher =
+                            case m.selectedGroup of
+                                Just selectedGroup ->
+                                    selectedGroup.participants
+                                        |> List.filter (\p -> p.role == Data.Teacher)
+                                        |> List.length
+                                        |> (==) 1
+
+                                Nothing ->
+                                    False
+
+                        popupType : NewCourse.PopupType
+                        popupType =
+                            Utils.tern
+                                isLastTeacher
+                                NewCourse.LastTeacherPopup
+                                NewCourse.SelfRemovePopup
+                    in
+                    ( { model | page = App.NewCourse { m | popupType = popupType } }
+                    , Cmd.none
+                    )
+
+                NewCourse.SelfRemove Utils.Cancel ->
+                    ( { model | page = App.NewCourse { m | popupType = NewCourse.NoPopup } }
+                    , Cmd.none
+                    )
+
+                NewCourse.SelfRemove Utils.Confirm ->
+                    let
+                        user : Data.User
+                        user =
+                            model.user
+                    in
+                    case m.selectedGroup of
+                        Just selectedGroup ->
+                            ( { model
+                                | page =
+                                    App.NewCourse
+                                        { m
+                                            | selectedGroup = Nothing
+                                            , popupType = NewCourse.NoPopup
+                                        }
+                                , user =
+                                    { user
+                                        | groups =
+                                            List.filter (\g -> g.id /= selectedGroup.id) model.user.groups
+                                    }
+                              }
+                            , Api.removeParticipant selectedGroup.id user.email (\_ -> App.Noop)
+                            )
+
+                        Nothing ->
+                            ( model, Cmd.none )
 
         _ ->
             ( model, Cmd.none )

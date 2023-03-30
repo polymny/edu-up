@@ -20,6 +20,7 @@ type Msg
     | RemoveParticipant Data.Participant
     | DeleteGroup Utils.Confirmation Data.Group
     | Response (WebData (Data.Group))
+    | SelfRemove Utils.Confirmation
 
 
 {-| The model for the new course page.
@@ -38,6 +39,8 @@ type PopupType
     | NewGroupPopup String
     | DeleteGroupPopup Data.Group
     | AddParticipantPopup Data.ParticipantRole String
+    | SelfRemovePopup
+    | LastTeacherPopup
 
 
 {-| The initial model for the new course page.

@@ -139,6 +139,38 @@ popup config user model =
                             }
                         ]
                     ]
+        
+        NewCourse.SelfRemovePopup ->
+            Ui.popup 1 "[Quitter le groupe]" <|
+                Element.column [ Ui.wf, Ui.hf, Ui.p 20 ]
+                    [ Element.text <| "[Êtes-vous sûr de vouloir quitter le groupe ?]"
+                    , Element.row [ Ui.wf, Ui.ab ]
+                        [ Ui.secondary []
+                            { action = Ui.Msg <| App.NewCourseMsg <| NewCourse.SelfRemove Utils.Cancel
+                            , label = Element.text <| Strings.uiCancel config.clientState.lang
+                            }
+                        , Ui.primary [ Ui.ar ]
+                            { action = Ui.Msg <| App.NewCourseMsg <| NewCourse.SelfRemove Utils.Confirm
+                            , label = Element.text <| Strings.uiConfirm config.clientState.lang
+                            }
+                        ]
+                    ]
+        
+        NewCourse.LastTeacherPopup ->
+            Ui.popup 1 "[Dernier enseignant]" <|
+                Element.column [ Ui.wf, Ui.hf, Ui.p 20 ]
+                    [ Element.text <| "[Vous êtes le dernier professeur du groupe.]"
+                    , Element.text <| "[Vous ne pouvez pas quitter le groupe.]"
+                    , Element.text <| "[ - Veuillez ajouter un autre professeur avant de quitter le groupe.]"
+                    , Element.text <| "[Ou]"
+                    , Element.text <| "[ - Supprimer le groupe.]"
+                    , Element.row [ Ui.wf, Ui.ab ]
+                        [ Ui.primary [ Ui.ar ]
+                            { action = Ui.Msg <| App.NewCourseMsg <| NewCourse.SelfRemove Utils.Cancel
+                            , label = Element.text <| Strings.uiConfirm config.clientState.lang
+                            }
+                        ]
+                    ]
 
 
 {-| Group button view.
