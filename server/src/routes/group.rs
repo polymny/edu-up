@@ -228,7 +228,13 @@ pub async fn new_assignment(user: User, db: Db, form: Json<NewAssignmentForm>) -
         return Err(Error(Status::Forbidden));
     }
 
-    let criteria = form.criteria.join("\n");
+    let criteria = form
+        .criteria
+        .iter()
+        .map(|x| x.trim())
+        .filter(|x| !x.is_empty())
+        .collect::<Vec<_>>()
+        .join("\n");
 
     let assignment = Assignment::create(criteria, subject, answer_template, group)
         .save(&db)

@@ -91,7 +91,11 @@ pub struct Assignment {
 impl Assignment {
     /// Creates a new criterion and adds it to the assignment.
     pub async fn add_criterion(&mut self, criterion: &str, db: &Db) -> Result<()> {
-        self.criteria += &format!("\n{}", criterion);
+        self.criteria += &format!(
+            "{}{}",
+            if self.criteria.is_empty() { "" } else { "\n" },
+            criterion
+        );
         self.save(&db).await?;
         Ok(())
     }
@@ -244,6 +248,7 @@ pub async fn populate_db(db: &Db, config: &Config) -> Result<()> {
     assignment.add_criterion("Gestuelle", &db).await.unwrap();
 
     let assignment = Assignment::get_by_id(assignment.id, &db).await.unwrap().unwrap();
+    println!("{}", assignment.to_json(&db).await?);
     let template = assignment.answer_template(&db).await.unwrap();
 
     // Create answers for each student
