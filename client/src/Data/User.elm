@@ -1,8 +1,8 @@
-module Data.User exposing (User, Group, Participant, decodeParticipant, decodeUser, decodeGroup, isPremium, addCapsule, deleteCapsule, updateUser, sortProjects, getCapsuleById, Project, toggleProject, compareCapsule, compareProject)
+module Data.User exposing (User, Group, Participant, Assignment, AssignmentState(..), decodeParticipant, decodeUser, decodeGroup, isPremium, addCapsule, deleteCapsule, updateUser, sortProjects, getCapsuleById, Project, toggleProject, compareCapsule, compareProject)
 
 {-| This module contains all the data related to the user.
 
-@docs User, Group, Participant, decodeParticipant, decodeUser, decodeGroup, isPremium, addCapsule, deleteCapsule, updateUser, sortProjects, getCapsuleById, Project, toggleProject, compareCapsule, compareProject
+@docs User, Group, Participant, Assignment, AssignmentState, decodeParticipant, decodeUser, decodeGroup, isPremium, addCapsule, deleteCapsule, updateUser, sortProjects, getCapsuleById, Project, toggleProject, compareCapsule, compareProject
 
 -}
 
@@ -59,6 +59,7 @@ type alias Group =
     { id : Int
     , name : String
     , participants : List Participant
+    , assignments : List Assignment
     }
 
 
@@ -66,10 +67,11 @@ type alias Group =
 -}
 decodeGroup : Decoder Group
 decodeGroup =
-    Decode.map3 Group
+    Decode.map4 Group
         (Decode.field "id" Decode.int)
         (Decode.field "name" Decode.string)
         (Decode.field "participants" (Decode.list decodeParticipant))
+        (Decode.field "assignments" (Decode.list decodeAssignment))
 
 
 {-| JSON decoder for participant.
@@ -311,3 +313,66 @@ updateUser capsule user =
             { project | capsules = List.map capsuleMapper project.capsules }
     in
     { user | projects = List.map projectMapper user.projects }
+
+
+{-| This type represents an assignment.
+-}
+type alias Assignment =
+    { id : Int
+    , criteria : List String
+    , subject : String
+    , answerTemplate : String
+    , group : Int
+    , state : AssignmentState
+    }
+
+
+{-| JSON decoder for assignment.
+-}
+decodeAssignment : Decoder Assignment
+decodeAssignment =
+    Decode.map6 Assignment
+        (Decode.field "id" Decode.int)
+        (Decode.field "criteria" (Decode.list Decode.string))
+        (Decode.field "subject" Decode.string)
+        (Decode.field "answer" Decode.string)
+        (Decode.field "group" Decode.int)
+        (Decode.field "state" decodeAssignmentState)
+
+
+{-| This type represents the state of an assignment.
+-}
+type AssignmentState
+    = Preparation
+    | Prepared
+    | Working
+    | Evaluation
+    | Finished
+
+
+{-| JSON decoder for assignment state.
+-}
+decodeAssignmentState : Decoder AssignmentState
+decodeAssignmentState =
+    Decode.string
+        |> Decode.andThen
+            (\state ->
+                case state of
+                    "preparation" ->
+                        Decode.succeed Preparation
+
+                    "prepared" ->
+                        Decode.succeed Prepared
+
+                    "working" ->
+                        Decode.succeed Working
+
+                    "evaluation" ->
+                        Decode.succeed Evaluation
+
+                    "finished" ->
+                        Decode.succeed Finished
+
+                    _ ->
+                        Decode.fail ("Unknown assignment state: " ++ state)
+            )

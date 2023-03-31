@@ -10,7 +10,7 @@ use rocket::State as S;
 
 use crate::config::Config;
 use crate::db::capsule::{Capsule, Role};
-use crate::db::group::{Answer, Assignment, Group, ParticipantRole};
+use crate::db::group::{Answer, Assignment, Group, ParticipantRole, AssignmentState};
 use crate::db::user::User;
 use crate::{Db, Error, HashId, Result};
 
@@ -236,7 +236,7 @@ pub async fn new_assignment(user: User, db: Db, form: Json<NewAssignmentForm>) -
         .collect::<Vec<_>>()
         .join("\n");
 
-    let assignment = Assignment::create(criteria, subject, answer_template, group)
+    let assignment = Assignment::create(criteria, subject, answer_template, group, AssignmentState::Preparation)
         .save(&db)
         .await?;
 

@@ -1,5 +1,7 @@
 //! This module helps us deal with students groups.
 
+use futures::future::try_join_all;
+
 use serde::{Deserialize, Serialize};
 
 use ergol::prelude::*;
@@ -56,13 +58,42 @@ impl Group {
                 })
             })
             .collect::<Vec<_>>();
+            
+        let assignments = self.assignments(db).await?;
+        let assignments = assignments
+            .iter()
+            .map(|assignment| assignment.to_json(db))
+            .collect::<Vec<_>>();
+        let assignments = try_join_all(assignments).await?;
+
 
         Ok(json!({
             "id": self.id,
             "name": self.name,
             "participants": participants,
+            "assignments": assignments
         }))
     }
+}
+
+/// The state of an assignment.
+#[derive(Debug, Copy, Clone, PgEnum, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord)]
+#[serde(rename_all = "lowercase")]
+pub enum AssignmentState {
+    /// The assignment creation is in progress.
+    Preparation,
+
+    /// The assignment creation is finished.
+    Prepared,
+
+    /// The students are working on the assignment.
+    Working,
+
+    /// The students or the teacher are evaluating the assignment.
+    Evaluation,
+
+    /// The assignment is finished.
+    Finished,
 }
 
 /// An assignment that a teacher will give to a group of students.
@@ -86,6 +117,9 @@ pub struct Assignment {
     /// The group of users associated with this assignment.
     #[many_to_one(assignments)]
     pub group: Group,
+
+    /// The state of the assignment.
+    pub state: AssignmentState,
 }
 
 impl Assignment {
@@ -106,14 +140,9 @@ impl Assignment {
             "id": self.id,
             "subject": HARSH.encode(self.subject(&db).await?.id),
             "answer": HARSH.encode(self.answer_template(&db).await?.id),
-            "participants": self.group(&db).await?.participants(&db).await?.into_iter().map(|(user, role)| {
-                json!({
-                    "username": user.username,
-                    "email": user.email,
-                    "role": role,
-                })
-            }).collect::<Vec<_>>(),
+            "group": self.group(&db).await?.id,
             "criteria": self.criteria.split("\n").collect::<Vec<_>>(),
+            "state": self.state,
         }))
     }
 }
@@ -240,7 +269,7 @@ pub async fn populate_db(db: &Db, config: &Config) -> Result<()> {
     subject.save(&db).await.unwrap();
 
     // Create the assignment
-    let mut assignment = Assignment::create("", &subject, &subject, &group1).save(&db).await.unwrap();
+    let mut assignment = Assignment::create("", &subject, &subject, &group1, AssignmentState::Preparation).save(&db).await.unwrap();
     assignment.add_criterion("Respect de la consigne", &db).await.unwrap();
     assignment.add_criterion("Clarté du discours", &db).await.unwrap();
     assignment.add_criterion("Structuration du propos", &db).await.unwrap();

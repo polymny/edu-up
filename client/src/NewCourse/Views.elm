@@ -2,6 +2,7 @@ module NewCourse.Views exposing (..)
 
 import App.Types as App
 import Config exposing (Config)
+import Data.Capsule as Data exposing (emptyCapsule)
 import Data.Types as Data
 import Data.User as Data
 import Element exposing (Element)
@@ -25,38 +26,43 @@ import Utils
 view : Config -> Data.User -> NewCourse.Model -> ( Element App.Msg, Element App.Msg )
 view config user model =
     ( Element.column [ Ui.wf, Ui.p 20, Ui.s 20, Ui.hf ]
-        [ Element.row [ Ui.s 10 ] <|
-            List.map
-                (\g ->
-                    model.selectedGroup
-                        |> Maybe.map .id
-                        |> Maybe.withDefault -1
-                        |> (==) g.id
-                        |> groupButton g
-                )
-                user.groups
-                ++ [ Ui.secondary []
-                        { action = Ui.Msg <| App.NewCourseMsg <| NewCourse.NewGroup Utils.Request ""
-                        , label = Ui.icon 18 Icons.add
-                        }
-                   ]
-        , Element.row [ Ui.wf, Ui.hf ]
-            [ Element.el
-                [ Ui.wfp 1
-                , Ui.hf
-                , Element.transparent <| model.selectedGroup == Nothing
-                , Element.htmlAttribute <|
-                    Transition.properties [ Transition.opacity 200 [ Transition.easeInOut ] ]
-                ]
-              <|
-                case model.selectedGroup of
-                    Just group ->
-                        participantLists user group model.selectorIndex
-
-                    Nothing ->
-                        Element.none
-            , Element.el [ Ui.wfp 1, Ui.hf ] Element.none
+        [ Element.row [ Ui.wf, Ui.s 20 ]
+            [ Ui.secondary []
+                { action = Ui.Msg <| App.NewCourseMsg <| NewCourse.NewGroup Utils.Request ""
+                , label = Ui.icon 18 Icons.add
+                }
+            , Element.el [ Ui.hf, Background.color <| Colors.alpha 0.1, Ui.wpx 1, Ui.ar ] Element.none
+            , Element.el [ Ui.wf, Element.scrollbarX ] <|
+                Element.row [ Element.scrollbarX, Ui.s 10 ] <|
+                    List.map
+                        (\g ->
+                            model.selectedGroup
+                                |> Maybe.map .id
+                                |> Maybe.withDefault -1
+                                |> (==) g.id
+                                |> groupButton g
+                        )
+                        user.groups
             ]
+        , Element.row
+            [ Ui.wf
+            , Ui.hf
+            , Ui.s 20
+            , Element.transparent <| model.selectedGroup == Nothing
+            , Element.htmlAttribute <|
+                Transition.properties [ Transition.opacity 200 [ Transition.easeInOut ] ]
+            ]
+          <|
+            case model.selectedGroup of
+                Just group ->
+                    [ Element.el [ Ui.wfp 1, Ui.hf ] <|
+                        participantLists user group model.selectorIndex
+                    , Element.el [ Ui.wfp 2, Ui.hf ] <|
+                        assignmentManager user group
+                    ]
+
+                Nothing ->
+                    [ Element.none ]
         ]
     , popup config user model
     )
@@ -187,10 +193,10 @@ groupButton group selected =
             Element.text group.name
     in
     if selected then
-        Ui.primary [ Ui.wf ] { action = action, label = label }
+        Ui.primary [] { action = action, label = label }
 
     else
-        Ui.secondary [ Ui.wf ] { action = action, label = label }
+        Ui.secondary [] { action = action, label = label }
 
 
 {-| Participant list view.
@@ -441,3 +447,148 @@ participantLists user group selectorIndex =
                     ]
                     []
         ]
+
+
+{-| The view to create a new course.
+-}
+assignmentManager : Data.User -> Data.Group -> Element App.Msg
+assignmentManager user group =
+    let
+        isTeacher : Bool
+        isTeacher =
+            group.participants
+                |> List.any (\p -> p.role == Data.Teacher && p.email == user.email)
+
+        inPreparation : List Data.Assignment
+        inPreparation =
+            group.assignments
+                |> List.filter (\a -> a.state == Data.Preparation || a.state == Data.Prepared)
+
+        workInProgress : List Data.Assignment
+        workInProgress =
+            group.assignments
+                |> List.filter (\a -> a.state == Data.Working)
+
+        finished : List Data.Assignment
+        finished =
+            group.assignments
+                |> List.filter (\a -> a.state == Data.Evaluation || a.state == Data.Finished)
+
+        assignmentView : Data.Assignment -> Element App.Msg
+        assignmentView assignment =
+            let
+                subjectCapsule : Data.Capsule
+                subjectCapsule =
+                    Data.getCapsuleById assignment.subject user
+                        |> Maybe.withDefault emptyCapsule
+
+                templateCapsule : Data.Capsule
+                templateCapsule =
+                    Data.getCapsuleById assignment.answerTemplate user
+                        |> Maybe.withDefault emptyCapsule
+            in
+            Element.row [ Ui.s 10 ]
+                [ Ui.navigationElement (Ui.Msg App.Noop) [] <|
+                    Element.row [ Ui.s 10 ]
+                        [ Element.text "[Sujet:]"
+                        , Element.text <| "[" ++ subjectCapsule.project ++ "]"
+                        , Element.text subjectCapsule.name
+                        ]
+                , Ui.navigationElement (Ui.Msg App.Noop) [] <|
+                    Element.row [ Ui.s 10 ]
+                        [ Element.text "[Answer:]"
+                        , Element.text <| "[" ++ templateCapsule.project ++ "]"
+                        , Element.text templateCapsule.name
+                        ]
+                ]
+
+        inPreparationView : Element App.Msg
+        inPreparationView =
+            if List.isEmpty inPreparation || not isTeacher then
+                Element.none
+
+            else
+                List.map
+                    assignmentView
+                    inPreparation
+                    |> List.intersperse (Element.el [ Ui.wf, Ui.hpx 1, Background.color <| Colors.alpha 0.1, Ui.px 10 ] Element.none)
+                    |> (\x ->
+                            Element.row [ Ui.wf, Ui.s 10 ]
+                                [ Element.el [ Ui.wf, Ui.hpx 1, Background.color <| Colors.alpha 0.1, Ui.px 10 ] Element.none
+                                , Element.text "[In preparation]"
+                                , Element.el [ Ui.wf, Ui.hpx 1, Background.color <| Colors.alpha 0.1, Ui.px 10 ] Element.none
+                                ]
+                                :: x
+                       )
+                    |> Element.column [ Ui.s 10, Ui.wf ]
+
+        workInProgressView : Element App.Msg
+        workInProgressView =
+            if List.isEmpty workInProgress then
+                Element.none
+
+            else
+                (Element.row [ Ui.wf ]
+                    [ Element.el [ Ui.wf, Ui.hpx 1, Background.color <| Colors.alpha 0.1, Ui.p 10 ] Element.none
+                    , Element.text "[Work in progress]"
+                    , Element.el [ Ui.wf, Ui.hpx 1, Background.color <| Colors.alpha 0.1, Ui.p 10 ] Element.none
+                    ]
+                    :: List.map
+                        assignmentView
+                        workInProgress
+                )
+                    |> List.intersperse (Element.el [ Ui.wf, Ui.hpx 1, Background.color <| Colors.alpha 0.1, Ui.p 10 ] Element.none)
+                    |> Element.column []
+
+        finishedView : Element App.Msg
+        finishedView =
+            if List.isEmpty finished then
+                Element.none
+
+            else
+                (Element.row [ Ui.wf ]
+                    [ Element.el [ Ui.wf, Ui.hpx 1, Background.color <| Colors.alpha 0.1, Ui.p 10 ] Element.none
+                    , Element.text "[Finished]"
+                    , Element.el [ Ui.wf, Ui.hpx 1, Background.color <| Colors.alpha 0.1, Ui.p 10 ] Element.none
+                    ]
+                    :: List.map
+                        assignmentView
+                        finished
+                )
+                    |> List.intersperse (Element.el [ Ui.wf, Ui.hpx 1, Background.color <| Colors.alpha 0.1, Ui.p 10 ] Element.none)
+                    |> Element.column []
+    in
+    Element.column [ Ui.wf ]
+        [ inPreparationView
+        , workInProgressView
+        , finishedView
+        ]
+
+
+
+-- Element.column [ Ui.hf, Ui.wf, Ui.s 10 ]
+--     [ Element.column
+--         [ Ui.s 10 ]
+--         [ Element.el [ Font.bold ] <| Element.text "[Choisir une capsule sujet.]"
+--         , Element.row
+--             [ Ui.s 10 ]
+--             [ Element.text "[Capsule choisie]"
+--             , Ui.primary [ Ui.s 10 ]
+--                 { label = Element.text "[Choisir]"
+--                 , action = Ui.Msg <| App.NewCourseMsg <| NewCourse.NoOp
+--                 }
+--             ]
+--         ]
+--     , Element.column
+--         [ Ui.s 10 ]
+--         [ Element.el [ Font.bold ] <| Element.text "[Choisir une capsule template.]"
+--         , Element.row
+--             [ Ui.s 10 ]
+--             [ Element.text "[Capsule choisie]"
+--             , Ui.primary [ Ui.s 10 ]
+--                 { label = Element.text "[Choisir]"
+--                 , action = Ui.Msg <| App.NewCourseMsg <| NewCourse.NoOp
+--                 }
+--             ]
+--         ]
+--     ]

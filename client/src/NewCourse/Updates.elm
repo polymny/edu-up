@@ -50,6 +50,7 @@ update msg model =
                             { id = -1
                             , name = groupName
                             , participants = [ selfParticipant ]
+                            , assignments = []
                             }
 
                         user : Data.User
