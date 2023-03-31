@@ -322,14 +322,13 @@ pub async fn validate_assignment(
     let template = assignment.answer_template(&db).await?;
 
     // Prepare answers for students
-    for (user, role) in participants {
+    for (student, role) in participants {
         if role == ParticipantRole::Teacher {
             continue;
         }
 
-        let mut new = Capsule::new(&template.project, format!("{}", template.name), &user, &db)
-            .await
-            .unwrap();
+        let mut new =
+            Capsule::new(&template.project, format!("{}", template.name), &user, &db).await?;
 
         new.privacy = template.privacy.clone();
         new.produced = template.produced;
@@ -343,19 +342,17 @@ pub async fn validate_assignment(
             let dest = config.data_path.join(&format!("{}/{}", new.id, dir));
 
             if orig.is_dir() {
-                create_dir_all(&dest).await.unwrap();
+                create_dir_all(&dest).await?;
 
                 let mut iter = read_dir(&orig)
                     .await
-                    .map_err(|_| Error(Status::InternalServerError))
-                    .unwrap();
+                    .map_err(|_| Error(Status::InternalServerError))?;
 
                 loop {
                     let next = iter
                         .next_entry()
                         .await
-                        .map_err(|_| Error(Status::InternalServerError))
-                        .unwrap();
+                        .map_err(|_| Error(Status::InternalServerError))?;
 
                     let next = match next {
                         Some(x) => x,
@@ -363,15 +360,11 @@ pub async fn validate_assignment(
                     };
 
                     let path = next.path();
-                    let file_name = path
-                        .file_name()
-                        .ok_or(Error(Status::InternalServerError))
-                        .unwrap();
+                    let file_name = path.file_name().ok_or(Error(Status::InternalServerError))?;
 
                     copy(orig.join(&file_name), dest.join(&file_name))
                         .await
-                        .map_err(|_| Error(Status::InternalServerError))
-                        .unwrap();
+                        .map_err(|_| Error(Status::InternalServerError))?;
                 }
             }
         }
@@ -384,14 +377,15 @@ pub async fn validate_assignment(
         if orig.is_file() {
             copy(orig, dest)
                 .await
-                .map_err(|_| Error(Status::InternalServerError))
-                .unwrap();
+                .map_err(|_| Error(Status::InternalServerError))?;
         }
 
-        new.set_changed();
-        new.save(&db).await.unwrap();
+        new.add_user(&student, Role::Write, &db).await?;
 
-        Answer::create(&assignment, &new).save(&db).await.unwrap();
+        new.set_changed();
+        new.save(&db).await?;
+
+        Answer::create(&assignment, &new).save(&db).await?;
     }
 
     Ok(())
