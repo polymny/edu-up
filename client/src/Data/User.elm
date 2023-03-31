@@ -1,4 +1,7 @@
-module Data.User exposing (User, Group, Participant, Assignment, AssignmentState(..), decodeParticipant, decodeUser, decodeGroup, isPremium, addCapsule, deleteCapsule, updateUser, sortProjects, getCapsuleById, Project, toggleProject, compareCapsule, compareProject)
+module Data.User exposing
+    ( User, Group, Participant, Assignment, AssignmentState(..), decodeParticipant, decodeUser, decodeGroup, isPremium, addCapsule, deleteCapsule, updateUser, sortProjects, getCapsuleById, Project, toggleProject, compareCapsule, compareProject
+    , getGroupById
+    )
 
 {-| This module contains all the data related to the user.
 
@@ -61,6 +64,13 @@ type alias Group =
     , participants : List Participant
     , assignments : List Assignment
     }
+
+
+{-| Gets a group from its id.
+-}
+getGroupById : Int -> User -> Maybe Group
+getGroupById id user =
+    user.groups |> List.filter (\x -> x.id == id) |> List.head
 
 
 {-| JSON decoder for group.

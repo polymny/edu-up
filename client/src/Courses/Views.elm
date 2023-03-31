@@ -1,7 +1,8 @@
-module NewCourse.Views exposing (..)
+module Courses.Views exposing (..)
 
 import App.Types as App
 import Config exposing (Config)
+import Courses.Types as Courses
 import Data.Capsule as Data exposing (emptyCapsule)
 import Data.Types as Data
 import Data.User as Data
@@ -12,7 +13,7 @@ import Element.Font as Font
 import Element.Input as Input
 import Html.Attributes exposing (style)
 import Material.Icons as Icons
-import NewCourse.Types as NewCourse
+import Route
 import Simple.Transition as Transition
 import Strings
 import Ui.Colors as Colors
@@ -23,12 +24,12 @@ import Utils
 
 {-| This function returns the view of the new course page.
 -}
-view : Config -> Data.User -> NewCourse.Model -> ( Element App.Msg, Element App.Msg )
+view : Config -> Data.User -> Courses.Model Data.Group -> ( Element App.Msg, Element App.Msg )
 view config user model =
     ( Element.column [ Ui.wf, Ui.p 20, Ui.s 20, Ui.hf ]
         [ Element.row [ Ui.wf, Ui.s 20 ]
             [ Ui.secondary []
-                { action = Ui.Msg <| App.NewCourseMsg <| NewCourse.NewGroup Utils.Request ""
+                { action = Ui.Msg <| App.CoursesMsg <| Courses.NewGroup Utils.Request ""
                 , label = Ui.icon 18 Icons.add
                 }
             , Element.el [ Ui.hf, Background.color <| Colors.alpha 0.1, Ui.wpx 1, Ui.ar ] Element.none
@@ -70,35 +71,35 @@ view config user model =
 
 {-| This function returns the view of the popup.
 -}
-popup : Config -> Data.User -> NewCourse.Model -> Element App.Msg
+popup : Config -> Data.User -> Courses.Model Data.Group -> Element App.Msg
 popup config user model =
     case model.popupType of
-        NewCourse.NoPopup ->
+        Courses.NoPopup ->
             Element.none
 
-        NewCourse.NewGroupPopup groupName ->
+        Courses.NewGroupPopup groupName ->
             Ui.popup 1 "[Nouveau groupe]" <|
                 Element.column [ Ui.wf, Ui.hf, Ui.p 20 ]
                     [ Input.text
                         [ Ui.wf ]
-                        { onChange = App.NewCourseMsg << NewCourse.NewGroup Utils.Request
+                        { onChange = App.CoursesMsg << Courses.NewGroup Utils.Request
                         , text = groupName
                         , placeholder = Just <| Input.placeholder [] <| Element.text "[Nom du groupe : e.g. 'Terminal 2']"
                         , label = Input.labelAbove [] (Ui.title "[Nom du groupe]")
                         }
                     , Element.row [ Ui.wf, Ui.ab ]
                         [ Ui.secondary []
-                            { action = Ui.Msg <| App.NewCourseMsg <| NewCourse.NewGroup Utils.Cancel ""
+                            { action = Ui.Msg <| App.CoursesMsg <| Courses.NewGroup Utils.Cancel ""
                             , label = Element.text <| Strings.uiCancel config.clientState.lang
                             }
                         , Ui.primary [ Ui.ar ]
-                            { action = Ui.Msg <| App.NewCourseMsg <| NewCourse.NewGroup Utils.Confirm groupName
+                            { action = Ui.Msg <| App.CoursesMsg <| Courses.NewGroup Utils.Confirm groupName
                             , label = Element.text <| Strings.uiConfirm config.clientState.lang
                             }
                         ]
                     ]
 
-        NewCourse.AddParticipantPopup participantRole participantEmail ->
+        Courses.AddParticipantPopup participantRole participantEmail ->
             let
                 title : String
                 title =
@@ -113,56 +114,56 @@ popup config user model =
                 Element.column [ Ui.wf, Ui.hf, Ui.p 20 ]
                     [ Input.text
                         [ Ui.wf ]
-                        { onChange = App.NewCourseMsg << NewCourse.AddParticipant Utils.Request participantRole
+                        { onChange = App.CoursesMsg << Courses.AddParticipant Utils.Request participantRole
                         , text = participantEmail
                         , placeholder = Just <| Input.placeholder [] <| Element.text "[exemple@exemple.ex]"
                         , label = Input.labelAbove [] (Ui.title "[Adresse email]")
                         }
                     , Element.row [ Ui.wf, Ui.ab ]
                         [ Ui.secondary []
-                            { action = Ui.Msg <| App.NewCourseMsg <| NewCourse.AddParticipant Utils.Cancel participantRole ""
+                            { action = Ui.Msg <| App.CoursesMsg <| Courses.AddParticipant Utils.Cancel participantRole ""
                             , label = Element.text <| Strings.uiCancel config.clientState.lang
                             }
                         , Ui.primary [ Ui.ar ]
-                            { action = Ui.Msg <| App.NewCourseMsg <| NewCourse.AddParticipant Utils.Confirm participantRole participantEmail
+                            { action = Ui.Msg <| App.CoursesMsg <| Courses.AddParticipant Utils.Confirm participantRole participantEmail
                             , label = Element.text <| Strings.uiConfirm config.clientState.lang
                             }
                         ]
                     ]
 
-        NewCourse.DeleteGroupPopup group ->
+        Courses.DeleteGroupPopup group ->
             Ui.popup 1 "[Supprimer le groupe]" <|
                 Element.column [ Ui.wf, Ui.hf, Ui.p 20 ]
                     [ Element.text <| "[Êtes-vous sûr de vouloir supprimer le groupe " ++ group.name ++ " ?]"
                     , Element.row [ Ui.wf, Ui.ab ]
                         [ Ui.secondary []
-                            { action = Ui.Msg <| App.NewCourseMsg <| NewCourse.DeleteGroup Utils.Cancel group
+                            { action = Ui.Msg <| App.CoursesMsg <| Courses.DeleteGroup Utils.Cancel group
                             , label = Element.text <| Strings.uiCancel config.clientState.lang
                             }
                         , Ui.primary [ Ui.ar ]
-                            { action = Ui.Msg <| App.NewCourseMsg <| NewCourse.DeleteGroup Utils.Confirm group
+                            { action = Ui.Msg <| App.CoursesMsg <| Courses.DeleteGroup Utils.Confirm group
                             , label = Element.text <| Strings.uiConfirm config.clientState.lang
                             }
                         ]
                     ]
 
-        NewCourse.SelfRemovePopup ->
+        Courses.SelfRemovePopup ->
             Ui.popup 1 "[Quitter le groupe]" <|
                 Element.column [ Ui.wf, Ui.hf, Ui.p 20 ]
                     [ Element.text <| "[Êtes-vous sûr de vouloir quitter le groupe ?]"
                     , Element.row [ Ui.wf, Ui.ab ]
                         [ Ui.secondary []
-                            { action = Ui.Msg <| App.NewCourseMsg <| NewCourse.SelfRemove Utils.Cancel
+                            { action = Ui.Msg <| App.CoursesMsg <| Courses.SelfRemove Utils.Cancel
                             , label = Element.text <| Strings.uiCancel config.clientState.lang
                             }
                         , Ui.primary [ Ui.ar ]
-                            { action = Ui.Msg <| App.NewCourseMsg <| NewCourse.SelfRemove Utils.Confirm
+                            { action = Ui.Msg <| App.CoursesMsg <| Courses.SelfRemove Utils.Confirm
                             , label = Element.text <| Strings.uiConfirm config.clientState.lang
                             }
                         ]
                     ]
 
-        NewCourse.LastTeacherPopup ->
+        Courses.LastTeacherPopup ->
             Ui.popup 1 "[Dernier enseignant]" <|
                 Element.column [ Ui.wf, Ui.hf, Ui.p 20 ]
                     [ Element.text <| "[Vous êtes le dernier professeur du groupe.]"
@@ -172,7 +173,7 @@ popup config user model =
                     , Element.text <| "[ - Supprimer le groupe.]"
                     , Element.row [ Ui.wf, Ui.ab ]
                         [ Ui.primary [ Ui.ar ]
-                            { action = Ui.Msg <| App.NewCourseMsg <| NewCourse.SelfRemove Utils.Cancel
+                            { action = Ui.Msg <| App.CoursesMsg <| Courses.SelfRemove Utils.Cancel
                             , label = Element.text <| Strings.uiConfirm config.clientState.lang
                             }
                         ]
@@ -186,7 +187,7 @@ groupButton group selected =
     let
         action : Ui.Action App.Msg
         action =
-            Ui.Msg <| App.NewCourseMsg <| NewCourse.SelectGroup group
+            Ui.Route <| Route.Courses <| Just group.id
 
         label : Element App.Msg
         label =
@@ -295,7 +296,7 @@ participantLists user group selectorIndex =
             Element.row [ Ui.s 10 ]
                 [ Utils.tern
                     isTeacher
-                    (Ui.navigationElement (Ui.Msg <| App.NewCourseMsg <| NewCourse.RemoveParticipant participant) [] <|
+                    (Ui.navigationElement (Ui.Msg <| App.CoursesMsg <| Courses.RemoveParticipant participant) [] <|
                         Element.el
                             [ Element.mouseOver [ Background.color <| Colors.alpha 0.1 ]
                             , Ui.p 5
@@ -330,7 +331,7 @@ participantLists user group selectorIndex =
         [ Element.row [ Ui.pl (2 * roundRadius), Ui.wf ]
             [ Element.row []
                 [ selector
-                , Ui.navigationElement (Ui.Msg <| App.NewCourseMsg <| NewCourse.ChangeSelectorIndex 0)
+                , Ui.navigationElement (Ui.Msg <| App.CoursesMsg <| Courses.ChangeSelectorIndex 0)
                     [ Ui.wpx buttonWidth
                     , Ui.hf
                     , Ui.py 20
@@ -352,7 +353,7 @@ participantLists user group selectorIndex =
                         ]
                     <|
                         Element.text "[Students:]"
-                , Ui.navigationElement (Ui.Msg <| App.NewCourseMsg <| NewCourse.ChangeSelectorIndex 1)
+                , Ui.navigationElement (Ui.Msg <| App.CoursesMsg <| Courses.ChangeSelectorIndex 1)
                     [ Ui.wpx buttonWidth
                     , Ui.hf
                     , Ui.py 20
@@ -378,7 +379,7 @@ participantLists user group selectorIndex =
             , Utils.tern
                 isTeacher
                 (Ui.navigationElement
-                    (Ui.Msg <| App.NewCourseMsg <| NewCourse.DeleteGroup Utils.Request group)
+                    (Ui.Msg <| App.CoursesMsg <| Courses.DeleteGroup Utils.Request group)
                     [ Ui.ar
                     , Font.color <| Colors.alpha 0.5
                     , Element.mouseOver [ Font.color Colors.greyFont ]
@@ -422,8 +423,8 @@ participantLists user group selectorIndex =
                     isTeacher
                     [ Ui.navigationElement
                         (Ui.Msg <|
-                            App.NewCourseMsg <|
-                                NewCourse.AddParticipant
+                            App.CoursesMsg <|
+                                Courses.AddParticipant
                                     Utils.Request
                                     (Utils.tern (selectorIndex == 0) Data.Student Data.Teacher)
                                     ""
@@ -557,9 +558,17 @@ assignmentManager user group =
                 )
                     |> List.intersperse (Element.el [ Ui.wf, Ui.hpx 1, Background.color <| Colors.alpha 0.1, Ui.p 10 ] Element.none)
                     |> Element.column []
+
+        newAssignmentButton : Element App.Msg
+        newAssignmentButton =
+            Ui.navigationElement
+                (Ui.Msg App.Noop)
+                [ Font.color Colors.green1 ]
+                (Element.text "+ [Créer un nouveau devoir]")
     in
     Element.column [ Ui.wf ]
-        [ inPreparationView
+        [ newAssignmentButton
+        , inPreparationView
         , workInProgressView
         , finishedView
         ]
@@ -575,7 +584,7 @@ assignmentManager user group =
 --             [ Element.text "[Capsule choisie]"
 --             , Ui.primary [ Ui.s 10 ]
 --                 { label = Element.text "[Choisir]"
---                 , action = Ui.Msg <| App.NewCourseMsg <| NewCourse.NoOp
+--                 , action = Ui.Msg <| App.CoursesMsg <| Courses.NoOp
 --                 }
 --             ]
 --         ]
@@ -587,7 +596,7 @@ assignmentManager user group =
 --             [ Element.text "[Capsule choisie]"
 --             , Ui.primary [ Ui.s 10 ]
 --                 { label = Element.text "[Choisir]"
---                 , action = Ui.Msg <| App.NewCourseMsg <| NewCourse.NoOp
+--                 , action = Ui.Msg <| App.CoursesMsg <| Courses.NoOp
 --                 }
 --             ]
 --         ]

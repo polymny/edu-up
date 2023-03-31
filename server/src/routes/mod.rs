@@ -276,6 +276,18 @@ pub async fn courses(
     index_without_cors(config, db, user, lang).await
 }
 
+/// The route to the courses page.
+#[get("/courses/<_id>")]
+pub async fn courses_with_group_id(
+    config: &S<Config>,
+    db: Db,
+    user: Option<User>,
+    lang: Lang,
+    _id: u64,
+) -> Either<Html<String>, Redirect> {
+    index_without_cors(config, db, user, lang).await
+}
+
 /// The route to the admin dashboard page.
 #[get("/admin")]
 pub async fn admin_dashboard(

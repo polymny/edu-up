@@ -14,13 +14,13 @@ import Acquisition.Types as Acquisition
 import App.Types as App
 import Browser.Navigation
 import Config exposing (Config)
+import Courses.Types as Courses
 import Data.Capsule as Data
 import Data.Types as Data
 import Data.User as Data exposing (User)
 import Home.Types as Home
 import Json.Decode as Decode
 import List exposing (product)
-import NewCourse.Types as NewCourse
 import Options.Types as Options
 import Preparation.Types as Preparation
 import Production.Types as Production
@@ -236,8 +236,8 @@ pageFromRoute _ user route =
         Route.Profile ->
             ( App.Profile Profile.init, Cmd.none )
 
-        Route.NewCourse ->
-            ( App.NewCourse NewCourse.init, Cmd.none )
+        Route.Courses c ->
+            ( App.Courses (Courses.init c), Cmd.none )
 
         _ ->
             ( App.Home Home.init, Cmd.none )
@@ -272,5 +272,5 @@ routeFromPage page =
         App.Profile _ ->
             Route.Profile
 
-        App.NewCourse _ ->
-            Route.NewCourse
+        App.Courses m ->
+            Route.Courses m.selectedGroup

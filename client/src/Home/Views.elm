@@ -49,34 +49,32 @@ view config user model =
         popup : Element App.Msg
         popup =
             case model.popupType of
-                Just pt ->
-                    case pt of
-                        Home.DeleteCapsulePopup c ->
-                            let
-                                isOwner =
-                                    c.role == Data.Owner
-                            in
-                            if isOwner then
-                                deleteCapsuleConfirmPopup lang c
+                Just (Home.DeleteCapsulePopup c) ->
+                    let
+                        isOwner =
+                            c.role == Data.Owner
+                    in
+                    if isOwner then
+                        deleteCapsuleConfirmPopup lang c
 
-                            else
-                                leaveCapsuleConfirmPopup lang c
+                    else
+                        leaveCapsuleConfirmPopup lang c
 
-                        Home.RenameCapsulePopup c ->
-                            renameCapsulePopup lang c
+                Just (Home.RenameCapsulePopup c) ->
+                    renameCapsulePopup lang c
 
-                        Home.DeleteProjectPopup p ->
-                            deleteProjectConfirmPopup lang p
+                Just (Home.DeleteProjectPopup p) ->
+                    deleteProjectConfirmPopup lang p
 
-                        Home.RenameProjectPopup p ->
-                            renameProjectPopup lang p
+                Just (Home.RenameProjectPopup p) ->
+                    renameProjectPopup lang p
 
                 _ ->
                     Element.none
     in
     ( Element.row [ Ui.wf, Ui.hf, Element.scrollbarX ]
         [ Element.el [ Ui.wfp 1, Ui.hf ] (leftColumn config user)
-        ,  Element.el [ Ui.wfp 6, Ui.p 10, Element.alignTop, Ui.hf, Element.scrollbarX ] (table config user)
+        , Element.el [ Ui.wfp 6, Ui.p 10, Element.alignTop, Ui.hf, Element.scrollbarX ] (table config user)
         ]
     , popup
     )
@@ -100,12 +98,12 @@ leftColumn config user =
                 { label = Element.text <| Strings.stepsPreparationSelectPdf config.clientState.lang
                 , action = Ui.Msg <| App.HomeMsg <| Home.SlideUploadClicked Nothing
                 }
-        
+
         newCourseButton : Element App.Msg
         newCourseButton =
             Ui.primary [ Ui.wf ]
                 { label = Element.text "[New Course]"
-                , action = Ui.Route Route.NewCourse
+                , action = Ui.Route <| Route.Courses Nothing
                 }
 
         storageBar : Element App.Msg

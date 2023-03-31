@@ -437,6 +437,7 @@ pub async fn rocket() -> StdResult<Rocket<Ignite>, rocket::Error> {
                 routes::options,
                 routes::profile,
                 routes::courses,
+                routes::courses_with_group_id,
                 routes::admin_dashboard,
                 routes::admin_user,
                 routes::admin_users,

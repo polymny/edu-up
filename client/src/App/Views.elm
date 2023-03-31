@@ -12,6 +12,9 @@ import App.Types as App
 import App.Utils as App
 import Browser
 import Config
+import Courses.Types as Courses
+import Courses.Views as Courses
+import Data.User as Data
 import Element exposing (Element)
 import Element.Background as Background
 import Element.Border as Border
@@ -21,7 +24,6 @@ import Html
 import Html.Attributes
 import Lang exposing (Lang)
 import Material.Icons
-import NewCourse.Views as NewCourse
 import NewCapsule.Views as NewCapsule
 import Options.Types as Options
 import Options.Views as Options
@@ -183,9 +185,11 @@ viewSuccess model =
 
         ( App.Profile m, _, _ ) ->
             Profile.view model.config model.user m
-        
-        ( App.NewCourse m, _, _ ) ->
-            NewCourse.view model.config model.user m
+
+        ( App.Courses m, _, _ ) ->
+            Maybe.andThen (\x -> Data.getGroupById x model.user) m.selectedGroup
+                |> (\x -> Courses.withGroup x m)
+                |> Courses.view model.config model.user
 
         _ ->
             ( Element.none, Element.none )

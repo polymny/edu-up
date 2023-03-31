@@ -20,7 +20,7 @@ type Route
     | Publication String
     | Options String
     | Profile
-    | NewCourse
+    | Courses (Maybe Int)
     | NotFound
     | Custom String
 
@@ -50,9 +50,12 @@ toUrl route =
 
         Profile ->
             "/profile"
-        
-        NewCourse ->
+
+        Courses Nothing ->
             "/courses"
+
+        Courses (Just groupId) ->
+            "/courses/" ++ String.fromInt groupId
 
         NotFound ->
             "/"
@@ -110,9 +113,14 @@ fromUrl url =
 
         "profile" :: [] ->
             Profile
-        
+
         "courses" :: [] ->
-            NewCourse
+            Courses Nothing
+
+        "courses" :: id :: [] ->
+            String.toInt id
+                |> Maybe.map (\i -> Courses (Just i))
+                |> Maybe.withDefault (Courses Nothing)
 
         _ ->
             NotFound
@@ -143,8 +151,8 @@ compareTab r1 r2 =
 
         ( Profile, Profile ) ->
             True
-        
-        ( NewCourse, NewCourse ) ->
+
+        ( Courses _, Courses _ ) ->
             True
 
         _ ->

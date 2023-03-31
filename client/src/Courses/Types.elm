@@ -1,17 +1,16 @@
-module NewCourse.Types exposing (..)
+module Courses.Types exposing (..)
 
 import Data.Types as Data
 import Data.User as Data
 import Http exposing (Part)
-import Utils
 import RemoteData exposing (WebData)
+import Utils
 
 
 {-| The Msg type for the new course page.
 -}
 type Msg
     = NoOp
-    | SelectGroup Data.Group
     | NewGroup Utils.Confirmation String
     | EnterPressed
     | EscapePressed
@@ -19,16 +18,26 @@ type Msg
     | AddParticipant Utils.Confirmation Data.ParticipantRole String
     | RemoveParticipant Data.Participant
     | DeleteGroup Utils.Confirmation Data.Group
-    | Response (WebData (Data.Group))
+    | Response (WebData Data.Group)
     | SelfRemove Utils.Confirmation
 
 
 {-| The model for the new course page.
 -}
-type alias Model =
-    { selectedGroup : Maybe Data.Group
+type alias Model a =
+    { selectedGroup : Maybe a
     , popupType : PopupType
     , selectorIndex : Int
+    }
+
+
+{-| Converts a Model Int in Model Data.Group.
+-}
+withGroup : Maybe Data.Group -> Model Int -> Model Data.Group
+withGroup group model =
+    { selectedGroup = group
+    , popupType = model.popupType
+    , selectorIndex = model.selectorIndex
     }
 
 
@@ -45,9 +54,9 @@ type PopupType
 
 {-| The initial model for the new course page.
 -}
-init : Model
-init =
-    { selectedGroup = Nothing
+init : Maybe Int -> Model Int
+init id =
+    { selectedGroup = id
     , popupType = NoPopup
     , selectorIndex = 0
     }

@@ -21,12 +21,12 @@ module App.Types exposing
 import Acquisition.Types as Acquisition
 import Browser
 import Config exposing (Config)
+import Courses.Types as Courses
 import Data.Capsule as Data
 import Data.User as Data exposing (User)
 import Home.Types as Home
 import Json.Decode as Decode
 import NewCapsule.Types as NewCapsule
-import NewCourse.Types as NewCourse
 import Options.Types as Options
 import Preparation.Types as Preparation
 import Production.Types as Production
@@ -83,7 +83,7 @@ type Page
     | Publication (Publication.Model String)
     | Options (Options.Model String)
     | Profile Profile.Model
-    | NewCourse NewCourse.Model
+    | Courses (Courses.Model Int)
 
 
 {-| This type represents the errors that can occur when the page starts.
@@ -113,7 +113,7 @@ type Msg
     | PublicationMsg Publication.Msg
     | OptionsMsg Options.Msg
     | ProfileMsg Profile.Msg
-    | NewCourseMsg NewCourse.Msg
+    | CoursesMsg Courses.Msg
     | ConfigMsg Config.Msg
     | WebSocketMsg WebSocketMsg
     | OnUrlChange Url.Url

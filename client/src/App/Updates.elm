@@ -13,6 +13,7 @@ import App.Types as App
 import App.Utils as App
 import Browser.Navigation
 import Config
+import Courses.Updates as Courses
 import Data.Capsule as Data
 import Data.Types as Data
 import Data.User as Data
@@ -21,7 +22,6 @@ import Home.Updates as Home
 import Json.Decode as Decode exposing (Decoder)
 import NewCapsule.Types as NewCapsule
 import NewCapsule.Updates as NewCapsule
-import NewCourse.Updates as NewCourse
 import Options.Types as Options
 import Options.Updates as Options
 import Preparation.Types as Preparation
@@ -333,8 +333,8 @@ updateModel msg model =
                 App.ProfileMsg sMsg ->
                     Profile.update sMsg model
 
-                App.NewCourseMsg sMsg ->
-                    NewCourse.update sMsg model
+                App.CoursesMsg sMsg ->
+                    Courses.update sMsg model
 
                 App.WebSocketMsg (App.CapsuleUpdated c) ->
                     let
@@ -565,9 +565,9 @@ subs m =
 
                     ( App.Profile _, _, _ ) ->
                         Sub.none
-                    
-                    ( App.NewCourse _, _, _ ) ->
-                        NewCourse.subs
+
+                    ( App.Courses _, _, _ ) ->
+                        Courses.subs
 
                     _ ->
                         Sub.none

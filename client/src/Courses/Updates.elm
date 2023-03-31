@@ -1,42 +1,37 @@
-module NewCourse.Updates exposing (..)
+module Courses.Updates exposing (..)
 
 import Api.User as Api
 import App.Types as App
+import Courses.Types as Courses exposing (PopupType(..))
+import Courses.Views exposing (popup)
 import Data.Types as Data
 import Data.User as Data
 import Keyboard
-import NewCourse.Types as NewCourse exposing (PopupType(..))
-import NewCourse.Views exposing (popup)
 import RemoteData exposing (RemoteData(..))
 import Utils
 
 
 {-| Updates of the new course page.
 -}
-update : NewCourse.Msg -> App.Model -> ( App.Model, Cmd App.Msg )
+update : Courses.Msg -> App.Model -> ( App.Model, Cmd App.Msg )
 update msg model =
     case model.page of
-        App.NewCourse m ->
+        App.Courses m ->
             case msg of
-                NewCourse.NoOp ->
+                Courses.NoOp ->
                     ( model, Cmd.none )
 
-                NewCourse.SelectGroup group ->
-                    ( { model | page = App.NewCourse { m | selectedGroup = Just group } }
+                Courses.NewGroup Utils.Request groupName ->
+                    ( { model | page = App.Courses { m | popupType = Courses.NewGroupPopup groupName } }
                     , Cmd.none
                     )
 
-                NewCourse.NewGroup Utils.Request groupName ->
-                    ( { model | page = App.NewCourse { m | popupType = NewCourse.NewGroupPopup groupName } }
+                Courses.NewGroup Utils.Cancel groupName ->
+                    ( { model | page = App.Courses { m | popupType = NoPopup } }
                     , Cmd.none
                     )
 
-                NewCourse.NewGroup Utils.Cancel groupName ->
-                    ( { model | page = App.NewCourse { m | popupType = NoPopup } }
-                    , Cmd.none
-                    )
-
-                NewCourse.NewGroup Utils.Confirm groupName ->
+                Courses.NewGroup Utils.Confirm groupName ->
                     let
                         selfParticipant : Data.Participant
                         selfParticipant =
@@ -59,83 +54,83 @@ update msg model =
                     in
                     ( { model
                         | page =
-                            App.NewCourse
+                            App.Courses
                                 { m
-                                    | selectedGroup = Just newGroup
+                                    | selectedGroup = Just newGroup.id
                                     , popupType = NoPopup
                                 }
                         , user = { user | groups = newGroup :: user.groups }
                       }
-                    , Api.createGroup groupName (App.NewCourseMsg << NewCourse.Response)
+                    , Api.createGroup groupName (App.CoursesMsg << Courses.Response)
                     )
 
-                NewCourse.EnterPressed ->
+                Courses.EnterPressed ->
                     case m.popupType of
                         NoPopup ->
                             ( model, Cmd.none )
 
                         NewGroupPopup groupName ->
-                            update (NewCourse.NewGroup Utils.Confirm groupName) model
+                            update (Courses.NewGroup Utils.Confirm groupName) model
 
                         AddParticipantPopup participantRole participantEmail ->
-                            update (NewCourse.AddParticipant Utils.Confirm participantRole participantEmail) model
+                            update (Courses.AddParticipant Utils.Confirm participantRole participantEmail) model
 
                         DeleteGroupPopup group ->
-                            update (NewCourse.DeleteGroup Utils.Confirm group) model
+                            update (Courses.DeleteGroup Utils.Confirm group) model
 
-                        NewCourse.SelfRemovePopup ->
-                            update (NewCourse.SelfRemove Utils.Confirm) model
+                        Courses.SelfRemovePopup ->
+                            update (Courses.SelfRemove Utils.Confirm) model
 
-                        NewCourse.LastTeacherPopup ->
-                            ( { model | page = App.NewCourse { m | popupType = NewCourse.NoPopup } }
+                        Courses.LastTeacherPopup ->
+                            ( { model | page = App.Courses { m | popupType = Courses.NoPopup } }
                             , Cmd.none
                             )
 
-                NewCourse.EscapePressed ->
+                Courses.EscapePressed ->
                     case m.popupType of
                         NoPopup ->
                             ( model, Cmd.none )
 
                         NewGroupPopup groupName ->
-                            update (NewCourse.NewGroup Utils.Cancel groupName) model
+                            update (Courses.NewGroup Utils.Cancel groupName) model
 
                         AddParticipantPopup participantRole participantEmail ->
-                            update (NewCourse.AddParticipant Utils.Cancel participantRole participantEmail) model
+                            update (Courses.AddParticipant Utils.Cancel participantRole participantEmail) model
 
                         DeleteGroupPopup group ->
-                            update (NewCourse.DeleteGroup Utils.Cancel group) model
+                            update (Courses.DeleteGroup Utils.Cancel group) model
 
-                        NewCourse.SelfRemovePopup ->
-                            update (NewCourse.SelfRemove Utils.Cancel) model
+                        Courses.SelfRemovePopup ->
+                            update (Courses.SelfRemove Utils.Cancel) model
 
-                        NewCourse.LastTeacherPopup ->
-                            ( { model | page = App.NewCourse { m | popupType = NewCourse.NoPopup } }
+                        Courses.LastTeacherPopup ->
+                            ( { model | page = App.Courses { m | popupType = Courses.NoPopup } }
                             , Cmd.none
                             )
 
-                NewCourse.ChangeSelectorIndex index ->
-                    ( { model | page = App.NewCourse { m | selectorIndex = index } }
+                Courses.ChangeSelectorIndex index ->
+                    ( { model | page = App.Courses { m | selectorIndex = index } }
                     , Cmd.none
                     )
 
-                NewCourse.AddParticipant Utils.Request participantRole participantEmail ->
+                Courses.AddParticipant Utils.Request participantRole participantEmail ->
                     ( { model
                         | page =
-                            App.NewCourse
+                            App.Courses
                                 { m
-                                    | popupType = NewCourse.AddParticipantPopup participantRole participantEmail
+                                    | popupType = Courses.AddParticipantPopup participantRole participantEmail
                                 }
                       }
                     , Cmd.none
                     )
 
-                NewCourse.AddParticipant Utils.Cancel participantEmail participantRole ->
-                    ( { model | page = App.NewCourse { m | popupType = NoPopup } }
+                Courses.AddParticipant Utils.Cancel participantEmail participantRole ->
+                    ( { model | page = App.Courses { m | popupType = NoPopup } }
                     , Cmd.none
                     )
 
-                NewCourse.AddParticipant Utils.Confirm participantRole participantEmail ->
-                    case m.selectedGroup of
+                Courses.AddParticipant Utils.Confirm participantRole participantEmail ->
+                    case Maybe.andThen (\x -> Data.getGroupById x model.user) m.selectedGroup of
                         Just group ->
                             let
                                 newParticipant : Data.Participant
@@ -160,25 +155,25 @@ update msg model =
                                         group
                                         { group | participants = newParticipant :: group.participants }
                             in
-                            ( { model | page = App.NewCourse { m | popupType = NoPopup } }
+                            ( { model | page = App.Courses { m | popupType = NoPopup } }
                             , Api.addParticipant
                                 group.id
                                 participantEmail
                                 participantRole
-                                (App.NewCourseMsg << NewCourse.Response)
+                                (App.CoursesMsg << Courses.Response)
                             )
 
                         Nothing ->
-                            ( { model | page = App.NewCourse { m | popupType = NoPopup } }
+                            ( { model | page = App.Courses { m | popupType = NoPopup } }
                             , Cmd.none
                             )
 
-                NewCourse.RemoveParticipant participant ->
+                Courses.RemoveParticipant participant ->
                     if participant.email == model.user.email then
-                        update (NewCourse.SelfRemove Utils.Request) model
+                        update (Courses.SelfRemove Utils.Request) model
 
                     else
-                        case m.selectedGroup of
+                        case Maybe.andThen (\x -> Data.getGroupById x model.user) m.selectedGroup of
                             Just group ->
                                 let
                                     newGroup : Data.Group
@@ -189,27 +184,27 @@ update msg model =
                                                     group.participants
                                         }
                                 in
-                                ( { model | page = App.NewCourse { m | selectedGroup = Just newGroup } }
+                                ( { model | page = App.Courses { m | selectedGroup = Just newGroup.id } }
                                 , Api.removeParticipant
                                     group.id
                                     participant.email
-                                    (App.NewCourseMsg << NewCourse.Response)
+                                    (App.CoursesMsg << Courses.Response)
                                 )
 
                             Nothing ->
                                 ( model, Cmd.none )
 
-                NewCourse.DeleteGroup Utils.Request group ->
-                    ( { model | page = App.NewCourse { m | popupType = NewCourse.DeleteGroupPopup group } }
+                Courses.DeleteGroup Utils.Request group ->
+                    ( { model | page = App.Courses { m | popupType = Courses.DeleteGroupPopup group } }
                     , Cmd.none
                     )
 
-                NewCourse.DeleteGroup Utils.Cancel group ->
-                    ( { model | page = App.NewCourse { m | popupType = NewCourse.NoPopup } }
+                Courses.DeleteGroup Utils.Cancel group ->
+                    ( { model | page = App.Courses { m | popupType = Courses.NoPopup } }
                     , Cmd.none
                     )
 
-                NewCourse.DeleteGroup Utils.Confirm group ->
+                Courses.DeleteGroup Utils.Confirm group ->
                     let
                         user : Data.User
                         user =
@@ -219,10 +214,10 @@ update msg model =
                         Just selectedGroup ->
                             ( { model
                                 | page =
-                                    App.NewCourse
+                                    App.Courses
                                         { m
                                             | selectedGroup = Nothing
-                                            , popupType = NewCourse.NoPopup
+                                            , popupType = Courses.NoPopup
                                         }
                                 , user =
                                     { user
@@ -230,13 +225,13 @@ update msg model =
                                             List.filter (\g -> g.id /= group.id) model.user.groups
                                     }
                               }
-                            , Api.deleteGroup group.id (App.NewCourseMsg << NewCourse.Response)
+                            , Api.deleteGroup group.id (App.CoursesMsg << Courses.Response)
                             )
 
                         Nothing ->
                             ( model, Cmd.none )
 
-                NewCourse.Response (Success group) ->
+                Courses.Response (Success group) ->
                     let
                         user : Data.User
                         user =
@@ -244,19 +239,19 @@ update msg model =
                     in
                     ( { model
                         | user = { user | groups = updateGroup group user.groups }
-                        , page = App.NewCourse { m | selectedGroup = Just group }
+                        , page = App.Courses { m | selectedGroup = Just group.id }
                       }
                     , Cmd.none
                     )
 
-                NewCourse.Response _ ->
+                Courses.Response _ ->
                     ( model, Cmd.none )
 
-                NewCourse.SelfRemove Utils.Request ->
+                Courses.SelfRemove Utils.Request ->
                     let
                         isLastTeacher : Bool
                         isLastTeacher =
-                            case m.selectedGroup of
+                            case Maybe.andThen (\x -> Data.getGroupById x model.user) m.selectedGroup of
                                 Just selectedGroup ->
                                     selectedGroup.participants
                                         |> List.filter (\p -> p.role == Data.Teacher)
@@ -266,23 +261,23 @@ update msg model =
                                 Nothing ->
                                     False
 
-                        popupType : NewCourse.PopupType
+                        popupType : Courses.PopupType
                         popupType =
                             Utils.tern
                                 isLastTeacher
-                                NewCourse.LastTeacherPopup
-                                NewCourse.SelfRemovePopup
+                                Courses.LastTeacherPopup
+                                Courses.SelfRemovePopup
                     in
-                    ( { model | page = App.NewCourse { m | popupType = popupType } }
+                    ( { model | page = App.Courses { m | popupType = popupType } }
                     , Cmd.none
                     )
 
-                NewCourse.SelfRemove Utils.Cancel ->
-                    ( { model | page = App.NewCourse { m | popupType = NewCourse.NoPopup } }
+                Courses.SelfRemove Utils.Cancel ->
+                    ( { model | page = App.Courses { m | popupType = Courses.NoPopup } }
                     , Cmd.none
                     )
 
-                NewCourse.SelfRemove Utils.Confirm ->
+                Courses.SelfRemove Utils.Confirm ->
                     let
                         user : Data.User
                         user =
@@ -292,18 +287,18 @@ update msg model =
                         Just selectedGroup ->
                             ( { model
                                 | page =
-                                    App.NewCourse
+                                    App.Courses
                                         { m
                                             | selectedGroup = Nothing
-                                            , popupType = NewCourse.NoPopup
+                                            , popupType = Courses.NoPopup
                                         }
                                 , user =
                                     { user
                                         | groups =
-                                            List.filter (\g -> g.id /= selectedGroup.id) model.user.groups
+                                            List.filter (\g -> g.id /= selectedGroup) model.user.groups
                                     }
                               }
-                            , Api.removeParticipant selectedGroup.id user.email (\_ -> App.Noop)
+                            , Api.removeParticipant selectedGroup user.email (\_ -> App.Noop)
                             )
 
                         Nothing ->
@@ -333,10 +328,10 @@ shortcuts : Keyboard.RawKey -> App.Msg
 shortcuts msg =
     case Keyboard.rawValue msg of
         "Escape" ->
-            App.NewCourseMsg NewCourse.EscapePressed
+            App.CoursesMsg Courses.EscapePressed
 
         "Enter" ->
-            App.NewCourseMsg NewCourse.EnterPressed
+            App.CoursesMsg Courses.EnterPressed
 
         _ ->
             App.Noop
