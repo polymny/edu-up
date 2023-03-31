@@ -2,12 +2,17 @@
 
 use serde::{Deserialize, Serialize};
 
+use tokio::fs::{copy, create_dir_all, read_dir};
+
 use rocket::http::Status;
 use rocket::serde::json::{json, Json, Value};
+use rocket::State as S;
 
-use crate::db::group::{Group, ParticipantRole};
+use crate::config::Config;
+use crate::db::capsule::{Capsule, Role};
+use crate::db::group::{Answer, Assignment, Group, ParticipantRole};
 use crate::db::user::User;
-use crate::{Db, Error, Result};
+use crate::{Db, Error, HashId, Result};
 
 /// The data for the new group form.
 #[derive(Serialize, Deserialize)]
@@ -160,21 +165,228 @@ pub async fn remove_participant(
         .find(|(p, _)| p.email == form.participant)
         .ok_or(Error(Status::NotFound))?;
 
-    
     if *participant_role == ParticipantRole::Teacher
         && participants
-        .iter()
-        .filter(|(_, r)| *r == ParticipantRole::Teacher)
-        .count()
-        == 1
+            .iter()
+            .filter(|(_, r)| *r == ParticipantRole::Teacher)
+            .count()
+            == 1
     {
         // The teacher is trying to remove themself from a group where they are the only teacher.
         // We do not allow that.
         return Err(Error(Status::BadRequest));
     }
-    
+
     // Remove the participant
     group.remove_participant(&participant, &db).await?;
 
     Ok(group.to_json(&db).await?)
+}
+
+/// The data for the remove participant form.
+#[derive(Serialize, Deserialize)]
+pub struct NewAssignmentForm {
+    /// The criteria for evaluation of the assignment.
+    pub criteria: Vec<String>,
+
+    /// The subject for the assignment.
+    pub subject: HashId,
+
+    /// The template for answering the subject.
+    pub answer_template: HashId,
+
+    /// The id of the group to which you want to assign the task.
+    pub group_id: i32,
+}
+
+/// Create a new assignment for a group.
+#[post("/new-assignment", data = "<form>")]
+pub async fn new_assignment(user: User, db: Db, form: Json<NewAssignmentForm>) -> Result<Value> {
+    let form = form.into_inner();
+
+    let (subject, _) = user
+        .get_capsule_with_permission(*form.subject, Role::Write, &db)
+        .await?;
+
+    let (answer_template, _) = user
+        .get_capsule_with_permission(*form.answer_template, Role::Write, &db)
+        .await?;
+
+    let group = Group::get_by_id(form.group_id, &db)
+        .await?
+        .ok_or(Error(Status::NotFound))?;
+
+    // Check that user is a teacher from the group
+    let mut allowed = false;
+    for (participant, role) in group.participants(&db).await? {
+        if participant.id == user.id && role == ParticipantRole::Teacher {
+            allowed = true;
+        }
+    }
+
+    if !allowed {
+        return Err(Error(Status::Forbidden));
+    }
+
+    let criteria = form.criteria.join("\n");
+
+    let assignment = Assignment::create(criteria, subject, answer_template, group)
+        .save(&db)
+        .await?;
+
+    Ok(assignment.to_json(&db).await?)
+}
+
+/// Form for deleting an assignment.
+#[derive(Serialize, Deserialize)]
+pub struct DeleteAssignmentForm {
+    /// The id of the assignment to validate.
+    pub assignment_id: i32,
+}
+
+/// Validates an assignment and create all the capsules for students based on the template.
+#[delete("/delete-assignment", data = "<form>")]
+pub async fn delete_assignment(
+    user: User,
+    db: Db,
+    form: Json<ValidateAssignmentForm>,
+) -> Result<()> {
+    let form = form.into_inner();
+
+    let assignment = Assignment::get_by_id(form.assignment_id, &db)
+        .await?
+        .ok_or(Error(Status::NotFound))?;
+
+    let participants = assignment.group(&db).await?.participants(&db).await?;
+
+    // Check that user is a teacher from the group
+    let mut allowed = false;
+
+    for (participant, role) in &participants {
+        if participant.id == user.id && *role == ParticipantRole::Teacher {
+            allowed = true;
+        }
+    }
+
+    if !allowed {
+        return Err(Error(Status::Forbidden));
+    }
+
+    assignment.delete(&db).await?;
+
+    Ok(())
+}
+
+/// Form for validating an assignment.
+#[derive(Serialize, Deserialize)]
+pub struct ValidateAssignmentForm {
+    /// The id of the assignment to validate.
+    pub assignment_id: i32,
+}
+
+/// Validates an assignment and create all the capsules for students based on the template.
+#[post("/validate-assignment", data = "<form>")]
+pub async fn validate_assignment(
+    user: User,
+    db: Db,
+    config: &S<Config>,
+    form: Json<ValidateAssignmentForm>,
+) -> Result<()> {
+    let form = form.into_inner();
+
+    let assignment = Assignment::get_by_id(form.assignment_id, &db)
+        .await?
+        .ok_or(Error(Status::NotFound))?;
+
+    let participants = assignment.group(&db).await?.participants(&db).await?;
+
+    // Check that user is a teacher from the group
+    let mut allowed = false;
+
+    for (participant, role) in &participants {
+        if participant.id == user.id && *role == ParticipantRole::Teacher {
+            allowed = true;
+        }
+    }
+
+    if !allowed {
+        return Err(Error(Status::Forbidden));
+    }
+
+    let template = assignment.answer_template(&db).await?;
+
+    // Prepare answers for students
+    for (user, role) in participants {
+        if role == ParticipantRole::Teacher {
+            continue;
+        }
+
+        let mut new = Capsule::new(&template.project, format!("{}", template.name), &user, &db)
+            .await
+            .unwrap();
+
+        new.privacy = template.privacy.clone();
+        new.produced = template.produced;
+        new.structure = template.structure.clone();
+        new.webcam_settings = template.webcam_settings.clone();
+        new.sound_track = template.sound_track.clone();
+        new.duration_ms = template.duration_ms;
+
+        for dir in ["assets", "tmp", "output"] {
+            let orig = config.data_path.join(&format!("{}/{}", template.id, dir));
+            let dest = config.data_path.join(&format!("{}/{}", new.id, dir));
+
+            if orig.is_dir() {
+                create_dir_all(&dest).await.unwrap();
+
+                let mut iter = read_dir(&orig)
+                    .await
+                    .map_err(|_| Error(Status::InternalServerError))
+                    .unwrap();
+
+                loop {
+                    let next = iter
+                        .next_entry()
+                        .await
+                        .map_err(|_| Error(Status::InternalServerError))
+                        .unwrap();
+
+                    let next = match next {
+                        Some(x) => x,
+                        None => break,
+                    };
+
+                    let path = next.path();
+                    let file_name = path
+                        .file_name()
+                        .ok_or(Error(Status::InternalServerError))
+                        .unwrap();
+
+                    copy(orig.join(&file_name), dest.join(&file_name))
+                        .await
+                        .map_err(|_| Error(Status::InternalServerError))
+                        .unwrap();
+                }
+            }
+        }
+
+        let orig = config
+            .data_path
+            .join(&format!("{}/output.mp4", template.id));
+        let dest = config.data_path.join(&format!("{}/output.mp4", new.id));
+
+        if orig.is_file() {
+            copy(orig, dest)
+                .await
+                .map_err(|_| Error(Status::InternalServerError))
+                .unwrap();
+        }
+
+        new.set_changed();
+        new.save(&db).await.unwrap();
+
+        Answer::create(&assignment, &new).save(&db).await.unwrap();
+    }
+
+    Ok(())
 }
