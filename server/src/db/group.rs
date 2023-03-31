@@ -14,7 +14,7 @@ use crate::command::export_slides;
 use crate::config::Config;
 use crate::db::capsule::{Capsule, Fade, Gos, Role, Slide};
 use crate::db::user::User;
-use crate::{Db, Error, Result};
+use crate::{Db, Error, Result, HARSH};
 
 /// The different levels of authorization a user can have.
 #[derive(Debug, Copy, Clone, PgEnum, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord)]
@@ -100,8 +100,8 @@ impl Assignment {
     pub async fn to_json(&self, db: &Db) -> Result<Value> {
         Ok(json!({
             "id": self.id,
-            "subject": self.subject(&db).await?.id,
-            "answer": self.answer_template(&db).await?.id,
+            "subject": HARSH.encode(self.subject(&db).await?.id),
+            "answer": HARSH.encode(self.answer_template(&db).await?.id),
             "participants": self.group(&db).await?.participants(&db).await?.into_iter().map(|(user, role)| {
                 json!({
                     "username": user.username,
