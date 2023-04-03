@@ -59,7 +59,7 @@ view config user model =
                     [ Element.el [ Ui.wfp 1, Ui.hf ] <|
                         participantLists user group model.selectorIndex
                     , Element.el [ Ui.wfp 2, Ui.hf ] <|
-                        assignmentManager user group
+                        assignmentManager config user model
                     ]
 
                 Nothing ->
@@ -73,6 +73,10 @@ view config user model =
 -}
 popup : Config -> Data.User -> Courses.Model Data.Group -> Element App.Msg
 popup config user model =
+    let
+        lang =
+            config.clientState.lang
+    in
     case model.popupType of
         Courses.NoPopup ->
             Element.none
@@ -84,7 +88,7 @@ popup config user model =
                         [ Ui.wf ]
                         { onChange = App.CoursesMsg << Courses.NewGroup Utils.Request
                         , text = groupName
-                        , placeholder = Just <| Input.placeholder [] <| Element.text "[Nom du groupe : e.g. 'Terminal 2']"
+                        , placeholder = Just <| Input.placeholder [] <| Element.text "[Nom du groupe : e.g. 'Terminale 2']"
                         , label = Input.labelAbove [] (Ui.title "[Nom du groupe]")
                         }
                     , Element.row [ Ui.wf, Ui.ab ]
@@ -178,6 +182,40 @@ popup config user model =
                             }
                         ]
                     ]
+
+        Courses.SelectCapsulePopup form ->
+            user.projects
+                |> List.concatMap .capsules
+                |> List.map
+                    (\x ->
+                        Utils.tern (form.capsule == Just x.id) Ui.primary Ui.secondary [] <|
+                            { action = Ui.Msg <| App.CoursesMsg <| Courses.CapsuleClicked x.id
+                            , label = Element.text <| x.project ++ " / " ++ x.name
+                            }
+                    )
+                |> Element.column [ Ui.wf, Ui.hf ]
+                |> (\x ->
+                        Element.column [ Ui.wf, Ui.hf, Ui.p 20 ]
+                            [ x
+                            , Element.row [ Ui.s 10, Ui.ar ]
+                                [ Ui.secondary []
+                                    { label = Element.text <| Strings.uiCancel lang
+                                    , action = Ui.Msg <| App.CoursesMsg <| Courses.ValidateCapsule Utils.Cancel ""
+                                    }
+                                , Ui.primary []
+                                    { label = Element.text <| Strings.uiConfirm lang
+                                    , action =
+                                        case form.capsule of
+                                            Just c ->
+                                                Ui.Msg <| App.CoursesMsg <| Courses.ValidateCapsule Utils.Confirm c
+
+                                            _ ->
+                                                Ui.None
+                                    }
+                                ]
+                            ]
+                   )
+                |> Ui.popup 5 "[Choisissez la capsule]"
 
 
 {-| Group button view.
@@ -452,28 +490,36 @@ participantLists user group selectorIndex =
 
 {-| The view to create a new course.
 -}
-assignmentManager : Data.User -> Data.Group -> Element App.Msg
-assignmentManager user group =
+assignmentManager : Config -> Data.User -> Courses.Model Data.Group -> Element App.Msg
+assignmentManager config user model =
     let
         isTeacher : Bool
         isTeacher =
-            group.participants
-                |> List.any (\p -> p.role == Data.Teacher && p.email == user.email)
+            model.selectedGroup
+                |> Maybe.map .participants
+                |> Maybe.map (List.any (\p -> p.role == Data.Teacher && p.email == user.email))
+                |> Maybe.withDefault False
 
         inPreparation : List Data.Assignment
         inPreparation =
-            group.assignments
-                |> List.filter (\a -> a.state == Data.Preparation || a.state == Data.Prepared)
+            model.selectedGroup
+                |> Maybe.map .assignments
+                |> Maybe.map (List.filter (\a -> a.state == Data.Preparation || a.state == Data.Prepared))
+                |> Maybe.withDefault []
 
         workInProgress : List Data.Assignment
         workInProgress =
-            group.assignments
-                |> List.filter (\a -> a.state == Data.Working)
+            model.selectedGroup
+                |> Maybe.map .assignments
+                |> Maybe.map (List.filter (\a -> a.state == Data.Working))
+                |> Maybe.withDefault []
 
         finished : List Data.Assignment
         finished =
-            group.assignments
-                |> List.filter (\a -> a.state == Data.Evaluation || a.state == Data.Finished)
+            model.selectedGroup
+                |> Maybe.map .assignments
+                |> Maybe.map (List.filter (\a -> a.state == Data.Evaluation || a.state == Data.Finished))
+                |> Maybe.withDefault []
 
         assignmentView : Data.Assignment -> Element App.Msg
         assignmentView assignment =
@@ -562,42 +608,51 @@ assignmentManager user group =
         newAssignmentButton : Element App.Msg
         newAssignmentButton =
             Ui.navigationElement
-                (Ui.Msg App.Noop)
+                (Ui.Msg <| App.CoursesMsg <| Courses.StartNewAssignment)
                 [ Font.color Colors.green1 ]
                 (Element.text "+ [Créer un nouveau devoir]")
     in
-    Element.column [ Ui.wf ]
-        [ newAssignmentButton
-        , inPreparationView
-        , workInProgressView
-        , finishedView
-        ]
+    Element.column [ Ui.wf, Ui.s 30 ] <|
+        case model.newAssignmentForm of
+            Nothing ->
+                [ newAssignmentButton
+                , inPreparationView
+                , workInProgressView
+                , finishedView
+                ]
 
-
-
--- Element.column [ Ui.hf, Ui.wf, Ui.s 10 ]
---     [ Element.column
---         [ Ui.s 10 ]
---         [ Element.el [ Font.bold ] <| Element.text "[Choisir une capsule sujet.]"
---         , Element.row
---             [ Ui.s 10 ]
---             [ Element.text "[Capsule choisie]"
---             , Ui.primary [ Ui.s 10 ]
---                 { label = Element.text "[Choisir]"
---                 , action = Ui.Msg <| App.CoursesMsg <| Courses.NoOp
---                 }
---             ]
---         ]
---     , Element.column
---         [ Ui.s 10 ]
---         [ Element.el [ Font.bold ] <| Element.text "[Choisir une capsule template.]"
---         , Element.row
---             [ Ui.s 10 ]
---             [ Element.text "[Capsule choisie]"
---             , Ui.primary [ Ui.s 10 ]
---                 { label = Element.text "[Choisir]"
---                 , action = Ui.Msg <| App.CoursesMsg <| Courses.NoOp
---                 }
---             ]
---         ]
---     ]
+            Just f ->
+                [ newAssignmentButton
+                , Element.column [ Ui.hf, Ui.wf, Ui.s 10 ]
+                    [ Element.column
+                        [ Ui.s 10 ]
+                        [ Element.el [ Font.bold ] <| Element.text "[Choisir une capsule sujet.]"
+                        , Element.row
+                            [ Ui.s 10 ]
+                            [ Maybe.andThen (\x -> Data.getCapsuleById x user) f.subject
+                                |> Maybe.map (\x -> x.project ++ " / " ++ x.name)
+                                |> Maybe.withDefault "[Choisir une capsule]"
+                                |> Element.text
+                            , Ui.primary [ Ui.s 10 ]
+                                { label = Element.text "[Choisir]"
+                                , action = Ui.Msg <| App.CoursesMsg <| Courses.SelectCapsule True
+                                }
+                            ]
+                        ]
+                    , Element.column
+                        [ Ui.s 10 ]
+                        [ Element.el [ Font.bold ] <| Element.text "[Choisir une capsule modèle pour la réponse.]"
+                        , Element.row
+                            [ Ui.s 10 ]
+                            [ Maybe.andThen (\x -> Data.getCapsuleById x user) f.answerTemplate
+                                |> Maybe.map (\x -> x.project ++ " / " ++ x.name)
+                                |> Maybe.withDefault "[Choisir une capsule]"
+                                |> Element.text
+                            , Ui.primary [ Ui.s 10 ]
+                                { label = Element.text "[Choisir]"
+                                , action = Ui.Msg <| App.CoursesMsg <| Courses.SelectCapsule False
+                                }
+                            ]
+                        ]
+                    ]
+                ]

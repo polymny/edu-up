@@ -1,5 +1,6 @@
 module Courses.Types exposing (..)
 
+import Data.Capsule as Data
 import Data.Types as Data
 import Data.User as Data
 import Http exposing (Part)
@@ -19,6 +20,10 @@ type Msg
     | DeleteGroup Utils.Confirmation Data.Group
     | Response (WebData Data.Group)
     | SelfRemove Utils.Confirmation
+    | StartNewAssignment
+    | SelectCapsule Bool
+    | CapsuleClicked String
+    | ValidateCapsule Utils.Confirmation String
 
 
 {-| The model for the new course page.
@@ -27,6 +32,24 @@ type alias Model a =
     { selectedGroup : Maybe a
     , popupType : PopupType
     , selectorIndex : Int
+    , newAssignmentForm : Maybe NewAssignmentForm
+    }
+
+
+{-| The form to create a new assignment.
+-}
+type alias NewAssignmentForm =
+    { criteria : List String
+    , subject : Maybe String
+    , answerTemplate : Maybe String
+    }
+
+
+initNewAssignmentForm : NewAssignmentForm
+initNewAssignmentForm =
+    { criteria = []
+    , subject = Nothing
+    , answerTemplate = Nothing
     }
 
 
@@ -37,6 +60,7 @@ withGroup group model =
     { selectedGroup = group
     , popupType = model.popupType
     , selectorIndex = model.selectorIndex
+    , newAssignmentForm = model.newAssignmentForm
     }
 
 
@@ -49,6 +73,20 @@ type PopupType
     | AddParticipantPopup Data.ParticipantRole String
     | SelfRemovePopup
     | LastTeacherPopup
+    | SelectCapsulePopup SelectCapsuleForm
+
+
+type alias SelectCapsuleForm =
+    { isSubject : Bool
+    , capsule : Maybe String
+    }
+
+
+initSelectCapsuleForm : Bool -> SelectCapsuleForm
+initSelectCapsuleForm isSubject =
+    { isSubject = isSubject
+    , capsule = Nothing
+    }
 
 
 {-| The initial model for the new course page.
@@ -58,4 +96,5 @@ init id =
     { selectedGroup = id
     , popupType = NoPopup
     , selectorIndex = 0
+    , newAssignmentForm = Nothing
     }

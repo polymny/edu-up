@@ -83,6 +83,14 @@ update msg model =
                             , Cmd.none
                             )
 
+                        Courses.SelectCapsulePopup f ->
+                            case f.capsule of
+                                Just c ->
+                                    update (Courses.ValidateCapsule Utils.Confirm c) model
+
+                                _ ->
+                                    ( model, Cmd.none )
+
                 Courses.EscapePressed ->
                     case m.popupType of
                         NoPopup ->
@@ -104,6 +112,9 @@ update msg model =
                             ( { model | page = App.Courses { m | popupType = Courses.NoPopup } }
                             , Cmd.none
                             )
+
+                        Courses.SelectCapsulePopup _ ->
+                            update (Courses.ValidateCapsule Utils.Cancel "") model
 
                 Courses.ChangeSelectorIndex index ->
                     ( { model | page = App.Courses { m | selectorIndex = index } }
@@ -299,6 +310,50 @@ update msg model =
                             )
 
                         Nothing ->
+                            ( model, Cmd.none )
+
+                Courses.StartNewAssignment ->
+                    ( { model | page = App.Courses { m | newAssignmentForm = Just Courses.initNewAssignmentForm } }, Cmd.none )
+
+                Courses.SelectCapsule b ->
+                    ( { model | page = App.Courses { m | popupType = SelectCapsulePopup <| Courses.initSelectCapsuleForm b } }
+                    , Cmd.none
+                    )
+
+                Courses.CapsuleClicked c ->
+                    case m.popupType of
+                        Courses.SelectCapsulePopup p ->
+                            ( { model | page = App.Courses { m | popupType = Courses.SelectCapsulePopup { p | capsule = Just c } } }, Cmd.none )
+
+                        _ ->
+                            ( model, Cmd.none )
+
+                Courses.ValidateCapsule Utils.Request _ ->
+                    ( model, Cmd.none )
+
+                Courses.ValidateCapsule Utils.Cancel _ ->
+                    ( { model | page = App.Courses { m | popupType = Courses.NoPopup } }, Cmd.none )
+
+                Courses.ValidateCapsule Utils.Confirm c ->
+                    case ( m.popupType, m.newAssignmentForm ) of
+                        ( Courses.SelectCapsulePopup p, Just form ) ->
+                            ( { model
+                                | page =
+                                    App.Courses
+                                        { m
+                                            | popupType = Courses.NoPopup
+                                            , newAssignmentForm =
+                                                if p.isSubject then
+                                                    Just { form | subject = Just c }
+
+                                                else
+                                                    Just { form | answerTemplate = Just c }
+                                        }
+                              }
+                            , Cmd.none
+                            )
+
+                        _ ->
                             ( model, Cmd.none )
 
         _ ->
