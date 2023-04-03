@@ -10,8 +10,7 @@ import Utils
 {-| The Msg type for the new course page.
 -}
 type Msg
-    = NoOp
-    | NewGroup Utils.Confirmation String
+    = NewGroup Utils.Confirmation String
     | EnterPressed
     | EscapePressed
     | ChangeSelectorIndex Int

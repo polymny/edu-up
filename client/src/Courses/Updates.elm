@@ -18,9 +18,6 @@ update msg model =
     case model.page of
         App.Courses m ->
             case msg of
-                Courses.NoOp ->
-                    ( model, Cmd.none )
-
                 Courses.NewGroup Utils.Request groupName ->
                     ( { model | page = App.Courses { m | popupType = Courses.NewGroupPopup groupName } }
                     , Cmd.none
