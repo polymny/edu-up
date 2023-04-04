@@ -27,6 +27,7 @@ type Msg
     | NewCriterion
     | RemoveCriterion Int
     | CriteriaChanged Int String
+    | CreateAssignment
 
 
 {-| The model for the new course page.

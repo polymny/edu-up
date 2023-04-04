@@ -696,7 +696,7 @@ assignmentManager config user model =
             let
                 action =
                     if f.subject /= Nothing && f.answerTemplate /= Nothing && not (List.any String.isEmpty f.criteria) then
-                        Ui.Msg <| App.Noop
+                        Ui.Msg <| App.CoursesMsg <| Courses.CreateAssignment
 
                     else
                         Ui.None

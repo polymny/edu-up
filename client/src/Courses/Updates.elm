@@ -388,6 +388,21 @@ update msg model =
                         _ ->
                             ( model, Cmd.none )
 
+                Courses.CreateAssignment ->
+                    case m.newAssignmentForm of
+                        Just f ->
+                            case ( m.selectedGroup, f.subject, f.answerTemplate ) of
+                                ( Just group, Just subject, Just answerTemplate ) ->
+                                    ( model
+                                    , Api.createAssignment group subject answerTemplate f.criteria (\_ -> App.Noop)
+                                    )
+
+                                _ ->
+                                    ( model, Cmd.none )
+
+                        _ ->
+                            ( model, Cmd.none )
+
         _ ->
             ( model, Cmd.none )
 
