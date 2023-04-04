@@ -24,6 +24,9 @@ type Msg
     | SelectCapsule Bool
     | CapsuleClicked String
     | ValidateCapsule Utils.Confirmation String
+    | NewCriterion
+    | RemoveCriterion Int
+    | CriteriaChanged Int String
 
 
 {-| The model for the new course page.

@@ -193,7 +193,7 @@ popup config user model =
                             , label = Element.text <| x.project ++ " / " ++ x.name
                             }
                     )
-                |> Element.column [ Ui.wf, Ui.hf ]
+                |> Element.column [ Ui.wf, Ui.hf, Ui.s 10 ]
                 |> (\x ->
                         Element.column [ Ui.wf, Ui.hf, Ui.p 20 ]
                             [ x
@@ -611,6 +611,100 @@ assignmentManager config user model =
                 (Ui.Msg <| App.CoursesMsg <| Courses.StartNewAssignment)
                 [ Font.color Colors.green1 ]
                 (Element.text "+ [Créer un nouveau devoir]")
+
+        subjectCapsuleSelect : Maybe String -> Element App.Msg
+        subjectCapsuleSelect capsuleId =
+            Element.column
+                [ Ui.s 10 ]
+                [ Element.el [ Font.bold ] <| Element.text "[Choisir une capsule sujet.]"
+                , Element.row
+                    [ Ui.s 10 ]
+                    [ Maybe.andThen (\x -> Data.getCapsuleById x user) capsuleId
+                        |> Maybe.map (\x -> x.project ++ " / " ++ x.name)
+                        |> Maybe.withDefault "[Choisir une capsule]"
+                        |> Element.text
+                    , Ui.primary [ Ui.s 10 ]
+                        { label = Element.text "[Choisir]"
+                        , action = Ui.Msg <| App.CoursesMsg <| Courses.SelectCapsule True
+                        }
+                    ]
+                ]
+
+        answerTemplateCapsuleSelect : Maybe String -> Element App.Msg
+        answerTemplateCapsuleSelect capsuleId =
+            Element.column
+                [ Ui.s 10 ]
+                [ Element.el [ Font.bold ] <| Element.text "[Choisir une capsule modèle pour la réponse.]"
+                , Element.row
+                    [ Ui.s 10 ]
+                    [ Maybe.andThen (\x -> Data.getCapsuleById x user) capsuleId
+                        |> Maybe.map (\x -> x.project ++ " / " ++ x.name)
+                        |> Maybe.withDefault "[Choisir une capsule]"
+                        |> Element.text
+                    , Ui.primary [ Ui.s 10 ]
+                        { label = Element.text "[Choisir]"
+                        , action = Ui.Msg <| App.CoursesMsg <| Courses.SelectCapsule False
+                        }
+                    ]
+                ]
+
+        criteriaEdition : List String -> Element App.Msg
+        criteriaEdition criteria =
+            Element.column [ Ui.s 10 ]
+                [ Element.el [ Font.bold ] <| Element.text "[Choisir les critères d'évaluation.]"
+                , Element.column [ Ui.s 10 ] <|
+                    List.indexedMap
+                        (\i x ->
+                            Element.row [ Ui.s 10 ]
+                                [ Ui.navigationElement (Ui.Msg <| App.CoursesMsg <| Courses.RemoveCriterion i) [] <|
+                                    Element.el
+                                        [ Element.mouseOver [ Background.color <| Colors.alpha 0.1 ]
+                                        , Ui.p 5
+                                        , Ui.r 30
+                                        , Font.color Colors.green1
+                                        , Ui.tooltip <| "[Enlever " ++ x ++ "]"
+                                        , Element.htmlAttribute <|
+                                            Transition.properties [ Transition.backgroundColor 200 [ Transition.easeInOut ] ]
+                                        ]
+                                    <|
+                                        Ui.icon 15 Icons.close
+                                , Input.text []
+                                    { label = Input.labelHidden "[Critère]"
+                                    , onChange = \m -> App.CoursesMsg <| Courses.CriteriaChanged i m
+                                    , placeholder = Nothing
+                                    , text = x
+                                    }
+                                ]
+                        )
+                        criteria
+                , Ui.navigationElement (Ui.Msg <| App.CoursesMsg <| Courses.NewCriterion) [] <|
+                    Element.row
+                        [ Font.color Colors.green1
+                        , Ui.s 10
+                        , Ui.p 5
+                        , Element.mouseOver [ Font.color <| Colors.black ]
+                        , Element.htmlAttribute <|
+                            Transition.properties [ Transition.color 200 [ Transition.easeInOut ] ]
+                        ]
+                        [ Element.el [] <| Ui.icon 18 Icons.add
+                        , Element.text <| "[Ajouter un critère]"
+                        ]
+                ]
+
+        createAssignmentButton : Courses.NewAssignmentForm -> Element App.Msg
+        createAssignmentButton f =
+            let
+                action =
+                    if f.subject /= Nothing && f.answerTemplate /= Nothing && not (List.any String.isEmpty f.criteria) then
+                        Ui.Msg <| App.Noop
+
+                    else
+                        Ui.None
+            in
+            Ui.primary []
+                { action = action
+                , label = Element.text "[Créer le devoir]"
+                }
     in
     Element.column [ Ui.wf, Ui.s 30 ] <|
         case model.newAssignmentForm of
@@ -624,35 +718,9 @@ assignmentManager config user model =
             Just f ->
                 [ newAssignmentButton
                 , Element.column [ Ui.hf, Ui.wf, Ui.s 10 ]
-                    [ Element.column
-                        [ Ui.s 10 ]
-                        [ Element.el [ Font.bold ] <| Element.text "[Choisir une capsule sujet.]"
-                        , Element.row
-                            [ Ui.s 10 ]
-                            [ Maybe.andThen (\x -> Data.getCapsuleById x user) f.subject
-                                |> Maybe.map (\x -> x.project ++ " / " ++ x.name)
-                                |> Maybe.withDefault "[Choisir une capsule]"
-                                |> Element.text
-                            , Ui.primary [ Ui.s 10 ]
-                                { label = Element.text "[Choisir]"
-                                , action = Ui.Msg <| App.CoursesMsg <| Courses.SelectCapsule True
-                                }
-                            ]
-                        ]
-                    , Element.column
-                        [ Ui.s 10 ]
-                        [ Element.el [ Font.bold ] <| Element.text "[Choisir une capsule modèle pour la réponse.]"
-                        , Element.row
-                            [ Ui.s 10 ]
-                            [ Maybe.andThen (\x -> Data.getCapsuleById x user) f.answerTemplate
-                                |> Maybe.map (\x -> x.project ++ " / " ++ x.name)
-                                |> Maybe.withDefault "[Choisir une capsule]"
-                                |> Element.text
-                            , Ui.primary [ Ui.s 10 ]
-                                { label = Element.text "[Choisir]"
-                                , action = Ui.Msg <| App.CoursesMsg <| Courses.SelectCapsule False
-                                }
-                            ]
-                        ]
+                    [ subjectCapsuleSelect f.subject
+                    , answerTemplateCapsuleSelect f.answerTemplate
+                    , criteriaEdition f.criteria
+                    , createAssignmentButton f
                     ]
                 ]

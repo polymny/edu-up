@@ -356,6 +356,38 @@ update msg model =
                         _ ->
                             ( model, Cmd.none )
 
+                Courses.NewCriterion ->
+                    case m.newAssignmentForm of
+                        Just f ->
+                            ( { model | page = App.Courses { m | newAssignmentForm = Just { f | criteria = f.criteria ++ [ "" ] } } }, Cmd.none )
+
+                        _ ->
+                            ( model, Cmd.none )
+
+                Courses.RemoveCriterion index ->
+                    case m.newAssignmentForm of
+                        Just f ->
+                            let
+                                newCriteria =
+                                    List.take index f.criteria ++ List.drop (index + 1) f.criteria
+                            in
+                            ( { model | page = App.Courses { m | newAssignmentForm = Just { f | criteria = newCriteria } } }, Cmd.none )
+
+                        _ ->
+                            ( model, Cmd.none )
+
+                Courses.CriteriaChanged index content ->
+                    case m.newAssignmentForm of
+                        Just f ->
+                            let
+                                newCriteria =
+                                    List.take index f.criteria ++ (content :: List.drop (index + 1) f.criteria)
+                            in
+                            ( { model | page = App.Courses { m | newAssignmentForm = Just { f | criteria = newCriteria } } }, Cmd.none )
+
+                        _ ->
+                            ( model, Cmd.none )
+
         _ ->
             ( model, Cmd.none )
 

@@ -58,14 +58,13 @@ impl Group {
                 })
             })
             .collect::<Vec<_>>();
-            
+
         let assignments = self.assignments(db).await?;
         let assignments = assignments
             .iter()
             .map(|assignment| assignment.to_json(db))
             .collect::<Vec<_>>();
         let assignments = try_join_all(assignments).await?;
-
 
         Ok(json!({
             "id": self.id,
@@ -240,7 +239,7 @@ pub async fn populate_db(db: &Db, config: &Config) -> Result<()> {
     group3.add_participant(&xbrodeur, ParticipantRole::Student, &db).await.unwrap();
 
     // Create the subject of the assignment
-    let mut subject = Capsule::new("Mon projet", "Sujet", &polymny, &db).await.unwrap();
+    let mut subject = Capsule::new("Système 4 équations 4 inconnues", "Sujet", &polymny, &db).await.unwrap();
 
     let path = config
         .data_path
@@ -268,8 +267,37 @@ pub async fn populate_db(db: &Db, config: &Config) -> Result<()> {
     subject.set_changed();
     subject.save(&db).await.unwrap();
 
+    // Create the template for the answer of the assignment
+    let mut answer_template = Capsule::new("Système 4 équations 4 inconnues", "Réponse", &polymny, &db).await.unwrap();
+
+    let path = config
+        .data_path
+        .join(format!("{}", answer_template.id))
+        .join("assets");
+
+    create_dir_all(&path).await.unwrap();
+
+    let gos = export_slides(&config, "example/slides.pdf", path, None).unwrap()
+        .into_iter()
+        .map(|x| Gos {
+            record: None,
+            slides: vec![Slide {
+                uuid: x,
+                extra: None,
+                prompt: String::new(),
+            }],
+            events: vec![],
+            webcam_settings: None,
+            fade: Fade::none(),
+        })
+        .collect::<Vec<_>>();
+
+    answer_template.structure = EJson(gos);
+    answer_template.set_changed();
+    answer_template.save(&db).await.unwrap();
+
     // Create the assignment
-    let mut assignment = Assignment::create("", &subject, &subject, &group1, AssignmentState::Preparation).save(&db).await.unwrap();
+    let mut assignment = Assignment::create("", &subject, &answer_template, &group1, AssignmentState::Preparation).save(&db).await.unwrap();
     assignment.add_criterion("Respect de la consigne", &db).await.unwrap();
     assignment.add_criterion("Clarté du discours", &db).await.unwrap();
     assignment.add_criterion("Structuration du propos", &db).await.unwrap();
@@ -277,7 +305,6 @@ pub async fn populate_db(db: &Db, config: &Config) -> Result<()> {
     assignment.add_criterion("Gestuelle", &db).await.unwrap();
 
     let assignment = Assignment::get_by_id(assignment.id, &db).await.unwrap().unwrap();
-    println!("{}", assignment.to_json(&db).await?);
     let template = assignment.answer_template(&db).await.unwrap();
 
     // Create answers for each student
