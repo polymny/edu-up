@@ -393,12 +393,28 @@ update msg model =
                         Just f ->
                             case ( m.selectedGroup, f.subject, f.answerTemplate ) of
                                 ( Just group, Just subject, Just answerTemplate ) ->
-                                    ( model
-                                    , Api.createAssignment group subject answerTemplate f.criteria (\_ -> App.Noop)
+                                    ( { model | page = App.Courses { m | newAssignmentForm = Just { f | submitted = RemoteData.Loading Nothing } } }
+                                    , Api.createAssignment group subject answerTemplate f.criteria (App.CoursesMsg << Courses.CreateAssignmentChanged)
                                     )
 
                                 _ ->
                                     ( model, Cmd.none )
+
+                        _ ->
+                            ( model, Cmd.none )
+
+                Courses.CreateAssignmentChanged (RemoteData.Success a) ->
+                    ( { model
+                        | user = Data.addAssignment a model.user
+                        , page = App.Courses { m | newAssignmentForm = Nothing }
+                      }
+                    , Cmd.none
+                    )
+
+                Courses.CreateAssignmentChanged status ->
+                    case m.newAssignmentForm of
+                        Just f ->
+                            ( { model | page = App.Courses { m | newAssignmentForm = Just { f | submitted = status } } }, Cmd.none )
 
                         _ ->
                             ( model, Cmd.none )

@@ -1,6 +1,6 @@
 module Data.User exposing
     ( User, Group, Participant, Assignment, AssignmentState(..), decodeParticipant, decodeUser, decodeGroup, isPremium, addCapsule, deleteCapsule, updateUser, sortProjects, getCapsuleById, Project, toggleProject, compareCapsule, compareProject
-    , getGroupById
+    , addAssignment, decodeAssignment, getGroupById
     )
 
 {-| This module contains all the data related to the user.
@@ -335,6 +335,22 @@ type alias Assignment =
     , group : Int
     , state : AssignmentState
     }
+
+
+{-| Adds an assignment to a user.
+-}
+addAssignment : Assignment -> User -> User
+addAssignment assignment user =
+    let
+        updateGroup : Group -> Group
+        updateGroup group =
+            if group.id == assignment.group then
+                { group | assignments = assignment :: group.assignments }
+
+            else
+                group
+    in
+    { user | groups = List.map updateGroup user.groups }
 
 
 {-| JSON decoder for assignment.

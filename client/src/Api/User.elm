@@ -218,10 +218,11 @@ removeParticipant groupId participantEmail toMsg =
 
 {-| Creates a new assignment.
 -}
-createAssignment : Int -> String -> String -> List String -> (WebData () -> msg) -> Cmd msg
+createAssignment : Int -> String -> String -> List String -> (WebData Data.Assignment -> msg) -> Cmd msg
 createAssignment groupId subject answerTemplate criteria toMsg =
-    Api.post
+    Api.postJson
         { url = "/api/new-assignment"
+        , decoder = Data.decodeAssignment
         , body =
             Http.jsonBody <|
                 Encode.object

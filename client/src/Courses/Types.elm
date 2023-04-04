@@ -28,6 +28,7 @@ type Msg
     | RemoveCriterion Int
     | CriteriaChanged Int String
     | CreateAssignment
+    | CreateAssignmentChanged (WebData Data.Assignment)
 
 
 {-| The model for the new course page.
@@ -46,6 +47,7 @@ type alias NewAssignmentForm =
     { criteria : List String
     , subject : Maybe String
     , answerTemplate : Maybe String
+    , submitted : WebData Data.Assignment
     }
 
 
@@ -54,6 +56,7 @@ initNewAssignmentForm =
     { criteria = []
     , subject = Nothing
     , answerTemplate = Nothing
+    , submitted = RemoteData.NotAsked
     }
 
 

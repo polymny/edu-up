@@ -13,6 +13,7 @@ import Element.Font as Font
 import Element.Input as Input
 import Html.Attributes exposing (style)
 import Material.Icons as Icons
+import RemoteData
 import Route
 import Simple.Transition as Transition
 import Strings
@@ -695,15 +696,25 @@ assignmentManager config user model =
         createAssignmentButton f =
             let
                 action =
-                    if f.subject /= Nothing && f.answerTemplate /= Nothing && not (List.any String.isEmpty f.criteria) then
-                        Ui.Msg <| App.CoursesMsg <| Courses.CreateAssignment
+                    case ( f.submitted, f.subject /= Nothing && f.answerTemplate /= Nothing && not (List.any String.isEmpty f.criteria) ) of
+                        ( RemoteData.Loading _, _ ) ->
+                            Ui.None
 
-                    else
-                        Ui.None
+                        ( _, True ) ->
+                            Ui.Msg <| App.CoursesMsg <| Courses.CreateAssignment
+
+                        _ ->
+                            Ui.None
             in
             Ui.primary []
                 { action = action
-                , label = Element.text "[Créer le devoir]"
+                , label =
+                    case f.submitted of
+                        RemoteData.Loading _ ->
+                            Ui.spinningSpinner [] 25
+
+                        _ ->
+                            Element.text "[Créer le devoir]"
                 }
     in
     Element.column [ Ui.wf, Ui.s 30 ] <|
