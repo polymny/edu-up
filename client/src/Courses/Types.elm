@@ -37,26 +37,28 @@ type alias Model a =
     { selectedGroup : Maybe a
     , popupType : PopupType
     , selectorIndex : Int
-    , newAssignmentForm : Maybe NewAssignmentForm
+    , newAssignmentForm : Maybe AssignmentForm
     }
 
 
 {-| The form to create a new assignment.
 -}
-type alias NewAssignmentForm =
+type alias AssignmentForm =
     { criteria : List String
     , subject : Maybe String
     , answerTemplate : Maybe String
     , submitted : WebData Data.Assignment
+    , assignment : Maybe Data.Assignment
     }
 
 
-initNewAssignmentForm : NewAssignmentForm
-initNewAssignmentForm =
-    { criteria = []
-    , subject = Nothing
-    , answerTemplate = Nothing
+initAssignmentForm : Maybe Data.Assignment -> AssignmentForm
+initAssignmentForm assignment =
+    { criteria = Maybe.map .criteria assignment |> Maybe.withDefault []
+    , subject = Maybe.map .subject assignment
+    , answerTemplate = Maybe.map .answerTemplate assignment
     , submitted = RemoteData.NotAsked
+    , assignment = assignment
     }
 
 
@@ -104,4 +106,15 @@ init id =
     , popupType = NoPopup
     , selectorIndex = 0
     , newAssignmentForm = Nothing
+    }
+
+
+{-| The initial model for the assignment page.
+-}
+initWithAssignment : Data.Assignment -> Model Int
+initWithAssignment assignment =
+    { selectedGroup = Just assignment.group
+    , popupType = NoPopup
+    , selectorIndex = 0
+    , newAssignmentForm = Just <| initAssignmentForm (Just assignment)
     }

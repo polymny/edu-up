@@ -21,6 +21,7 @@ type Route
     | Options String
     | Profile
     | Courses (Maybe Int)
+    | Assignment Int
     | NotFound
     | Custom String
 
@@ -56,6 +57,9 @@ toUrl route =
 
         Courses (Just groupId) ->
             "/courses/" ++ String.fromInt groupId
+
+        Assignment id ->
+            "/assignments/" ++ String.fromInt id
 
         NotFound ->
             "/"
@@ -122,6 +126,11 @@ fromUrl url =
                 |> Maybe.map (\i -> Courses (Just i))
                 |> Maybe.withDefault (Courses Nothing)
 
+        "assignments" :: id :: [] ->
+            String.toInt id
+                |> Maybe.map (\i -> Assignment i)
+                |> Maybe.withDefault (Courses Nothing)
+
         _ ->
             NotFound
 
@@ -153,6 +162,9 @@ compareTab r1 r2 =
             True
 
         ( Courses _, Courses _ ) ->
+            True
+
+        ( Assignment _, Assignment _ ) ->
             True
 
         _ ->

@@ -239,6 +239,14 @@ pageFromRoute _ user route =
         Route.Courses c ->
             ( App.Courses (Courses.init c), Cmd.none )
 
+        Route.Assignment i ->
+            ( Data.getAssignmentById i user
+                |> Maybe.map Courses.initWithAssignment
+                |> Maybe.map App.Courses
+                |> Maybe.withDefault (App.Courses <| Courses.init Nothing)
+            , Cmd.none
+            )
+
         _ ->
             ( App.Home Home.init, Cmd.none )
 
@@ -273,4 +281,9 @@ routeFromPage page =
             Route.Profile
 
         App.Courses m ->
-            Route.Courses m.selectedGroup
+            case Maybe.map .assignment m.newAssignmentForm of
+                Just (Just x) ->
+                    Route.Assignment x.group
+
+                _ ->
+                    Route.Courses m.selectedGroup

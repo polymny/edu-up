@@ -315,7 +315,7 @@ update msg model =
                             ( model, Cmd.none )
 
                 Courses.StartNewAssignment ->
-                    ( { model | page = App.Courses { m | newAssignmentForm = Just Courses.initNewAssignmentForm } }, Cmd.none )
+                    ( { model | page = App.Courses { m | newAssignmentForm = Just <| Courses.initAssignmentForm Nothing } }, Cmd.none )
 
                 Courses.SelectCapsule b ->
                     ( { model | page = App.Courses { m | popupType = SelectCapsulePopup <| Courses.initSelectCapsuleForm b } }

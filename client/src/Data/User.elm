@@ -1,6 +1,6 @@
 module Data.User exposing
     ( User, decodeUser, isPremium, addCapsule, deleteCapsule, updateUser, sortProjects, getCapsuleById, Project, toggleProject, compareCapsule, compareProject
-    , addAssignment, getGroupById
+    , addAssignment, getAssignmentById, getGroupById
     )
 
 {-| This module contains all the data related to the user.
@@ -300,3 +300,13 @@ addAssignment assignment user =
 getGroupById : Int -> User -> Maybe Data.Group
 getGroupById id user =
     user.groups |> List.filter (\x -> x.id == id) |> List.head
+
+
+{-| Gets an assignment from its id.
+-}
+getAssignmentById : Int -> User -> Maybe Data.Assignment
+getAssignmentById id user =
+    user.groups
+        |> List.concatMap .assignments
+        |> List.filter (\x -> x.id == id)
+        |> List.head

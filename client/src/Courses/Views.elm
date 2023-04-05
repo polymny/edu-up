@@ -537,7 +537,7 @@ assignmentManager config user model =
                         |> Maybe.withDefault emptyCapsule
             in
             Element.row [ Ui.s 10 ]
-                [ Ui.navigationElement (Ui.Msg App.Noop) [] <|
+                [ Ui.navigationElement (Ui.Route <| Route.Assignment assignment.id) [] <|
                     Element.row [ Ui.s 10 ]
                         [ Element.text "[Sujet:]"
                         , Element.text <| "[" ++ subjectCapsule.project ++ "]"
@@ -693,16 +693,20 @@ assignmentManager config user model =
                         ]
                 ]
 
-        createAssignmentButton : Courses.NewAssignmentForm -> Element App.Msg
+        createAssignmentButton : Courses.AssignmentForm -> Element App.Msg
         createAssignmentButton f =
             let
                 action =
-                    case ( f.submitted, f.subject /= Nothing && f.answerTemplate /= Nothing && not (List.any String.isEmpty f.criteria) ) of
-                        ( RemoteData.Loading _, _ ) ->
+                    case ( f.submitted, f.assignment, f.subject /= Nothing && f.answerTemplate /= Nothing && not (List.any String.isEmpty f.criteria) ) of
+                        ( RemoteData.Loading _, _, _ ) ->
                             Ui.None
 
-                        ( _, True ) ->
+                        ( _, Nothing, True ) ->
                             Ui.Msg <| App.CoursesMsg <| Courses.CreateAssignment
+
+                        ( _, Just a, True ) ->
+                            -- Update assignment a
+                            Ui.None
 
                         _ ->
                             Ui.None
@@ -710,12 +714,15 @@ assignmentManager config user model =
             Ui.primary []
                 { action = action
                 , label =
-                    case f.submitted of
-                        RemoteData.Loading _ ->
+                    case ( f.submitted, f.assignment ) of
+                        ( RemoteData.Loading _, _ ) ->
                             Ui.spinningSpinner [] 25
 
-                        _ ->
+                        ( _, Nothing ) ->
                             Element.text "[Créer le devoir]"
+
+                        ( _, Just _ ) ->
+                            Element.text "[Mettre à jour le devoir]"
                 }
     in
     Element.column [ Ui.wf, Ui.s 30 ] <|
@@ -728,11 +735,8 @@ assignmentManager config user model =
                 ]
 
             Just f ->
-                [ newAssignmentButton
-                , Element.column [ Ui.hf, Ui.wf, Ui.s 10 ]
-                    [ subjectCapsuleSelect f.subject
-                    , answerTemplateCapsuleSelect f.answerTemplate
-                    , criteriaEdition f.criteria
-                    , createAssignmentButton f
-                    ]
+                [ subjectCapsuleSelect f.subject
+                , answerTemplateCapsuleSelect f.answerTemplate
+                , criteriaEdition f.criteria
+                , createAssignmentButton f
                 ]
