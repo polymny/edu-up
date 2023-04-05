@@ -1,9 +1,9 @@
 module Courses.Types exposing (..)
 
 import Data.Capsule as Data
+import Data.Group as Data
 import Data.Types as Data
 import Data.User as Data
-import Http exposing (Part)
 import RemoteData exposing (WebData)
 import Utils
 

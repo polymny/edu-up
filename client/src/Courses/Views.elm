@@ -4,6 +4,7 @@ import App.Types as App
 import Config exposing (Config)
 import Courses.Types as Courses
 import Data.Capsule as Data exposing (emptyCapsule)
+import Data.Group as Data
 import Data.Types as Data
 import Data.User as Data
 import Element exposing (Element)

@@ -1,17 +1,18 @@
 module Data.User exposing
-    ( User, Group, Participant, Assignment, AssignmentState(..), decodeParticipant, decodeUser, decodeGroup, isPremium, addCapsule, deleteCapsule, updateUser, sortProjects, getCapsuleById, Project, toggleProject, compareCapsule, compareProject
-    , addAssignment, decodeAssignment, getGroupById
+    ( User, decodeUser, isPremium, addCapsule, deleteCapsule, updateUser, sortProjects, getCapsuleById, Project, toggleProject, compareCapsule, compareProject
+    , addAssignment, getGroupById
     )
 
 {-| This module contains all the data related to the user.
 
-@docs User, Group, Participant, Assignment, AssignmentState, decodeParticipant, decodeUser, decodeGroup, isPremium, addCapsule, deleteCapsule, updateUser, sortProjects, getCapsuleById, Project, toggleProject, compareCapsule, compareProject
+@docs User, decodeUser, isPremium, addCapsule, deleteCapsule, updateUser, sortProjects, getCapsuleById, Project, toggleProject, compareCapsule, compareProject
 
 -}
 
 import Data.Capsule as Data exposing (Capsule)
+import Data.Group as Data
 import Data.Types as Data
-import Json.Decode as Decode exposing (Decoder, field)
+import Json.Decode as Decode exposing (Decoder)
 import List.Extra
 
 
@@ -39,7 +40,7 @@ type alias PrivateUser =
     , plan : Data.Plan
     , capsules : List Capsule
     , quota : Int
-    , groups : List Group
+    , groups : List Data.Group
     }
 
 
@@ -53,54 +54,7 @@ decodePrivateUser =
         (Decode.field "plan" Data.decodePlan)
         (Decode.field "capsules" (Decode.list Data.decodeCapsule))
         (Decode.field "disk_quota" Decode.int)
-        (Decode.field "groups" (Decode.list decodeGroup))
-
-
-{-| This type represents a group with all the info we have on it.
--}
-type alias Group =
-    { id : Int
-    , name : String
-    , participants : List Participant
-    , assignments : List Assignment
-    }
-
-
-{-| Gets a group from its id.
--}
-getGroupById : Int -> User -> Maybe Group
-getGroupById id user =
-    user.groups |> List.filter (\x -> x.id == id) |> List.head
-
-
-{-| JSON decoder for group.
--}
-decodeGroup : Decoder Group
-decodeGroup =
-    Decode.map4 Group
-        (Decode.field "id" Decode.int)
-        (Decode.field "name" Decode.string)
-        (Decode.field "participants" (Decode.list decodeParticipant))
-        (Decode.field "assignments" (Decode.list decodeAssignment))
-
-
-{-| JSON decoder for participant.
--}
-decodeParticipant : Decoder Participant
-decodeParticipant =
-    Decode.map3 Participant
-        (Decode.field "username" Decode.string)
-        (Decode.field "email" Decode.string)
-        (Decode.field "role" Data.decodeGroupRole)
-
-
-{-| This type represents a participant with all the info we have on it.
--}
-type alias Participant =
-    { username : String
-    , email : String
-    , role : Data.ParticipantRole
-    }
+        (Decode.field "groups" (Decode.list Data.decodeGroup))
 
 
 {-| This type represents a user with all the info we have on them.
@@ -111,7 +65,7 @@ type alias User =
     , plan : Data.Plan
     , projects : List Project
     , quota : Int
-    , groups : List Group
+    , groups : List Data.Group
     }
 
 
@@ -325,24 +279,12 @@ updateUser capsule user =
     { user | projects = List.map projectMapper user.projects }
 
 
-{-| This type represents an assignment.
--}
-type alias Assignment =
-    { id : Int
-    , criteria : List String
-    , subject : String
-    , answerTemplate : String
-    , group : Int
-    , state : AssignmentState
-    }
-
-
 {-| Adds an assignment to a user.
 -}
-addAssignment : Assignment -> User -> User
+addAssignment : Data.Assignment -> User -> User
 addAssignment assignment user =
     let
-        updateGroup : Group -> Group
+        updateGroup : Data.Group -> Data.Group
         updateGroup group =
             if group.id == assignment.group then
                 { group | assignments = assignment :: group.assignments }
@@ -353,52 +295,8 @@ addAssignment assignment user =
     { user | groups = List.map updateGroup user.groups }
 
 
-{-| JSON decoder for assignment.
+{-| Gets a group from its id.
 -}
-decodeAssignment : Decoder Assignment
-decodeAssignment =
-    Decode.map6 Assignment
-        (Decode.field "id" Decode.int)
-        (Decode.field "criteria" (Decode.list Decode.string))
-        (Decode.field "subject" Decode.string)
-        (Decode.field "answer" Decode.string)
-        (Decode.field "group" Decode.int)
-        (Decode.field "state" decodeAssignmentState)
-
-
-{-| This type represents the state of an assignment.
--}
-type AssignmentState
-    = Preparation
-    | Prepared
-    | Working
-    | Evaluation
-    | Finished
-
-
-{-| JSON decoder for assignment state.
--}
-decodeAssignmentState : Decoder AssignmentState
-decodeAssignmentState =
-    Decode.string
-        |> Decode.andThen
-            (\state ->
-                case state of
-                    "preparation" ->
-                        Decode.succeed Preparation
-
-                    "prepared" ->
-                        Decode.succeed Prepared
-
-                    "working" ->
-                        Decode.succeed Working
-
-                    "evaluation" ->
-                        Decode.succeed Evaluation
-
-                    "finished" ->
-                        Decode.succeed Finished
-
-                    _ ->
-                        Decode.fail ("Unknown assignment state: " ++ state)
-            )
+getGroupById : Int -> User -> Maybe Data.Group
+getGroupById id user =
+    user.groups |> List.filter (\x -> x.id == id) |> List.head

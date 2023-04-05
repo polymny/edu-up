@@ -1,9 +1,10 @@
 module Courses.Updates exposing (..)
 
+import Api.Group as Api
 import Api.User as Api
 import App.Types as App
 import Courses.Types as Courses exposing (PopupType(..))
-import Courses.Views exposing (popup)
+import Data.Group as Data
 import Data.Types as Data
 import Data.User as Data
 import Keyboard
@@ -23,7 +24,7 @@ update msg model =
                     , Cmd.none
                     )
 
-                Courses.NewGroup Utils.Cancel groupName ->
+                Courses.NewGroup Utils.Cancel _ ->
                     ( { model | page = App.Courses { m | popupType = NoPopup } }
                     , Cmd.none
                     )
@@ -132,7 +133,7 @@ update msg model =
                     , Cmd.none
                     )
 
-                Courses.AddParticipant Utils.Cancel participantEmail participantRole ->
+                Courses.AddParticipant Utils.Cancel _ _ ->
                     ( { model | page = App.Courses { m | popupType = NoPopup } }
                     , Cmd.none
                     )
@@ -140,6 +141,7 @@ update msg model =
                 Courses.AddParticipant Utils.Confirm participantRole participantEmail ->
                     case Maybe.andThen (\x -> Data.getGroupById x model.user) m.selectedGroup of
                         Just group ->
+                            -- TODO all this is unused and it scares me
                             let
                                 newParticipant : Data.Participant
                                 newParticipant =
