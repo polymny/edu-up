@@ -84,3 +84,14 @@ createAssignment groupId subject answerTemplate criteria toMsg =
                     ]
         , toMsg = toMsg
         }
+
+
+{-| Validates an assignment.
+-}
+validateAssignment : Int -> (WebData () -> msg) -> Cmd msg
+validateAssignment assignmentId toMsg =
+    Api.post
+        { url = "/api/validate-assignment"
+        , body = Http.jsonBody <| Encode.object [ ( "assignment_id", Encode.int assignmentId ) ]
+        , toMsg = toMsg
+        }

@@ -10,8 +10,9 @@ use rocket::State as S;
 
 use crate::config::Config;
 use crate::db::capsule::{Capsule, Role};
-use crate::db::group::{Answer, Assignment, Group, ParticipantRole, AssignmentState};
+use crate::db::group::{Answer, Assignment, AssignmentState, Group, ParticipantRole};
 use crate::db::user::User;
+use crate::websockets::WebSockets;
 use crate::{Db, Error, HashId, Result};
 
 /// The data for the new group form.
@@ -236,9 +237,15 @@ pub async fn new_assignment(user: User, db: Db, form: Json<NewAssignmentForm>) -
         .collect::<Vec<_>>()
         .join("\n");
 
-    let assignment = Assignment::create(criteria, subject, answer_template, group, AssignmentState::Preparation)
-        .save(&db)
-        .await?;
+    let assignment = Assignment::create(
+        criteria,
+        subject,
+        answer_template,
+        group,
+        AssignmentState::Preparation,
+    )
+    .save(&db)
+    .await?;
 
     Ok(assignment.to_json(&db).await?)
 }
@@ -296,6 +303,7 @@ pub async fn validate_assignment(
     user: User,
     db: Db,
     config: &S<Config>,
+    socks: &S<WebSockets>,
     form: Json<ValidateAssignmentForm>,
 ) -> Result<()> {
     let form = form.into_inner();
@@ -327,8 +335,13 @@ pub async fn validate_assignment(
             continue;
         }
 
-        let mut new =
-            Capsule::new(&template.project, format!("{}", template.name), &user, &db).await?;
+        let mut new = Capsule::new(
+            &template.project,
+            format!("{} ({})", template.name, &student.username),
+            &user,
+            &db,
+        )
+        .await?;
 
         new.privacy = template.privacy.clone();
         new.produced = template.produced;
@@ -384,9 +397,17 @@ pub async fn validate_assignment(
 
         new.set_changed();
         new.save(&db).await?;
+        new.notify_change(&db, &socks).await?;
 
         Answer::create(&assignment, &new).save(&db).await?;
     }
+
+    let mut assignment = Assignment::get_by_id(form.assignment_id, &db)
+        .await?
+        .ok_or(Error(Status::NotFound))?;
+
+    assignment.state = AssignmentState::Working;
+    assignment.save(&db).await?;
 
     Ok(())
 }

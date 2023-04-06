@@ -1,6 +1,6 @@
 module Data.User exposing
     ( User, decodeUser, isPremium, addCapsule, deleteCapsule, updateUser, sortProjects, getCapsuleById, Project, toggleProject, compareCapsule, compareProject
-    , addAssignment, getAssignmentById, getGroupById
+    , addAssignment, getAssignmentById, getGroupById, updateAssignment
     )
 
 {-| This module contains all the data related to the user.
@@ -264,17 +264,28 @@ deleteCapsule capsule user =
 updateUser : Capsule -> User -> User
 updateUser capsule user =
     let
-        capsuleMapper : Capsule -> Capsule
+        capsuleMapper : Capsule -> ( Capsule, Bool )
         capsuleMapper c =
             if c.id == capsule.id then
-                capsule
+                ( capsule, True )
 
             else
-                c
+                ( c, False )
 
         projectMapper : Project -> Project
         projectMapper project =
-            { project | capsules = List.map capsuleMapper project.capsules }
+            let
+                ( capsules, changed ) =
+                    List.map capsuleMapper project.capsules |> List.unzip
+
+                newCapsules =
+                    if capsule.project == project.name && not (List.any (\x -> x) changed) then
+                        capsule :: project.capsules
+
+                    else
+                        capsules
+            in
+            { project | capsules = newCapsules }
     in
     { user | projects = List.map projectMapper user.projects }
 
@@ -291,6 +302,26 @@ addAssignment assignment user =
 
             else
                 group
+    in
+    { user | groups = List.map updateGroup user.groups }
+
+
+{-| Updates an assignment.
+-}
+updateAssignment : Data.Assignment -> User -> User
+updateAssignment assignment user =
+    let
+        updateSingleAssignment : Data.Assignment -> Data.Assignment
+        updateSingleAssignment a =
+            if a.id == assignment.id then
+                assignment
+
+            else
+                a
+
+        updateGroup : Data.Group -> Data.Group
+        updateGroup group =
+            { group | assignments = List.map updateSingleAssignment group.assignments }
     in
     { user | groups = List.map updateGroup user.groups }
 

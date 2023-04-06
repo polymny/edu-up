@@ -421,6 +421,21 @@ update msg model =
                         _ ->
                             ( model, Cmd.none )
 
+                Courses.ValidateAssignment assignment ->
+                    let
+                        newAssignment =
+                            { assignment | state = Data.Working }
+
+                        newAssignmentForm =
+                            Maybe.map (\x -> { x | assignment = Just newAssignment }) m.newAssignmentForm
+                    in
+                    ( { model
+                        | user = Data.updateAssignment newAssignment model.user
+                        , page = App.Courses { m | newAssignmentForm = newAssignmentForm }
+                      }
+                    , Api.validateAssignment assignment.id (\_ -> App.Noop)
+                    )
+
         _ ->
             ( model, Cmd.none )
 

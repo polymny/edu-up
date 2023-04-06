@@ -536,20 +536,19 @@ assignmentManager config user model =
                     Data.getCapsuleById assignment.answerTemplate user
                         |> Maybe.withDefault emptyCapsule
             in
-            Element.row [ Ui.s 10 ]
-                [ Ui.navigationElement (Ui.Route <| Route.Assignment assignment.id) [] <|
-                    Element.row [ Ui.s 10 ]
+            Ui.navigationElement (Ui.Route <| Route.Assignment assignment.id) [] <|
+                Element.row [ Ui.s 10 ]
+                    [ Element.row [ Ui.s 10 ]
                         [ Element.text "[Sujet:]"
                         , Element.text <| "[" ++ subjectCapsule.project ++ "]"
                         , Element.text subjectCapsule.name
                         ]
-                , Ui.navigationElement (Ui.Msg App.Noop) [] <|
-                    Element.row [ Ui.s 10 ]
+                    , Element.row [ Ui.s 10 ]
                         [ Element.text "[Answer:]"
                         , Element.text <| "[" ++ templateCapsule.project ++ "]"
                         , Element.text templateCapsule.name
                         ]
-                ]
+                    ]
 
         inPreparationView : Element App.Msg
         inPreparationView =
@@ -724,6 +723,18 @@ assignmentManager config user model =
                         ( _, Just _ ) ->
                             Element.text "[Mettre à jour le devoir]"
                 }
+
+        startAssignmentButton : Data.Assignment -> Element App.Msg
+        startAssignmentButton a =
+            case a.state of
+                Data.Preparation ->
+                    Ui.primary []
+                        { label = Element.text "[Démarrer le devoir]"
+                        , action = Ui.Msg <| App.CoursesMsg <| Courses.ValidateAssignment a
+                        }
+
+                _ ->
+                    Element.none
     in
     Element.column [ Ui.wf, Ui.s 30 ] <|
         case model.newAssignmentForm of
@@ -739,4 +750,5 @@ assignmentManager config user model =
                 , answerTemplateCapsuleSelect f.answerTemplate
                 , criteriaEdition f.criteria
                 , createAssignmentButton f
+                , Maybe.map startAssignmentButton f.assignment |> Maybe.withDefault Element.none
                 ]

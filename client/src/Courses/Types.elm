@@ -29,6 +29,7 @@ type Msg
     | CriteriaChanged Int String
     | CreateAssignment
     | CreateAssignmentChanged (WebData Data.Assignment)
+    | ValidateAssignment Data.Assignment
 
 
 {-| The model for the new course page.

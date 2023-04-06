@@ -10,7 +10,7 @@ use ergol::tokio_postgres::types::Json as EJson;
 use rocket::http::Status;
 use rocket::serde::json::{json, Value};
 
-use tokio::fs::{copy, create_dir_all, read_dir};
+use tokio::fs::create_dir_all;
 
 use crate::command::export_slides;
 use crate::config::Config;
@@ -207,48 +207,48 @@ pub async fn populate_db(db: &Db, config: &Config) -> Result<()> {
     let polymny = User::get_by_username("polymny", &db).await.unwrap().unwrap();
 
     // Create a bunch of students
-    let iguernon = User::new("iguernon","iguernon@example.com", "hashed", true, &None, &db, &config).await.unwrap();
-    let tmarceau = User::new("tmarceau","tmarceau@example.com", "hashed", true, &None, &db, &config).await.unwrap();
-    let cbabin = User::new("cbabin",  "cbabin@example.com", "hashed", true, &None, &db, &config).await.unwrap();
-    let lgrignon = User::new("lgrignon","lgrignon@example.com", "hashed", true, &None, &db, &config).await.unwrap();
-    let epaquin = User::new("epaquin", "epaquin@example.com", "hashed", true, &None, &db, &config).await.unwrap();
-    let dsalmons = User::new("dsalmons","dsalmons@example.com", "hashed", true, &None, &db, &config).await.unwrap();
-    let lsacre = User::new("lsacre",  "lsacre@example.com", "hashed", true, &None, &db, &config).await.unwrap();
-    let ysalois = User::new("ysalois", "ysalois@example.com", "hashed", true, &None, &db, &config).await.unwrap();
-    let rseguin = User::new("rseguin", "rseguin@example.com", "hashed", true, &None, &db, &config).await.unwrap();
-    let xbrodeur = User::new("xbrodeur","xbrodeur@example.com", "hashed", true, &None, &db, &config).await.unwrap();
+    let iguernon = User::new("iguernon","iguernon@example.com", "hashed", true, &None, &db, &config).await?;
+    let tmarceau = User::new("tmarceau","tmarceau@example.com", "hashed", true, &None, &db, &config).await?;
+    let cbabin = User::new("cbabin",  "cbabin@example.com", "hashed", true, &None, &db, &config).await?;
+    let lgrignon = User::new("lgrignon","lgrignon@example.com", "hashed", true, &None, &db, &config).await?;
+    let epaquin = User::new("epaquin", "epaquin@example.com", "hashed", true, &None, &db, &config).await?;
+    let dsalmons = User::new("dsalmons","dsalmons@example.com", "hashed", true, &None, &db, &config).await?;
+    let lsacre = User::new("lsacre",  "lsacre@example.com", "hashed", true, &None, &db, &config).await?;
+    let ysalois = User::new("ysalois", "ysalois@example.com", "hashed", true, &None, &db, &config).await?;
+    let rseguin = User::new("rseguin", "rseguin@example.com", "hashed", true, &None, &db, &config).await?;
+    let xbrodeur = User::new("xbrodeur","xbrodeur@example.com", "hashed", true, &None, &db, &config).await?;
 
     // Create a few groups
-    let group1 = Group::create("Terminale 1").save(&db).await.unwrap();
-    group1.add_participant(&polymny, ParticipantRole::Teacher, &db).await.unwrap();
-    group1.add_participant(&iguernon, ParticipantRole::Student, &db).await.unwrap();
-    group1.add_participant(&tmarceau, ParticipantRole::Student, &db).await.unwrap();
-    group1.add_participant(&cbabin, ParticipantRole::Student, &db).await.unwrap();
+    let group1 = Group::create("Terminale 1").save(&db).await?;
+    group1.add_participant(&polymny, ParticipantRole::Teacher, &db).await?;
+    group1.add_participant(&iguernon, ParticipantRole::Student, &db).await?;
+    group1.add_participant(&tmarceau, ParticipantRole::Student, &db).await?;
+    group1.add_participant(&cbabin, ParticipantRole::Student, &db).await?;
 
-    let group2 = Group::create("Terminale 2").save(&db).await.unwrap();
-    group2.add_participant(&polymny, ParticipantRole::Teacher, &db).await.unwrap();
-    group2.add_participant(&lgrignon, ParticipantRole::Student, &db).await.unwrap();
-    group2.add_participant(&epaquin, ParticipantRole::Student, &db).await.unwrap();
-    group2.add_participant(&dsalmons, ParticipantRole::Student, &db).await.unwrap();
+    let group2 = Group::create("Terminale 2").save(&db).await?;
+    group2.add_participant(&polymny, ParticipantRole::Teacher, &db).await?;
+    group2.add_participant(&lgrignon, ParticipantRole::Student, &db).await?;
+    group2.add_participant(&epaquin, ParticipantRole::Student, &db).await?;
+    group2.add_participant(&dsalmons, ParticipantRole::Student, &db).await?;
 
-    let group3 = Group::create("Première 1").save(&db).await.unwrap();
-    group3.add_participant(&polymny, ParticipantRole::Teacher, &db).await.unwrap();
-    group3.add_participant(&lsacre, ParticipantRole::Student, &db).await.unwrap();
-    group3.add_participant(&ysalois, ParticipantRole::Student, &db).await.unwrap();
-    group3.add_participant(&rseguin, ParticipantRole::Student, &db).await.unwrap();
-    group3.add_participant(&xbrodeur, ParticipantRole::Student, &db).await.unwrap();
+    let group3 = Group::create("Première 1").save(&db).await?;
+    group3.add_participant(&polymny, ParticipantRole::Teacher, &db).await?;
+    group3.add_participant(&lsacre, ParticipantRole::Student, &db).await?;
+    group3.add_participant(&ysalois, ParticipantRole::Student, &db).await?;
+    group3.add_participant(&rseguin, ParticipantRole::Student, &db).await?;
+    group3.add_participant(&xbrodeur, ParticipantRole::Student, &db).await?;
 
     // Create the subject of the assignment
-    let mut subject = Capsule::new("Système 4 équations 4 inconnues", "Sujet", &polymny, &db).await.unwrap();
+    let mut subject = Capsule::new("Système 4 équations 4 inconnues", "Sujet", &polymny, &db).await?;
 
     let path = config
         .data_path
         .join(format!("{}", subject.id))
         .join("assets");
 
-    create_dir_all(&path).await.unwrap();
+    create_dir_all(&path).await?;
 
-    let gos = export_slides(&config, "example/slides.pdf", path, None).unwrap()
+    let gos = export_slides(&config, "example/slides.pdf", path, None)?
         .into_iter()
         .map(|x| Gos {
             record: None,
@@ -265,19 +265,19 @@ pub async fn populate_db(db: &Db, config: &Config) -> Result<()> {
 
     subject.structure = EJson(gos);
     subject.set_changed();
-    subject.save(&db).await.unwrap();
+    subject.save(&db).await?;
 
     // Create the template for the answer of the assignment
-    let mut answer_template = Capsule::new("Système 4 équations 4 inconnues", "Réponse", &polymny, &db).await.unwrap();
+    let mut answer_template = Capsule::new("Système 4 équations 4 inconnues", "Réponse", &polymny, &db).await?;
 
     let path = config
         .data_path
         .join(format!("{}", answer_template.id))
         .join("assets");
 
-    create_dir_all(&path).await.unwrap();
+    create_dir_all(&path).await?;
 
-    let gos = export_slides(&config, "example/slides.pdf", path, None).unwrap()
+    let gos = export_slides(&config, "example/slides.pdf", path, None)?
         .into_iter()
         .map(|x| Gos {
             record: None,
@@ -294,85 +294,7 @@ pub async fn populate_db(db: &Db, config: &Config) -> Result<()> {
 
     answer_template.structure = EJson(gos);
     answer_template.set_changed();
-    answer_template.save(&db).await.unwrap();
-
-    // Create the assignment
-    let mut assignment = Assignment::create("", &subject, &answer_template, &group1, AssignmentState::Preparation).save(&db).await.unwrap();
-    assignment.add_criterion("Respect de la consigne", &db).await.unwrap();
-    assignment.add_criterion("Clarté du discours", &db).await.unwrap();
-    assignment.add_criterion("Structuration du propos", &db).await.unwrap();
-    assignment.add_criterion("Débit", &db).await.unwrap();
-    assignment.add_criterion("Gestuelle", &db).await.unwrap();
-
-    let assignment = Assignment::get_by_id(assignment.id, &db).await.unwrap().unwrap();
-    let template = assignment.answer_template(&db).await.unwrap();
-
-    // Create answers for each student
-    for (user, role) in assignment.group(&db).await.unwrap().participants(&db).await.unwrap() {
-        if role == ParticipantRole::Teacher {
-            continue;
-        }
-
-        let mut new = Capsule::new(
-            &template.project,
-            format!("{}", template.name),
-            &user,
-            &db,
-        ).await.unwrap();
-
-        new.privacy = template.privacy.clone();
-        new.produced = template.produced;
-        new.structure = template.structure.clone();
-        new.webcam_settings = template.webcam_settings.clone();
-        new.sound_track = template.sound_track.clone();
-        new.duration_ms = template.duration_ms;
-
-        for dir in ["assets", "tmp", "output"] {
-            let orig = config.data_path.join(&format!("{}/{}", template.id, dir));
-            let dest = config.data_path.join(&format!("{}/{}", new.id, dir));
-
-            if orig.is_dir() {
-                create_dir_all(&dest).await.unwrap();
-
-                let mut iter = read_dir(&orig)
-                    .await
-                    .map_err(|_| Error(Status::InternalServerError)).unwrap();
-
-                loop {
-                    let next = iter
-                        .next_entry()
-                        .await
-                        .map_err(|_| Error(Status::InternalServerError)).unwrap();
-
-                    let next = match next {
-                        Some(x) => x,
-                        None => break,
-                    };
-
-                    let path = next.path();
-                    let file_name = path.file_name().ok_or(Error(Status::InternalServerError)).unwrap();
-
-                    copy(orig.join(&file_name), dest.join(&file_name))
-                        .await
-                        .map_err(|_| Error(Status::InternalServerError)).unwrap();
-                    }
-            }
-        }
-
-        let orig = config.data_path.join(&format!("{}/output.mp4", template.id));
-        let dest = config.data_path.join(&format!("{}/output.mp4", new.id));
-
-        if orig.is_file() {
-            copy(orig, dest)
-                .await
-                .map_err(|_| Error(Status::InternalServerError)).unwrap();
-        }
-
-        new.set_changed();
-        new.save(&db).await.unwrap();
-
-        Answer::create(&assignment, &new).save(&db).await.unwrap();
-    }
+    answer_template.save(&db).await?;
 
     Ok(())
 }
