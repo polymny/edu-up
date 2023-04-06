@@ -119,6 +119,7 @@ type Msg
     | OnUrlChange Url.Url
     | InternalUrl Url.Url
     | ExternalUrl String
+    | CopyString String
     | Logout
     | LoggedOut
 
