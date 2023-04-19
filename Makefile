@@ -76,6 +76,7 @@ client/src/Strings.elm: client/strings/*po
 clean: clean-client clean-server
 
 server/dist/js/ports.js: client/ports.js
+	@mkdir -p server/dist/js
 	@cp client/ports.js server/dist/js/ports.js
 
 multiview:
