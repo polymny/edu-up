@@ -161,6 +161,7 @@ type alias ClientConfig =
     , sortBy : Data.SortBy
     , devices : Device.Devices
     , preferredDevice : Maybe Device.Device
+    , matting : Bool
     }
 
 
@@ -174,6 +175,7 @@ defaultClientConfig =
     , sortBy = { key = Data.LastModified, ascending = False }
     , devices = { audio = [], video = [] }
     , preferredDevice = Nothing
+    , matting = False
     }
 
 
@@ -202,13 +204,14 @@ makeDefault default arg =
 -}
 decodeClientConfig : Decoder ClientConfig
 decodeClientConfig =
-    Decode.map6 ClientConfig
+    Decode.map7 ClientConfig
         (Decode.field "lang" Decode.string |> Decode.map Lang.fromString |> makeDefault defaultClientConfig.lang)
         (Decode.field "zoomLevel" Decode.int |> makeDefault defaultClientConfig.zoomLevel)
         (Decode.field "promptSize" Decode.int |> makeDefault defaultClientConfig.promptSize)
         (Decode.field "sortBy" Data.decodeSortBy |> makeDefault defaultClientConfig.sortBy)
         (Decode.field "devices" Device.decodeDevices |> makeDefault defaultClientConfig.devices)
         (Decode.maybe (Decode.field "preferredDevice" Device.decodeDevice))
+        (Decode.field "matting" Decode.bool |> makeDefault defaultClientConfig.matting)
 
 
 {-| This type holds the client global state.

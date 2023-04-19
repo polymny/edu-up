@@ -731,7 +731,16 @@ settingsPopup config model =
     Element.column [ Ui.wf, Ui.hf, Element.scrollbars ]
         [ Element.row [ Ui.wf, Ui.hf, Element.scrollbars ]
             [ Element.el [ Ui.wf, Ui.hf, Element.scrollbars ] settings
-            , Element.el [ Ui.wf ] <| devicePlayer config model
+            , Element.column [ Ui.wf ]
+                [ Element.el [ Ui.wf ] <| devicePlayer config model
+                , Input.checkbox
+                    [ Ui.p 10 ]
+                    { checked = config.clientConfig.matting
+                    , icon = Input.defaultCheckbox
+                    , label = Input.labelRight [] <| Element.text <| Strings.stepsAcquisitionToggleMatting lang
+                    , onChange = \_ -> App.AcquisitionMsg <| Acquisition.ToggleMatting
+                    }
+                ]
             ]
         , Ui.primary [ Ui.ab, Ui.ar ]
             { label = Element.text <| Strings.uiConfirm lang

@@ -63,7 +63,7 @@
 
 # Matting
  - [ ] dans record:
-    - [ ] option camera, acitver ou non le matting
+    - [x] option camera, acitver ou non le matting
     - [ ] si option matting activé, live preview du matting
     - [ ] validation record, lance le matting si activé dans les settings
  - [ ] dans production:

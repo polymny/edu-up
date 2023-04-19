@@ -517,6 +517,10 @@ msgstr "You can then use the right arrow to end your recording"
 msgid "Steps.Acquisition.reinitializeDevices"
 msgstr "Reinitialize all devices"
 
+#. Toggle matting.
+msgid "Steps.Acquisition.toggleMatting"
+msgstr "Use virtual green screen"
+
 #. Step of video production.
 msgid "Steps.Production.production"
 msgstr "Production"
