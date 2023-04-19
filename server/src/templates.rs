@@ -108,6 +108,7 @@ const INDEX_HTML_BEFORE_FLAGS: &str = r#"<!doctype HTML>
         <div id="root"></div>
         <script src="/dist/js/main.js"></script>
         <script src="/dist/js/ports.js"></script>
+        <script src="https://cdn.jsdelivr.net/npm/@mediapipe/selfie_segmentation/selfie_segmentation.js" crossorigin="anonymous"></script>
         <script src="/dist/js/old-main.js"></script>
         <script src="/dist/js/old-ports.js"></script>
         <script src="/dist/jszip.min.js"></script>
@@ -149,6 +150,7 @@ const INDEX_HTML_BEFORE_FLAGS: &str = r#"<!doctype HTML>
         <div id="root"></div>
         <script src="/dist/js/main.min.js"></script>
         <script src="/dist/js/ports.js"></script>
+        <script src="https://cdn.jsdelivr.net/npm/@mediapipe/selfie_segmentation/selfie_segmentation.js" crossorigin="anonymous"></script>
         <script src="/dist/js/old-main.min.js"></script>
         <script src="/dist/js/old-ports.js"></script>
         <script src="/dist/jszip.min.js"></script>

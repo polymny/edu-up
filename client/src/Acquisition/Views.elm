@@ -10,6 +10,7 @@ import Acquisition.Types as Acquisition
 import App.Types as App
 import Config exposing (Config)
 import Data.Capsule as Data
+import Data.Types exposing (Plan(..))
 import Data.User exposing (User)
 import Device
 import Element exposing (Element)
@@ -42,7 +43,7 @@ as the left column.
 
 -}
 view : Config -> User -> Acquisition.Model Data.Capsule Data.Gos -> ( Element App.Msg, Element App.Msg, Element App.Msg )
-view config _ model =
+view config user model =
     let
         -- Shortcut for lang
         lang =
@@ -222,7 +223,7 @@ view config _ model =
                 Element.column
                     [ Ui.wf, Ui.s 10 ]
                     ((if not model.showSettings then
-                        devicePlayer config model
+                        devicePlayer user config model
 
                       else
                         Element.none
@@ -330,7 +331,7 @@ view config _ model =
         -- Settings popup or popup to confirm the deletion of a record
         popup =
             if model.showSettings then
-                settingsPopup config model
+                settingsPopup user config model
 
             else if model.deleteRecord then
                 deleteRecordPopup
@@ -565,8 +566,8 @@ deviceInfo config =
 
 {-| Creates a HTML video element on which the device feedback will be displayed.
 -}
-devicePlayer : Config -> Acquisition.Model Data.Capsule Data.Gos -> Element App.Msg
-devicePlayer config model =
+devicePlayer : User -> Config -> Acquisition.Model Data.Capsule Data.Gos -> Element App.Msg
+devicePlayer user config model =
     let
         -- Shortcut for lang
         lang =
@@ -636,12 +637,18 @@ devicePlayer config model =
             else
                 Element.none
 
+        -- Element displayed in front of the device feedback to display the green screen video
+        greenedVideoElement : Element App.Msg
+        greenedVideoElement =
+            greenVideo (config.clientConfig.matting && (user.plan == PremiumLvl1 || user.plan == Admin))
+
         -- Element that shows the device feedback to the user
         player : Element App.Msg
         player =
             Element.el
                 [ Ui.wf
                 , Ui.at
+                , Element.inFront greenedVideoElement
                 , Element.inFront inFrontElement
                 , Element.inFront vumeterElement
                 , Element.inFront settingsElement
@@ -651,10 +658,30 @@ devicePlayer config model =
     player
 
 
+
+{- Creates a canvas to previous the green screen video -}
+
+
+greenVideo : Bool -> Element App.Msg
+greenVideo display =
+    Element.html
+        (Html.canvas
+            [ Html.Attributes.class "wf hf"
+            , Html.Attributes.id "greened-video"
+            , Html.Attributes.style "display" <|
+                Utils.tern
+                    display
+                    "block"
+                    "none"
+            ]
+            []
+        )
+
+
 {-| Creates the settings popup, with all the information about the different devices.
 -}
-settingsPopup : Config -> Acquisition.Model Data.Capsule Data.Gos -> Element App.Msg
-settingsPopup config model =
+settingsPopup : User -> Config -> Acquisition.Model Data.Capsule Data.Gos -> Element App.Msg
+settingsPopup user config model =
     let
         -- Shortcut for lang
         lang =
@@ -732,14 +759,18 @@ settingsPopup config model =
         [ Element.row [ Ui.wf, Ui.hf, Element.scrollbars ]
             [ Element.el [ Ui.wf, Ui.hf, Element.scrollbars ] settings
             , Element.column [ Ui.wf ]
-                [ Element.el [ Ui.wf ] <| devicePlayer config model
-                , Input.checkbox
-                    [ Ui.p 10 ]
-                    { checked = config.clientConfig.matting
-                    , icon = Input.defaultCheckbox
-                    , label = Input.labelRight [] <| Element.text <| Strings.stepsAcquisitionToggleMatting lang
-                    , onChange = \_ -> App.AcquisitionMsg <| Acquisition.ToggleMatting
-                    }
+                [ Element.el [ Ui.wf ] <| devicePlayer user config model
+                , if user.plan == PremiumLvl1 || user.plan == Admin then
+                    Input.checkbox
+                        [ Ui.p 10 ]
+                        { checked = config.clientConfig.matting
+                        , icon = Input.defaultCheckbox
+                        , label = Input.labelRight [] <| Element.text <| Strings.stepsAcquisitionToggleMatting lang
+                        , onChange = \_ -> App.AcquisitionMsg <| Acquisition.ToggleMatting
+                        }
+
+                  else
+                    Element.none
                 ]
             ]
         , Ui.primary [ Ui.ab, Ui.ar ]

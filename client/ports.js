@@ -1,3 +1,54 @@
+class Camera {
+    constructor() {
+
+        this.selfieSegmentation = new SelfieSegmentation({
+            locateFile: (file) => {
+                return `https://cdn.jsdelivr.net/npm/@mediapipe/selfie_segmentation/${file}`;
+            }
+        });
+        this.selfieSegmentation.setOptions({ modelSelection: 1 });
+        this.selfieSegmentation.onResults(results => {
+            this.greenedElement.height = results.segmentationMask.height / results.segmentationMask.width * this.greenedElement.width;
+
+            // Clear the canvas and draw the mask.
+            this.greenedCtx.clearRect(0, 0, this.greenedElement.width, this.greenedElement.height);
+            this.greenedCtx.drawImage(results.segmentationMask, 0, 0,
+                this.greenedElement.width, this.greenedElement.height);
+
+            // Only overwrite existing pixels.
+            this.greenedCtx.globalCompositeOperation = 'source-out';
+            this.greenedCtx.fillStyle = '#00FF00';
+            this.greenedCtx.fillRect(0, 0, this.greenedElement.width, this.greenedElement.height);
+
+            // Only overwrite missing pixels.
+            this.greenedCtx.globalCompositeOperation = 'destination-atop';
+            this.greenedCtx.drawImage(
+                results.image, 0, 0, this.greenedElement.width, this.greenedElement.height);
+
+            requestAnimationFrame(() => this.render());
+        });
+    }
+
+    start() {
+        this.running = true;
+        requestAnimationFrame(() => this.render());
+    }
+
+    render() {
+        if (!this.running) {
+            return;
+        }
+        this.selfieSegmentation.send({ image: this.video });
+    }
+
+    reset(video) {
+        this.video = video;
+        this.running = false;
+        this.greenedElement = document.getElementById("greened-video");
+        this.greenedCtx = this.greenedElement.getContext('2d');
+    }
+}
+
 function init(node, flags) {
 
     ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -60,6 +111,9 @@ function init(node, flags) {
 
     // The id of the video element.
     const videoId = "video";
+
+    // The greened camera.
+    let camera = new Camera();
 
     // The audio and video for the level checks when adding soundtracks.
     let soundtrackCheck = {
@@ -540,6 +594,11 @@ function init(node, flags) {
         element.src = null;
         element.muted = muted;
         await element.play();
+
+        camera.reset(element);
+        camera = new Camera();
+        camera.reset(element);
+        camera.start();
     }
 
     // Starts the recording.
@@ -853,6 +912,13 @@ function init(node, flags) {
             requestAnimationFrame(renderPointer);
 
         }
+
+
+        camera.reset(video);
+        camera = new Camera();
+        camera.reset(video);
+        camera.start();
+
     }
 
     // Stops the current record.
@@ -1536,7 +1602,7 @@ function init(node, flags) {
     });
 
     // Copies the string to the clipboard.
-    makePort("copyString", async function(args) {
+    makePort("copyString", async function (args) {
         await navigator.clipboard.writeText(args);
     });
 
