@@ -1,486 +1,523 @@
-module Preparation.Updates exposing (..)
+module Preparation.Updates exposing (update, subs)
 
-import Api
-import Capsule
-import Core.Types as Core
+{-| This module contains the update function for the preparation page.
+
+@docs update, subs
+
+-}
+
+import Api.Capsule as Api
+import App.Types as App
+import App.Utils as App
+import Config exposing (Config)
+import Data.Capsule as Data
+import Data.User as Data exposing (User)
 import Dict exposing (Dict)
 import File
 import File.Select as Select
-import Lang
-import Popup
+import Keyboard
+import List.Extra
 import Preparation.Types as Preparation
-import Status
-import User
+import RemoteData
+import Svg.Attributes exposing (display)
+import Utils
 
 
-update : Preparation.Msg -> Core.Model -> ( Core.Model, Cmd Core.Msg )
+{-| The update function of the preparation page.
+-}
+update : Preparation.Msg -> App.Model -> ( App.Model, Cmd App.Msg )
 update msg model =
-    case model.page of
-        Core.Preparation m ->
+    let
+        ( maybeCapsule, _ ) =
+            App.capsuleAndGos model.user model.page
+    in
+    case ( model.page, maybeCapsule ) of
+        ( App.Preparation m, Just capsule ) ->
             case msg of
-                Preparation.StartEditPrompt uuid ->
-                    case Capsule.findSlide uuid m.capsule of
-                        Just slide ->
-                            ( mkModel model (Core.Preparation { m | editPrompt = Just slide }), Cmd.none )
+                Preparation.DnD sMsg ->
+                    updateDnD model.user sMsg m model.config
+                        |> Tuple.mapFirst (\( x, y ) -> { model | page = App.Preparation x, config = y })
 
-                        _ ->
-                            ( model, Cmd.none )
-
-                Preparation.PromptChanged newContent ->
-                    let
-                        newPrompt =
-                            case m.editPrompt of
-                                Just s ->
-                                    Just { s | prompt = newContent }
-
-                                x ->
-                                    x
-                    in
-                    ( mkModel model (Core.Preparation { m | editPrompt = newPrompt }), Cmd.none )
-
-                Preparation.CancelPromptChange ->
-                    ( mkModel model (Core.Preparation { m | editPrompt = Nothing }), Cmd.none )
-
-                Preparation.PromptChangeSlide newSlide ->
-                    let
-                        newCapsule =
-                            case m.editPrompt of
-                                Just s ->
-                                    Capsule.changeSlide { s | prompt = clearNewLines s.prompt } m.capsule
-
-                                _ ->
-                                    m.capsule
-
-                        newUser =
-                            User.changeCapsule newCapsule model.user
-                    in
-                    ( mkModel
-                        { model | user = newUser }
-                        (Core.Preparation
-                            { m
-                                | capsule = newCapsule
-                                , editPrompt = newSlide
-                                , slides = Preparation.setupSlides newCapsule
-                            }
-                        )
-                    , Api.updateCapsule Core.Noop newCapsule
-                    )
-
-                Preparation.RequestDeleteSlide uuid ->
-                    let
-                        popup =
-                            Popup.popup
-                                (Lang.warning model.global.lang)
-                                (Lang.deleteSlideConfirm model.global.lang)
-                                Core.Cancel
-                                (Core.PreparationMsg (Preparation.DeleteSlide uuid))
-                    in
-                    ( { model | popup = Just popup }, Cmd.none )
-
-                Preparation.DeleteSlide uuid ->
-                    let
-                        newCapsule =
-                            Capsule.deleteSlide uuid m.capsule
-
-                        newUser =
-                            User.changeCapsule newCapsule model.user
-                    in
-                    ( mkModel
-                        { model | user = newUser, popup = Nothing }
-                        (Core.Preparation { m | capsule = newCapsule, slides = Preparation.setupSlides newCapsule })
-                    , Api.updateCapsule Core.Noop newCapsule
-                    )
-
-                Preparation.DnD message ->
-                    updateDnD message model m
-
-                Preparation.ExtraResourceSelect slide ->
-                    ( model
-                    , Select.file
-                        (case slide of
-                            Preparation.AddGos _ ->
-                                [ "application/pdf", "image/*" ]
-
-                            _ ->
-                                [ "application/pdf", "image/*", "video/*" ]
-                        )
-                        (\x -> Core.PreparationMsg (Preparation.ExtraResourceSelected slide x))
-                    )
-
-                Preparation.ExtraResourceSelected slide file ->
-                    let
-                        mime =
-                            File.mime file
-
-                        form =
-                            Preparation.initChangeSlideForm slide 1 file
-
-                        ( mkMsg, newForm ) =
-                            if String.startsWith "video/" mime then
-                                ( \_ -> Core.PreparationMsg (Preparation.ExtraResourceProgress "" (Preparation.Transcoding 0))
-                                , Nothing
-                                )
-
-                            else
-                                ( \x -> Core.PreparationMsg (Preparation.ExtraResourceFinished x mime)
-                                , Just { form | status = Status.Sent }
-                                )
-                    in
-                    if mime == "application/pdf" then
-                        ( mkModel model (Core.Preparation { m | changeSlideForm = Just form }), Cmd.none )
-
-                    else
-                        let
-                            ( tracker, cmd ) =
-                                case form.slide of
-                                    Preparation.ReplaceSlide s ->
-                                        Api.replaceSlide
-                                            mkMsg
-                                            Core.Noop
-                                            m.capsule.id
-                                            s.uuid
-                                            0
-                                            form.file
-
-                                    Preparation.AddSlide gos ->
-                                        Api.addSlide
-                                            mkMsg
-                                            Core.Noop
-                                            m.capsule.id
-                                            gos
-                                            0
-                                            form.file
-
-                                    Preparation.AddGos gos ->
-                                        Api.addGos
-                                            mkMsg
-                                            Core.Noop
-                                            m.capsule.id
-                                            gos
-                                            0
-                                            form.file
-                        in
-                        ( mkModel model
-                            (Core.Preparation
-                                { m
-                                    | tracker = Just ( tracker, Preparation.Upload 0.0 )
-                                    , changeSlideForm = newForm
-                                }
-                            )
-                        , cmd
-                        )
-
-                Preparation.ExtraResourceFailed ->
-                    let
-                        form =
-                            m.changeSlideForm
-                                |> Maybe.map (\x -> { x | status = Status.Error })
-                    in
-                    ( mkModel model (Core.Preparation { m | changeSlideForm = form, tracker = Nothing }), Cmd.none )
-
-                Preparation.ExtraResourceChangePage newPage ->
-                    let
-                        newForm =
-                            Maybe.map (\x -> { x | page = newPage }) m.changeSlideForm
-                    in
-                    ( mkModel model (Core.Preparation { m | changeSlideForm = newForm }), Cmd.none )
-
-                Preparation.ExtraResourcePageValidate ->
-                    case m.changeSlideForm of
-                        Just { slide, page, file } ->
-                            case String.toInt page of
-                                Just p ->
-                                    let
-                                        newForm =
-                                            Maybe.map (\x -> { x | status = Status.Sent }) m.changeSlideForm
-
-                                        mime =
-                                            File.mime file
-
-                                        ms x =
-                                            Core.PreparationMsg (Preparation.ExtraResourceFinished x mime)
-
-                                        errMsg =
-                                            Core.PreparationMsg Preparation.ExtraResourceFailed
-
-                                        ( tracker, cmd ) =
-                                            case slide of
-                                                Preparation.ReplaceSlide s ->
-                                                    Api.replaceSlide ms errMsg m.capsule.id s.uuid p file
-
-                                                Preparation.AddSlide s ->
-                                                    Api.addSlide ms errMsg m.capsule.id s p file
-
-                                                Preparation.AddGos s ->
-                                                    Api.addGos ms errMsg m.capsule.id s p file
-                                    in
-                                    ( mkModel model
-                                        (Core.Preparation
-                                            { m
-                                                | changeSlideForm = newForm
-                                                , tracker = Just ( tracker, Preparation.Upload 0.0 )
-                                            }
-                                        )
-                                    , cmd
-                                    )
-
-                                Nothing ->
-                                    ( model, Cmd.none )
-
-                        Nothing ->
-                            ( model, Cmd.none )
-
-                Preparation.ExtraResourcePageCancel ->
-                    ( mkModel model (Core.Preparation { m | changeSlideForm = Nothing, tracker = Nothing }), Cmd.none )
-
-                Preparation.ExtraResourceProgress tracker progress ->
-                    if Maybe.map Tuple.first m.tracker == Just tracker then
-                        ( mkModel model (Core.Preparation { m | tracker = Just ( tracker, progress ) }), Cmd.none )
+                Preparation.CapsuleUpdate id data ->
+                    if model.config.clientState.lastRequest == id + 1 then
+                        ( { model | page = App.Preparation { m | capsuleUpdate = data } }, Cmd.none )
 
                     else
                         ( model, Cmd.none )
 
-                Preparation.ExtraResourceFinished newCapsule mime ->
-                    if String.startsWith "video/" mime then
-                        ( mkModel
-                            { model | user = User.changeCapsule newCapsule model.user }
-                            (Core.Preparation { m | tracker = Just ( "", Preparation.Transcoding 0.0 ) })
-                        , Cmd.none
-                        )
-
-                    else
-                        ( mkModel
-                            { model | user = User.changeCapsule newCapsule model.user }
-                            (Core.Preparation (Preparation.init newCapsule))
-                        , Cmd.none
-                        )
-
-                Preparation.ExtraResourceDelete slide ->
-                    let
-                        newCapsule =
-                            Capsule.updateSlide { slide | extra = Nothing } m.capsule
-                    in
-                    ( mkModel
-                        { model | user = User.changeCapsule newCapsule model.user }
-                        (Core.Preparation (Preparation.init newCapsule))
-                    , Api.updateCapsule Core.Noop newCapsule
+                Preparation.DeleteSlide Utils.Request slide ->
+                    ( { model
+                        | page =
+                            App.Preparation
+                                { m
+                                    | popupType = Preparation.DeleteSlidePopup slide
+                                    , displayPopup = True
+                                }
+                      }
+                    , Cmd.none
                     )
 
-                Preparation.ExtraResourceVideoUploadCancel ->
-                    let
-                        oldCapsule =
-                            m.capsule
+                Preparation.DeleteSlide Utils.Cancel _ ->
+                    ( { model | page = App.Preparation { m | displayPopup = False } }, Cmd.none )
 
+                Preparation.DeleteSlide Utils.Confirm slide ->
+                    let
                         newCapsule =
-                            { oldCapsule | videoUploaded = Capsule.Idle }
+                            Data.deleteSlide slide capsule
+
+                        ( sync, newConfig ) =
+                            ( Api.updateCapsule newCapsule
+                                (\x -> App.PreparationMsg (Preparation.CapsuleUpdate model.config.clientState.lastRequest x))
+                            , Config.incrementRequest model.config
+                            )
                     in
-                    ( mkModel { model | user = User.changeCapsule newCapsule model.user } (Core.Preparation { m | changeSlideForm = Nothing, tracker = Nothing }), Api.cancelVideoUpload Core.Noop m.capsule )
+                    ( { model
+                        | user = Data.updateUser newCapsule model.user
+                        , page = App.Preparation (Preparation.init newCapsule)
+                        , config = newConfig
+                      }
+                    , sync
+                    )
+
+                Preparation.DeleteExtra Utils.Request slide ->
+                    ( { model
+                        | page =
+                            App.Preparation
+                                { m
+                                    | popupType = Preparation.DeleteExtraPopup slide
+                                    , displayPopup = True
+                                }
+                      }
+                    , Cmd.none
+                    )
+
+                Preparation.DeleteExtra Utils.Cancel _ ->
+                    ( { model | page = App.Preparation { m | displayPopup = False } }, Cmd.none )
+
+                Preparation.DeleteExtra Utils.Confirm slide ->
+                    let
+                        newCapsule =
+                            Data.deleteExtra slide capsule
+
+                        ( sync, newConfig ) =
+                            ( Api.updateCapsule newCapsule
+                                (\x -> App.PreparationMsg (Preparation.CapsuleUpdate model.config.clientState.lastRequest x))
+                            , Config.incrementRequest model.config
+                            )
+                    in
+                    ( { model
+                        | user = Data.updateUser newCapsule model.user
+                        , page = App.Preparation (Preparation.init newCapsule)
+                        , config = newConfig
+                      }
+                    , sync
+                    )
+
+                Preparation.Extra sMsg ->
+                    let
+                        ( newM, cmd, newConfig ) =
+                            updateExtra model.user sMsg m model.config
+                    in
+                    ( { model | page = App.Preparation newM, config = newConfig }, cmd )
+
+                Preparation.EditPrompt slide ->
+                    ( { model
+                        | page =
+                            App.Preparation
+                                { m
+                                    | popupType = Preparation.EditPromptPopup slide
+                                    , displayPopup = True
+                                }
+                      }
+                    , Cmd.none
+                    )
+
+                Preparation.PromptChanged Utils.Request slide ->
+                    ( { model
+                        | page =
+                            App.Preparation
+                                { m
+                                    | popupType = Preparation.EditPromptPopup slide
+                                    , displayPopup = True
+                                }
+                      }
+                    , Cmd.none
+                    )
+
+                Preparation.PromptChanged Utils.Cancel _ ->
+                    ( { model | page = App.Preparation { m | displayPopup = False } }, Cmd.none )
+
+                Preparation.PromptChanged Utils.Confirm slide ->
+                    let
+                        newCapsule =
+                            Data.updateSlide { slide | prompt = fixPrompt slide.prompt } capsule
+
+                        sync =
+                            Api.updateCapsule newCapsule
+                                (\x -> App.PreparationMsg (Preparation.CapsuleUpdate model.config.clientState.lastRequest x))
+                    in
+                    ( { model | user = Data.updateUser newCapsule model.user, page = App.Preparation (Preparation.init newCapsule) }, sync )
+
+                Preparation.GoToPreviousSlide currentSlideIndex currentSlide ->
+                    let
+                        newCapsule =
+                            Data.updateSlide { currentSlide | prompt = fixPrompt currentSlide.prompt } capsule
+
+                        sync =
+                            Api.updateCapsule newCapsule
+                                (\x -> App.PreparationMsg (Preparation.CapsuleUpdate model.config.clientState.lastRequest x))
+
+                        previousSlide =
+                            capsule.structure
+                                |> List.concatMap .slides
+                                |> List.drop (currentSlideIndex - 2)
+                                |> List.head
+                    in
+                    ( { model
+                        | page =
+                            App.Preparation <|
+                                case previousSlide of
+                                    Just previousSlidee ->
+                                        { m
+                                            | popupType = Preparation.EditPromptPopup previousSlidee
+                                            , displayPopup = True
+                                        }
+
+                                    Nothing ->
+                                        { m | displayPopup = False }
+                      }
+                    , sync
+                    )
+
+                Preparation.GoToNextSlide currentSlideIndex currentSlide ->
+                    let
+                        newCapsule =
+                            Data.updateSlide { currentSlide | prompt = fixPrompt currentSlide.prompt } capsule
+
+                        sync =
+                            Api.updateCapsule newCapsule
+                                (\x -> App.PreparationMsg (Preparation.CapsuleUpdate model.config.clientState.lastRequest x))
+
+                        nextSlide =
+                            capsule.structure
+                                |> List.concatMap .slides
+                                |> List.drop currentSlideIndex
+                                |> List.head
+                    in
+                    ( { model
+                        | page =
+                            App.Preparation <|
+                                case nextSlide of
+                                    Just nextSlidee ->
+                                        { m
+                                            | popupType = Preparation.EditPromptPopup nextSlidee
+                                            , displayPopup = True
+                                        }
+
+                                    Nothing ->
+                                        { m | displayPopup = False }
+                      }
+                    , sync
+                    )
+
+                Preparation.EscapePressed ->
+                    if m.displayPopup then
+                        case m.popupType of
+                            Preparation.ConfirmUpdateCapsulePopup _ ->
+                                update Preparation.CancelUpdateCapsule model
+
+                            _ ->
+                                ( { model | page = App.Preparation { m | displayPopup = False } }, Cmd.none )
+
+                    else
+                        ( model, Cmd.none )
+
+                Preparation.EnterPressed ->
+                    if m.displayPopup then
+                        case m.popupType of
+                            Preparation.NoPopup ->
+                                ( model, Cmd.none )
+
+                            Preparation.EditPromptPopup slide ->
+                                ( model, Cmd.none )
+
+                            Preparation.DeleteExtraPopup slide ->
+                                update (Preparation.DeleteExtra Utils.Confirm slide) model
+
+                            Preparation.DeleteSlidePopup slide ->
+                                update (Preparation.DeleteSlide Utils.Confirm slide) model
+
+                            Preparation.ConfirmUpdateCapsulePopup c ->
+                                update Preparation.ConfirmUpdateCapsule model
+
+                            Preparation.ChangeSlidePopup f ->
+                                update
+                                    (Preparation.Extra <|
+                                        Preparation.Selected
+                                            f.slide
+                                            f.file
+                                            (case String.toInt f.page of
+                                                Just x ->
+                                                    if x > 0 then
+                                                        Just x
+
+                                                    else
+                                                        Nothing
+
+                                                _ ->
+                                                    Nothing
+                                            )
+                                    )
+                                    model
+
+                    else
+                        ( model, Cmd.none )
+
+                Preparation.ConfirmUpdateCapsule ->
+                    if m.displayPopup then
+                        case m.popupType of
+                            Preparation.ConfirmUpdateCapsulePopup c ->
+                                ( { model | page = App.Preparation <| Preparation.init c }
+                                , Api.updateCapsule c (\_ -> App.Noop)
+                                )
+
+                            _ ->
+                                ( model, Cmd.none )
+
+                    else
+                        ( model, Cmd.none )
+
+                Preparation.CancelUpdateCapsule ->
+                    ( { model | page = App.Preparation <| Preparation.init capsule }, Cmd.none )
 
         _ ->
             ( model, Cmd.none )
 
 
-clearNewLines : String -> String
-clearNewLines input =
-    input |> String.split "\n" |> List.filter (not << String.isEmpty) |> String.join "\n"
+{-| The update function that deals with extra resources.
+-}
+updateExtra : User -> Preparation.ExtraMsg -> Preparation.Model String -> Config.Config -> ( Preparation.Model String, Cmd App.Msg, Config.Config )
+updateExtra user msg model config =
+    let
+        maybeCapsule =
+            Data.getCapsuleById model.capsule user
+    in
+    case ( msg, maybeCapsule ) of
+        ( Preparation.Select changeSlide, Just _ ) ->
+            let
+                mimes =
+                    case changeSlide of
+                        Preparation.ReplaceSlide _ ->
+                            [ "image/*", "application/pdf", "video/*" ]
+
+                        _ ->
+                            [ "image/*", "application/pdf" ]
+
+                cmd =
+                    Select.file mimes (\x -> App.PreparationMsg (Preparation.Extra (Preparation.Selected changeSlide x Nothing)))
+            in
+            ( model, cmd, config )
+
+        ( Preparation.Selected changeSlide file page, Just capsule ) ->
+            case ( File.mime file, page ) of
+                ( "application/pdf", Nothing ) ->
+                    ( { model
+                        | popupType = Preparation.ChangeSlidePopup { slide = changeSlide, file = file, page = "1" }
+                        , displayPopup = True
+                      }
+                    , Cmd.none
+                    , config
+                    )
+
+                _ ->
+                    let
+                        p =
+                            Maybe.withDefault 0 page
+
+                        mkMsg x =
+                            App.PreparationMsg <| Preparation.Extra <| Preparation.ChangeSlideUpdated x
+
+                        task : Config.TaskStatus
+                        task =
+                            { task =
+                                case changeSlide of
+                                    Preparation.AddSlide _ ->
+                                        Config.AddSlide config.clientState.taskId capsule.id
+
+                                    Preparation.AddGos _ ->
+                                        Config.AddGos config.clientState.taskId capsule.id
+
+                                    Preparation.ReplaceSlide _ ->
+                                        Config.ReplaceSlide config.clientState.taskId capsule.id
+                            , progress = Just 0.0
+                            , finished = False
+                            , aborted = False
+                            , global = True
+                            }
+
+                        ( newConfig, _ ) =
+                            Config.update (Config.UpdateTaskStatus task) config
+                    in
+                    case changeSlide of
+                        Preparation.AddSlide gos ->
+                            ( { model | changeSlide = RemoteData.Loading Nothing }
+                            , Api.addSlide capsule gos p file config.clientState.taskId mkMsg
+                            , Config.incrementTaskId newConfig
+                            )
+
+                        Preparation.AddGos gos ->
+                            ( { model | changeSlide = RemoteData.Loading Nothing }
+                            , Api.addGos capsule gos p file config.clientState.taskId mkMsg
+                            , Config.incrementTaskId newConfig
+                            )
+
+                        Preparation.ReplaceSlide slide ->
+                            ( { model | changeSlide = RemoteData.Loading Nothing }
+                            , Api.replaceSlide capsule slide p file config.clientState.taskId mkMsg
+                            , Config.incrementTaskId newConfig
+                            )
+
+        ( Preparation.PageChanged page, Just _ ) ->
+            let
+                newModel =
+                    if model.displayPopup then
+                        case model.popupType of
+                            Preparation.ChangeSlidePopup c ->
+                                { model
+                                    | popupType = Preparation.ChangeSlidePopup { c | page = page }
+                                    , displayPopup = True
+                                }
+
+                            _ ->
+                                { model | displayPopup = False }
+
+                    else
+                        { model | displayPopup = False }
+            in
+            ( newModel, Cmd.none, config )
+
+        ( Preparation.PageCancel, Just _ ) ->
+            ( { model | displayPopup = False, changeSlide = RemoteData.NotAsked }, Cmd.none, config )
+
+        ( Preparation.ChangeSlideUpdated (RemoteData.Success c), Just _ ) ->
+            let
+                cmd : Cmd App.Msg
+                cmd =
+                    Api.updateCapsule c
+                        (\_ -> App.Noop)
+            in
+            ( Preparation.init c, cmd, config )
+
+        ( Preparation.ChangeSlideUpdated d, Just _ ) ->
+            ( { model | changeSlide = d }, Cmd.none, config )
+
+        _ ->
+            ( model, Cmd.none, config )
 
 
-mkModel : Core.Model -> Core.Page -> Core.Model
-mkModel input newPage =
-    { input | page = newPage }
-
-
-updateDnD : Preparation.DnDMsg -> Core.Model -> Preparation.Model -> ( Core.Model, Cmd Core.Msg )
-updateDnD msg model submodel =
-    case msg of
-        Preparation.SlideMoved m ->
+{-| The update function for the DnD part of the page.
+-}
+updateDnD : User -> Preparation.DnDMsg -> Preparation.Model String -> Config -> ( ( Preparation.Model String, Config ), Cmd App.Msg )
+updateDnD user msg model config =
+    let
+        maybeCapsule =
+            Data.getCapsuleById model.capsule user
+    in
+    case ( msg, maybeCapsule ) of
+        ( Preparation.SlideMoved sMsg, Just capsule ) ->
             let
                 pre =
-                    Preparation.slideSystem.info submodel.slideModel
+                    Preparation.slideSystem.info model.slideModel
 
                 ( slideModel, slides ) =
-                    Preparation.slideSystem.update m submodel.slideModel (List.concat submodel.slides)
+                    Preparation.slideSystem.update sMsg model.slideModel model.slides
 
                 post =
                     Preparation.slideSystem.info slideModel
 
-                ( broken, updatedStructure ) =
+                dropped =
+                    pre /= Nothing && post == Nothing
+
+                ( ( broken, newStructure ), newSlides ) =
                     case ( pre, post ) of
                         ( Just _, Nothing ) ->
-                            fixStructure submodel.capsule.structure (extractStructure slides)
-
-                        _ ->
-                            ( False, submodel.capsule.structure )
-
-                popup =
-                    if broken && submodel.capsule.structure /= updatedStructure then
-                        Just
-                            (Popup.popup (Lang.warning model.global.lang)
-                                (Lang.dndWillBreak model.global.lang)
-                                (Core.PreparationMsg (Preparation.DnD (Preparation.CancelBroken submodel.capsule)))
-                                (Core.PreparationMsg (Preparation.DnD (Preparation.ConfirmBroken updatedCapsule)))
+                            let
+                                extracted =
+                                    extractStructure slides
+                            in
+                            ( fixStructure capsule.structure extracted
+                            , Preparation.setupSlides { capsule | structure = extracted }
                             )
 
+                        _ ->
+                            ( ( False, capsule.structure ), slides )
+
+                ( syncCmd, newConfig ) =
+                    if dropped && capsule.structure /= newStructure && not broken then
+                        ( Api.updateCapsule
+                            { capsule | structure = newStructure }
+                            (\x -> App.PreparationMsg (Preparation.CapsuleUpdate config.clientState.lastRequest x))
+                        , Config.incrementRequest config
+                        )
+
                     else
-                        Nothing
+                        ( Cmd.none, config )
 
-                capsule =
-                    submodel.capsule
-
-                updatedCapsule =
-                    { capsule | structure = updatedStructure }
-
-                updatedSlidesView =
-                    case ( pre, post ) of
-                        ( Just _, Nothing ) ->
-                            Preparation.setupSlides updatedCapsule
-
-                        _ ->
-                            regroupSlides slides
-
-                syncCmd =
-                    case ( pre, post, submodel.capsule.structure /= updatedStructure && not broken ) of
-                        ( Just _, Nothing, True ) ->
-                            Api.updateCapsule Core.Noop updatedCapsule
-
-                        _ ->
-                            Cmd.none
+                newCapsule =
+                    { capsule | structure = newStructure }
             in
-            ( { model
-                | page =
-                    if broken then
-                        Core.Preparation
-                            { submodel | slideModel = slideModel, slides = updatedSlidesView }
-
-                    else
-                        Core.Preparation
-                            { submodel | slideModel = slideModel, slides = updatedSlidesView, capsule = updatedCapsule }
-                , user = User.changeCapsule updatedCapsule model.user
-                , popup = popup
-              }
+            ( ( { model
+                    | slideModel = slideModel
+                    , popupType = Utils.tern broken (Preparation.ConfirmUpdateCapsulePopup newCapsule) model.popupType
+                    , displayPopup = Utils.tern broken True model.displayPopup
+                    , slides = newSlides
+                }
+              , newConfig
+              )
             , Cmd.batch
-                [ Preparation.slideSystem.commands slideModel |> Cmd.map (\x -> Core.PreparationMsg (Preparation.DnD x))
-                , syncCmd
+                [ syncCmd
+                , Preparation.slideSystem.commands slideModel
+                    |> Cmd.map (\x -> App.PreparationMsg (Preparation.DnD x))
                 ]
             )
 
-        Preparation.GosMoved _ ->
-            ( model, Cmd.none )
-
-        Preparation.ConfirmBroken capsule ->
-            ( mkModel { model | user = User.changeCapsule capsule model.user, popup = Nothing }
-                (Core.Preparation (Preparation.init capsule))
-            , Api.updateCapsule Core.Noop capsule
-            )
-
-        Preparation.CancelBroken capsule ->
-            ( mkModel { model | user = User.changeCapsule capsule model.user, popup = Nothing }
-                (Core.Preparation (Preparation.init capsule))
-            , Cmd.none
-            )
+        _ ->
+            ( ( model, config ), Cmd.none )
 
 
-
--- Utils
-
-
-extractStructure : List Preparation.MaybeSlide -> List Capsule.Gos
+{-| Creates a dummy capsule structure given a list of slides.
+-}
+extractStructure : List Preparation.Slide -> List Data.Gos
 extractStructure slides =
-    List.filter (\x -> x.slides /= []) (extractStructureAux (List.reverse slides) [] Nothing)
+    slides
+        |> List.Extra.gatherWith (\a b -> a.totalGosId == b.totalGosId)
+        |> List.map (\( a, b ) -> a :: b)
+        |> List.map (List.filterMap .slide)
+        |> List.filter (\x -> x /= [])
+        |> List.map Data.gosFromSlides
 
 
-extractStructureAux : List Preparation.MaybeSlide -> List Capsule.Gos -> Maybe Capsule.Gos -> List Capsule.Gos
-extractStructureAux slides current currentGos =
-    case ( slides, currentGos ) of
-        ( [], Nothing ) ->
-            current
+{-| Retrieves the information in the structure from the old structure given a structure that contains only slides.
 
-        ( [], Just gos ) ->
-            gos :: current
+Returns the new structure as well as a boolean indicating if records have been lost.
 
-        ( h :: t, _ ) ->
-            let
-                newCurrent =
-                    case ( isGosId h, currentGos ) of
-                        ( True, Just gos ) ->
-                            gos :: current
-
-                        ( True, Nothing ) ->
-                            current
-
-                        ( False, _ ) ->
-                            current
-
-                newGos =
-                    case ( h, currentGos ) of
-                        ( Preparation.Slide _ s, Nothing ) ->
-                            { record = Nothing
-                            , slides = [ s ]
-                            , events = []
-                            , webcamSettings = Capsule.defaultWebcamSettings
-                            , fade = { afadein = Nothing, afadeout = Nothing, vfadein = Nothing, vfadeout = Nothing }
-                            }
-
-                        ( Preparation.Slide _ s, Just gos ) ->
-                            let
-                                newSlides =
-                                    s :: gos.slides
-                            in
-                            { gos | slides = newSlides }
-
-                        ( Preparation.GosId _, _ ) ->
-                            { record = Nothing
-                            , slides = []
-                            , events = []
-                            , webcamSettings = Capsule.defaultWebcamSettings
-                            , fade = { afadein = Nothing, afadeout = Nothing, vfadein = Nothing, vfadeout = Nothing }
-                            }
-            in
-            extractStructureAux t newCurrent (Just newGos)
-
-
-regroupSlidesAux : List Preparation.MaybeSlide -> List Preparation.MaybeSlide -> List (List Preparation.MaybeSlide) -> List (List Preparation.MaybeSlide)
-regroupSlidesAux slides currentList total =
-    case slides of
-        [] ->
-            if currentList == [] then
-                total
-
-            else
-                currentList :: total
-
-        (Preparation.Slide gos s) :: t ->
-            regroupSlidesAux t (Preparation.Slide gos s :: currentList) total
-
-        (Preparation.GosId id) :: t ->
-            if currentList == [] then
-                regroupSlidesAux t [ Preparation.GosId id ] total
-
-            else
-                regroupSlidesAux t [ Preparation.GosId id ] (currentList :: total)
-
-
-regroupSlides : List Preparation.MaybeSlide -> List (List Preparation.MaybeSlide)
-regroupSlides slides =
-    List.reverse (List.map List.reverse (regroupSlidesAux slides [] []))
-
-
-fixStructure : List Capsule.Gos -> List Capsule.Gos -> ( Bool, List Capsule.Gos )
+-}
+fixStructure : List Data.Gos -> List Data.Gos -> ( Bool, List Data.Gos )
 fixStructure old new =
     let
         -- The dict that associates the list of slides id to the gos in the previous list of gos
-        oldGos : Dict (List String) Capsule.Gos
+        oldGos : Dict (List String) Data.Gos
         oldGos =
             Dict.fromList (List.map (\x -> ( List.map .uuid x.slides, x )) old)
 
         -- The dict that associates the list of slides id to the gos in the new
         -- list of gos, which doesn't contain any records or other stuff
-        newGos : Dict (List String) Capsule.Gos
+        newGos : Dict (List String) Data.Gos
         newGos =
             Dict.fromList (List.map (\x -> ( List.map .uuid x.slides, x )) new)
 
         -- Retrieves the old gos from the new gos, allownig to get the record and other stuff back
-        fix : Capsule.Gos -> Capsule.Gos
+        fix : Data.Gos -> Data.Gos
         fix gos =
             case Dict.get (List.map .uuid gos.slides) oldGos of
                 Nothing ->
@@ -491,7 +528,7 @@ fixStructure old new =
 
         -- Retrieves the new gos from the old gos, if not found and the old gos
         -- has records and stuff, it will be lost
-        isBroken : Capsule.Gos -> Bool
+        isBroken : Data.Gos -> Bool
         isBroken gos =
             case ( Dict.get (List.map .uuid gos.slides) newGos, gos.record ) of
                 -- if not found but the previous gos has a record, the record will be lost
@@ -511,16 +548,42 @@ fixStructure old new =
     ( broken, ret )
 
 
-isJustSlide : Preparation.MaybeSlide -> Bool
-isJustSlide slide =
-    case slide of
-        Preparation.Slide _ _ ->
-            True
+{-| Fixes the empty lines and trailing spaces in a prompt string.
+-}
+fixPrompt : String -> String
+fixPrompt input =
+    input
+        |> String.split "\n"
+        |> List.filter (not << String.isEmpty)
+        |> List.map String.trim
+        |> String.join "\n"
+
+
+{-| Keyboard shortcuts of the preparation page.
+-}
+shortcuts : Keyboard.RawKey -> App.Msg
+shortcuts msg =
+    case Keyboard.rawValue msg of
+        "Escape" ->
+            App.PreparationMsg Preparation.EscapePressed
+
+        "Enter" ->
+            App.PreparationMsg Preparation.EnterPressed
 
         _ ->
-            False
+            App.Noop
 
 
-isGosId : Preparation.MaybeSlide -> Bool
-isGosId slide =
-    not (isJustSlide slide)
+{-| Subscriptions for the prepration view.
+-}
+subs : Preparation.Model String -> Sub App.Msg
+subs model =
+    Sub.batch
+        [ Sub.batch
+            [ Preparation.slideSystem.subscriptions model.slideModel
+            , Preparation.gosSystem.subscriptions model.gosModel
+            ]
+            |> Sub.map Preparation.DnD
+            |> Sub.map App.PreparationMsg
+        , Keyboard.ups shortcuts
+        ]

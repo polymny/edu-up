@@ -1,183 +1,212 @@
-module Ui.Colors exposing (..)
+module Ui.Colors exposing
+    ( green1, green2, green3, yellow, blue, red, orange, orangeLight, greenLight, white, black, alpha, alphaColor, transparent, grey, greyBackground, greyFont, greyFontDisabled, greyBorder, tableBackground, colorToString
+    , redLight
+    )
+
+{-| This module contains all the color definitions that will be used in the app.
+
+@docs green1, green2, green3, yellow, blue, red, redLigth, orange, orangeLight, greenLight, white, black, alpha, alphaColor, transparent, grey, greyBackground, greyFont, greyFontDisabled, greyBorder, tableBackground, colorToString
+
+-}
 
 import Element
-import SolidColor exposing (SolidColor)
+import Json.Decode exposing (int)
 
 
-toUi : SolidColor -> Element.Color
-toUi color =
-    let
-        ( r, g, b ) =
-            SolidColor.toRGB color
-    in
-    Element.rgb255 (floor r) (floor g) (floor b)
+{-| The dark green color from Polymny logo.
+-}
+green1 : Element.Color
+green1 =
+    Element.rgb255 38 150 60
 
 
-navbar : Element.Color
-navbar =
-    SolidColor.fromRGB ( 72, 199, 116 ) |> toUi
+{-| The medium green color from Polymny logo.
+-}
+green2 : Element.Color
+green2 =
+    Element.rgb255 127 204 40
 
 
-navbarOver : Element.Color
-navbarOver =
-    SolidColor.fromRGB ( 58, 187, 103 ) |> toUi
+{-| The bright green color from Polymny logo.
+-}
+green3 : Element.Color
+green3 =
+    Element.rgb255 202 227 16
 
 
+{-| The yellow color from Polymny logo.
+-}
+yellow : Element.Color
+yellow =
+    Element.rgb255 253 210 40
+
+
+{-| Pure blue.
+-}
+blue : Element.Color
+blue =
+    Element.rgb255 0 0 255
+
+
+{-| Pure red.
+-}
+red : Element.Color
+red =
+    Element.rgb255 255 0 0
+
+
+{-| A lightened red.
+-}
+redLight : Element.Color
+redLight =
+    Element.rgb255 255 204 204
+
+
+{-| An orange color.
+-}
+orange : Element.Color
+orange =
+    Element.rgb255 255 165 0
+
+
+{-| A lightened orange.
+-}
+orangeLight : Element.Color
+orangeLight =
+    Element.rgb255 255 237 204
+
+
+{-| A lightened green 2.
+-}
+greenLight : Element.Color
+greenLight =
+    Element.rgb255 201 245 204
+
+
+{-| A pure white.
+-}
 white : Element.Color
 white =
-    SolidColor.fromHSL ( 0, 0, 100 ) |> toUi
+    Element.rgb255 255 255 255
 
 
+{-| A pure black.
+-}
 black : Element.Color
 black =
-    SolidColor.fromHSL ( 0, 0, 4 ) |> toUi
+    Element.rgb255 0 0 0
 
 
-light : Element.Color
-light =
-    SolidColor.fromHSL ( 0, 0, 96 ) |> toUi
+{-| A pure transparent.
+-}
+transparent : Element.Color
+transparent =
+    Element.rgba255 0 0 0 0
 
 
-dark : Element.Color
-dark =
-    SolidColor.fromHSL ( 0, 0, 21 ) |> toUi
+{-| A transparent black color.
+-}
+alpha : Float -> Element.Color
+alpha value =
+    Element.rgba 0 0 0 value
 
 
-primary : Element.Color
-primary =
-    SolidColor.fromHSL ( 171, 100, 41 ) |> toUi
+{-| Changes the alpha on a color.
+-}
+alphaColor : Float -> Element.Color -> Element.Color
+alphaColor value color =
+    color |> Element.toRgb |> (\x -> { x | alpha = value }) |> Element.fromRgb
 
 
-link : Element.Color
-link =
-    SolidColor.fromHSL ( 217, 71, 53 ) |> toUi
+{-| This function gives shades of grey.
+
+The parameter givs pure white with 0 as parameter, and pure black with 9 or more.
+
+-}
+grey : Int -> Element.Color
+grey shade =
+    case shade of
+        0 ->
+            Element.rgb255 0 0 0
+
+        1 ->
+            Element.rgb255 18 18 18
+
+        2 ->
+            Element.rgb255 36 36 36
+
+        3 ->
+            Element.rgb255 54 54 54
+
+        4 ->
+            Element.rgb255 74 74 74
+
+        5 ->
+            Element.rgb255 181 181 181
+
+        6 ->
+            Element.rgb255 219 219 219
+
+        7 ->
+            Element.rgb255 245 245 245
+
+        8 ->
+            Element.rgb255 250 250 250
+
+        _ ->
+            Element.rgb255 255 255 255
 
 
-info : Element.Color
-info =
-    SolidColor.fromHSL ( 204, 86, 53 ) |> toUi
+{-| This color is the color used for backgrounds to avoid them being too bright.
+-}
+greyBackground : Element.Color
+greyBackground =
+    grey 7
 
 
-success : Element.Color
-success =
-    SolidColor.fromHSL ( 141, 71, 48 ) |> toUi
+{-| This color is the color used for fonts to avoid them being too dark.
+-}
+greyFont : Element.Color
+greyFont =
+    grey 2
 
 
-warning : Element.Color
-warning =
-    SolidColor.fromHSL ( 48, 100, 67 ) |> toUi
+{-| This color can be used for the border of elements.
+-}
+greyBorder : Element.Color
+greyBorder =
+    grey 5
 
 
-danger : Element.Color
-danger =
-    SolidColor.fromHSL ( 348, 100, 61 ) |> toUi
+{-| This color can be used for disabled text.
+-}
+greyFontDisabled : Element.Color
+greyFontDisabled =
+    grey 5
 
 
-blackBis : Element.Color
-blackBis =
-    SolidColor.fromHSL ( 0, 0, 7 ) |> toUi
+{-| This color is the background of the dark lines of tables.
+-}
+tableBackground : Element.Color
+tableBackground =
+    Element.rgb 228 233 230
 
 
-blackTer : Element.Color
-blackTer =
-    SolidColor.fromHSL ( 0, 0, 14 ) |> toUi
+{-| Convers an element color to a css string.
+-}
+colorToString : Element.Color -> String
+colorToString color =
+    let
+        rgb =
+            Element.toRgb color
 
+        r =
+            floor (255 * rgb.red) |> String.fromInt
 
-greyDarker : Element.Color
-greyDarker =
-    SolidColor.fromHSL ( 0, 0, 21 ) |> toUi
+        g =
+            floor (255 * rgb.green) |> String.fromInt
 
-
-greyDark : Element.Color
-greyDark =
-    SolidColor.fromHSL ( 0, 0, 29 ) |> toUi
-
-
-grey : Element.Color
-grey =
-    SolidColor.fromHSL ( 0, 0, 48 ) |> toUi
-
-
-greyLight : Element.Color
-greyLight =
-    SolidColor.fromHSL ( 0, 0, 71 ) |> toUi
-
-
-greyLighter : Element.Color
-greyLighter =
-    SolidColor.fromHSL ( 0, 0, 86 ) |> toUi
-
-
-whiteTer : Element.Color
-whiteTer =
-    SolidColor.fromHSL ( 0, 0, 96 ) |> toUi
-
-
-whiteBis : Element.Color
-whiteBis =
-    SolidColor.fromHSL ( 0, 0, 98 ) |> toUi
-
-
-primaryLight : Element.Color
-primaryLight =
-    SolidColor.fromHSL ( 171, 100, 96 ) |> toUi
-
-
-linkLight : Element.Color
-linkLight =
-    SolidColor.fromHSL ( 219, 70, 96 ) |> toUi
-
-
-infoLight : Element.Color
-infoLight =
-    SolidColor.fromHSL ( 206, 70, 96 ) |> toUi
-
-
-successLight : Element.Color
-successLight =
-    SolidColor.fromHSL ( 142, 52, 96 ) |> toUi
-
-
-warningLight : Element.Color
-warningLight =
-    SolidColor.fromHSL ( 48, 100, 96 ) |> toUi
-
-
-dangerLight : Element.Color
-dangerLight =
-    SolidColor.fromHSL ( 347, 90, 96 ) |> toUi
-
-
-primaryDark : Element.Color
-primaryDark =
-    SolidColor.fromHSL ( 171, 100, 29 ) |> toUi
-
-
-linkDark : Element.Color
-linkDark =
-    SolidColor.fromHSL ( 217, 71, 45 ) |> toUi
-
-
-infoDark : Element.Color
-infoDark =
-    SolidColor.fromHSL ( 204, 71, 39 ) |> toUi
-
-
-successDark : Element.Color
-successDark =
-    SolidColor.fromHSL ( 141, 53, 31 ) |> toUi
-
-
-warningDark : Element.Color
-warningDark =
-    SolidColor.fromHSL ( 48, 100, 29 ) |> toUi
-
-
-dangerDark : Element.Color
-dangerDark =
-    SolidColor.fromHSL ( 348, 86, 43 ) |> toUi
-
-
-darkTransparent : Element.Color
-darkTransparent =
-    Element.rgba255 0 0 0 0.8
+        b =
+            floor (255 * rgb.blue) |> String.fromInt
+    in
+    "rgb(" ++ r ++ "," ++ g ++ "," ++ b ++ ")"

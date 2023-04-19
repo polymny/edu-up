@@ -47,7 +47,7 @@ pub enum Plan {
 
 /// A user of polymny.
 #[ergol]
-#[derive(Serialize, Clone)]
+#[derive(Serialize)]
 pub struct User {
     /// The id of the user.
     #[id]

@@ -1,496 +1,353 @@
 module Unlogged.Views exposing (..)
 
-import Browser
+{-| This module contains the view for the unlogged part of the app.
+-}
+
 import Element exposing (Element)
-import Element.Background as Background
+import Element.Border as Border
 import Element.Font as Font
 import Element.Input as Input
-import Lang exposing (Lang)
-import Route
-import Status
-import Ui.BottomBar as Ui
+import Html exposing (Html)
+import Html.Attributes
+import Http
+import Lang
+import RemoteData
+import Strings
 import Ui.Colors as Colors
-import Ui.Navbar as Ui
+import Ui.Elements as Ui
 import Ui.Utils as Ui
 import Unlogged.Types as Unlogged
-import Utils exposing (checkEmail)
+import Utils
 
 
-view : Maybe Unlogged.Model -> Browser.Document Unlogged.Msg
-view fullModel =
-    { title = "Polymny"
-    , body = [ Element.layout [ Ui.hf, Font.size 18 ] (viewContent fullModel) ]
-    }
-
-
-viewContent : Maybe Unlogged.Model -> Element Unlogged.Msg
-viewContent model =
-    case model of
-        Just m ->
-            Element.column
-                [ Background.color Colors.whiteBis
-                , Ui.wf
-                , Ui.hf
-                , Font.family [ Font.typeface "Cantarell" ]
-                ]
-                [ Ui.navbar m.global Nothing Nothing |> Element.map (\_ -> Unlogged.Noop)
-                , Element.el [ Ui.hf, Ui.wf ] (content m)
-                , Ui.bottomBar Unlogged.LangChanged m.global Nothing
-                ]
-
-        Nothing ->
-            Element.none
-
-
-content : Unlogged.Model -> Element Unlogged.Msg
-content { global, page } =
+{-| The view of the form.
+-}
+view : Unlogged.Model -> Element Unlogged.Msg
+view model =
     let
-        element =
-            case page of
-                Unlogged.Login form ->
-                    loginForm global.registrationDisabled global.lang form
+        lang =
+            model.lang
 
-                Unlogged.SignUp form ->
-                    signUpForm global.lang form
+        ( password, layout ) =
+            case model.page of
+                Unlogged.SignUp ->
+                    ( Input.newPassword, Element.column )
 
-                Unlogged.ForgotPassword form ->
-                    forgotPasswordForm global.lang form
+                Unlogged.ResetPassword _ ->
+                    ( Input.newPassword, Element.column )
 
-                Unlogged.ResetPassword form ->
-                    resetPassword global.lang form
+                _ ->
+                    ( Input.currentPassword, Element.row )
 
-                Unlogged.Activated ->
-                    activated global.lang
+        only : List Unlogged.Page -> Element Unlogged.Msg -> Element Unlogged.Msg
+        only pages element =
+            if List.any (Unlogged.comparePage model.page) pages then
+                element
 
-                Unlogged.ValidateInvitation form ->
-                    validateInvitationForm global.lang form
-    in
-    Element.row [ Ui.wf ]
-        [ Element.el [ Ui.wfp 2 ] Element.none
-        , Element.column [ Element.spacing 10, Ui.wfp 1 ] [ element ]
-        , Element.el [ Ui.wfp 2 ] Element.none
-        ]
+            else
+                Element.none
 
+        buttonText : Element msg
+        buttonText =
+            case ( model.page, ( ( model.loginRequest, model.newPasswordRequest ), ( model.resetPasswordRequest, model.signUpRequest ) ) ) of
+                ( _, ( ( RemoteData.Loading _, _ ), ( _, _ ) ) ) ->
+                    Ui.spinningSpinner [ Ui.cx ] 20
 
-loginForm : Bool -> Lang -> Unlogged.LoginForm -> Element Unlogged.Msg
-loginForm registrationDisabled lang form =
-    let
-        msg =
-            case form.status of
-                Status.NotSent ->
-                    Just Unlogged.LoginSubmitted
+                ( _, ( ( _, RemoteData.Loading _ ), ( _, _ ) ) ) ->
+                    Ui.spinningSpinner [ Ui.cx ] 20
 
-                Status.Error ->
-                    Just Unlogged.LoginSubmitted
+                ( _, ( ( _, _ ), ( RemoteData.Loading _, _ ) ) ) ->
+                    Ui.spinningSpinner [ Ui.cx ] 20
+
+                ( _, ( ( _, _ ), ( _, RemoteData.Loading _ ) ) ) ->
+                    Ui.spinningSpinner [ Ui.cx ] 20
+
+                ( Unlogged.Login, ( ( _, _ ), ( _, _ ) ) ) ->
+                    Strings.loginLogin lang |> Element.text
+
+                ( Unlogged.SignUp, ( ( _, _ ), ( _, _ ) ) ) ->
+                    Strings.loginSignUp lang |> Element.text
+
+                ( Unlogged.ForgotPassword, ( ( _, _ ), ( _, _ ) ) ) ->
+                    Strings.loginRequestNewPassword lang |> Element.text
+
+                ( Unlogged.ResetPassword _, ( ( _, _ ), ( _, _ ) ) ) ->
+                    Strings.loginResetPassword lang |> Element.text
+
+        strength =
+            Utils.passwordStrength model.password
+
+        length =
+            String.length model.password
+
+        formatError : Maybe String -> Element msg
+        formatError string =
+            case string of
+                Just s ->
+                    Ui.errorModal [ Ui.wf ] (Element.text s)
+
+                Nothing ->
+                    Element.none
+
+        errorMessage : Maybe String
+        errorMessage =
+            case ( model.page, ( ( model.loginRequest, model.newPasswordRequest ), ( model.resetPasswordRequest, model.signUpRequest ) ) ) of
+                ( Unlogged.Login, ( ( RemoteData.Failure (Http.BadStatus 401), _ ), ( _, _ ) ) ) ->
+                    Just <| Strings.loginWrongUsernameOrPassword lang ++ "."
+
+                ( Unlogged.Login, ( ( RemoteData.Failure _, _ ), ( _, _ ) ) ) ->
+                    Just <| Strings.loginUnknownError lang ++ "."
+
+                ( Unlogged.ForgotPassword, ( ( _, RemoteData.Failure _ ), ( _, _ ) ) ) ->
+                    Just <| Strings.loginUnknownError lang ++ "."
+
+                ( Unlogged.ResetPassword _, ( ( _, _ ), ( RemoteData.Failure _, _ ) ) ) ->
+                    Just <| Strings.loginUnknownError lang ++ "."
+
+                ( Unlogged.SignUp, ( ( _, _ ), ( _, RemoteData.Failure (Http.BadStatus 404) ) ) ) ->
+                    Just <| Strings.loginUsernameOrEmailAlreadyExist lang ++ "."
+
+                ( Unlogged.SignUp, ( ( _, _ ), ( _, RemoteData.Failure _ ) ) ) ->
+                    Just <| Strings.loginUnknownError lang ++ "."
 
                 _ ->
                     Nothing
 
-        submitOnEnter =
-            case msg of
-                Just m ->
-                    [ Ui.onEnter m ]
-
-                _ ->
-                    []
-
-        errorMessage =
-            case form.status of
-                Status.Error ->
-                    Ui.error (Element.text (Lang.loginFailed lang))
+        formatSuccess : Maybe String -> Element msg
+        formatSuccess string =
+            case string of
+                Just s ->
+                    Ui.successModal [ Ui.wf ] (Element.text s)
 
                 _ ->
                     Element.none
 
-        submitButton =
-            Element.el [ Element.centerX ]
-                (Ui.primaryButton
-                    { label =
-                        case form.status of
-                            Status.Sent ->
-                                Ui.spinner
+        successMessage : Maybe String
+        successMessage =
+            case ( model.page, model.newPasswordRequest, model.signUpRequest ) of
+                ( Unlogged.ForgotPassword, RemoteData.Success (), _ ) ->
+                    Just <| Strings.loginMailSent lang ++ "."
 
-                            _ ->
-                                Element.text (Lang.login lang)
-                    , onPress = msg
-                    }
+                ( Unlogged.SignUp, _, RemoteData.Success () ) ->
+                    Just <| Strings.loginMailSent lang ++ "."
+
+                _ ->
+                    Nothing
+
+        ( passwordAttr, passwordError, passwordAccepted ) =
+            if model.page == Unlogged.SignUp || Unlogged.comparePage model.page (Unlogged.ResetPassword "") then
+                if length < 6 then
+                    ( [ Ui.b 1, Border.color Colors.red ]
+                    , Strings.loginPasswordTooShort lang
+                        |> Element.text
+                        |> Element.el [ Font.color Colors.red ]
+                    , False
+                    )
+
+                else if strength < Utils.minPasswordStrength then
+                    ( [ Ui.b 1, Border.color Colors.red ]
+                    , Strings.loginInsufficientPasswordComplexity lang
+                        |> Element.text
+                        |> Element.el [ Font.color Colors.red ]
+                    , False
+                    )
+
+                else if strength < Utils.minPasswordStrength + 1 then
+                    ( []
+                    , Strings.loginAcceptablePasswordComplexity lang
+                        |> Element.text
+                        |> Element.el [ Font.color Colors.orange ]
+                    , True
+                    )
+
+                else
+                    ( []
+                    , Strings.loginStrongPasswordComplexity lang
+                        |> Element.text
+                        |> Element.el [ Font.color Colors.green2 ]
+                    , True
+                    )
+
+            else
+                ( [], Element.none, True )
+
+        ( emailAttr, emailError, emailAccepted ) =
+            if model.page == Unlogged.SignUp && not (Utils.checkEmail model.email) then
+                ( [ Ui.b 1, Border.color Colors.red ]
+                , Strings.loginIncorrectEmailAddress lang |> Element.text |> Element.el [ Font.color Colors.red ]
+                , False
                 )
 
-        fields =
-            [ errorMessage
-            , Input.username submitOnEnter
-                { label = Input.labelLeft [] Element.none
-                , onChange = Unlogged.LoginUsernameChanged
-                , placeholder = Just (Input.placeholder [] (Element.text (Lang.username lang)))
-                , text = form.username
-                }
-            , Input.currentPassword submitOnEnter
-                { label = Input.labelLeft [] Element.none
-                , onChange = Unlogged.LoginPasswordChanged
-                , placeholder = Just (Input.placeholder [] (Element.text (Lang.password lang)))
-                , text = form.password
-                , show = False
-                }
-            , submitButton
-            , Element.row [ Element.spacing 10, Element.centerX ]
-                [ Ui.linkButton []
-                    { onPress = Just (Unlogged.GoToPage (Unlogged.ForgotPassword Unlogged.initForgotPasswordForm))
-                    , label = Element.text (Lang.forgotYourPassword lang)
-                    }
-                , if not registrationDisabled then
-                    Ui.linkButton []
-                        { onPress = Just (Unlogged.GoToPage (Unlogged.SignUp Unlogged.initSignUpForm))
-                        , label = Element.text (Lang.notRegisteredYet lang)
-                        }
+            else
+                ( [], Element.none, True )
 
-                  else
-                    Element.none
-                ]
-            ]
-    in
-    Element.column [ Element.padding 10, Element.spacing 10 ] fields
-
-
-signUpForm : Lang -> Unlogged.SignUpForm -> Element Unlogged.Msg
-signUpForm lang form =
-    let
-        emailSyntax =
-            checkEmail form.email
-
-        passwordMatch =
-            form.password == form.repeatPassword
-
-        usernameAtLeast3 =
-            String.length form.username > 3
-
-        errorMessages =
-            [ maybe (not passwordMatch) (Lang.passwordsDontMatch lang)
-            , maybe (not emailSyntax) (Lang.invalidEmail lang)
-            , maybe (not usernameAtLeast3) (Lang.usernameMustBeAtLeast3 lang)
-            , maybe (not form.acceptConditions) (Lang.mustAcceptConditions lang)
-            ]
-                |> List.filterMap (\x -> x)
-
-        errorElement =
-            case ( form.status, form.showMessage, not (List.isEmpty errorMessages) ) of
-                ( _, True, True ) ->
-                    Ui.error
-                        (Element.column
-                            [ Element.spacing 10 ]
-                            [ Element.text (Lang.errorsInSignUpForm lang)
-                            , errorMessages
-                                |> List.map Element.text
-                                |> Element.column [ Element.paddingXY 20 0 ]
-                            ]
-                        )
-
-                _ ->
-                    Element.none
-
-        msg =
-            case ( form.status, List.isEmpty errorMessages ) of
-                ( Status.NotSent, True ) ->
-                    Just Unlogged.SignUpSubmitted
-
-                ( Status.Error, True ) ->
-                    Just Unlogged.SignUpSubmitted
-
-                _ ->
-                    Just Unlogged.SignUpShowMessage
-
-        submitOnEnter =
-            case msg of
-                Just m ->
-                    [ Ui.onEnter m ]
-
-                _ ->
-                    []
-
-        submitButton =
-            case form.status of
-                Status.Success ->
-                    Element.none
-
-                _ ->
-                    Element.el [ Element.centerX ]
-                        (Ui.primaryButton
-                            { label =
-                                case form.status of
-                                    Status.Sent ->
-                                        Ui.spinner
-
-                                    _ ->
-                                        Element.text (Lang.signUp lang)
-                            , onPress = msg
-                            }
-                        )
-
-        fields =
-            [ errorElement
-            , Input.username submitOnEnter
-                { label = Input.labelLeft [] Element.none
-                , onChange = Unlogged.SignUpUsernameChanged
-                , placeholder = Just (Input.placeholder [] (Element.text (Lang.username lang)))
-                , text = form.username
-                }
-            , Input.email submitOnEnter
-                { label = Input.labelLeft [] Element.none
-                , onChange = Unlogged.SignUpEmailChanged
-                , placeholder = Just (Input.placeholder [] (Element.text (Lang.emailAddress lang)))
-                , text = form.email
-                }
-            , Input.newPassword submitOnEnter
-                { label = Input.labelLeft [] Element.none
-                , onChange = Unlogged.SignUpPasswordChanged
-                , placeholder = Just (Input.placeholder [] (Element.text (Lang.password lang)))
-                , text = form.password
-                , show = False
-                }
-            , Input.newPassword submitOnEnter
-                { label = Input.labelLeft [] Element.none
-                , onChange = Unlogged.SignUpRepeatPasswordChanged
-                , placeholder = Just (Input.placeholder [] (Element.text (Lang.repeatPassword lang)))
-                , text = form.repeatPassword
-                , show = False
-                }
-            , Input.checkbox []
-                { label = Input.labelRight [] (Element.text (Lang.acceptConditions lang))
-                , onChange = Unlogged.SignUpConditionsChanged
-                , icon = Input.defaultCheckbox
-                , checked = form.acceptConditions
-                }
-            , Input.checkbox []
-                { label = Input.labelRight [] (Element.text (Lang.registerNewsletter lang))
-                , onChange = Unlogged.SignUpRegisterNewsletterChanged
-                , icon = Input.defaultCheckbox
-                , checked = form.registerNewsletter
-                }
-            , submitButton
-            ]
-    in
-    Element.column [ Element.padding 10, Element.spacing 10 ] fields
-
-
-forgotPasswordForm : Lang -> Unlogged.ForgotPasswordForm -> Element Unlogged.Msg
-forgotPasswordForm lang form =
-    let
-        msg =
-            case form.status of
-                Status.NotSent ->
-                    Just Unlogged.ForgotPasswordSubmitted
-
-                Status.Error ->
-                    Just Unlogged.ForgotPasswordSubmitted
-
-                _ ->
-                    Nothing
-
-        submitOnEnter =
-            case msg of
-                Just m ->
-                    [ Ui.onEnter m ]
-
-                _ ->
-                    []
-
-        errorMessage =
-            case form.status of
-                Status.Error ->
-                    Ui.error (Element.text (Lang.noSuchEmail lang))
-
-                Status.Success ->
-                    Ui.success (Element.text (Lang.mailSent lang))
-
-                _ ->
-                    Element.none
-
-        submitButton =
-            case form.status of
-                Status.Success ->
-                    Element.none
-
-                _ ->
-                    Element.el [ Element.centerX ]
-                        (Ui.primaryButton
-                            { label =
-                                case form.status of
-                                    Status.Sent ->
-                                        Ui.spinner
-
-                                    _ ->
-                                        Element.text (Lang.askNewPassword lang)
-                            , onPress = msg
-                            }
-                        )
-
-        fields =
-            Element.column [ Element.spacing 10 ]
-                [ errorMessage
-                , Input.username submitOnEnter
-                    { label = Input.labelLeft [] Element.none
-                    , onChange = Unlogged.ForgotPasswordEmailChanged
-                    , placeholder = Just (Input.placeholder [] (Element.text (Lang.emailAddress lang)))
-                    , text = form.email
-                    }
-                , submitButton
-                ]
-    in
-    Element.el [ Element.padding 10 ] fields
-
-
-resetPassword : Lang -> Unlogged.ResetPasswordForm -> Element Unlogged.Msg
-resetPassword lang form =
-    let
-        msg =
-            case form.status of
-                Status.NotSent ->
-                    Just Unlogged.ResetPasswordSubmitted
-
-                _ ->
-                    Nothing
-
-        submitOnEnter =
-            case msg of
-                Just m ->
-                    [ Ui.onEnter m ]
-
-                _ ->
-                    []
-
-        submitButton =
-            Element.el [ Element.centerX ]
-                (Ui.primaryButton
-                    { label =
-                        case form.status of
-                            Status.Sent ->
-                                Ui.spinner
-
-                            _ ->
-                                Element.text (Lang.changePassword lang)
-                    , onPress = msg
-                    }
+        ( repeatAttr, repeatError, repeatAccepted ) =
+            if (model.page == Unlogged.SignUp || Unlogged.comparePage model.page (Unlogged.ResetPassword "")) && model.password /= model.repeatPassword then
+                ( [ Ui.b 1, Border.color Colors.red ]
+                , Strings.loginPasswordsDontMatch lang
+                    |> Element.text
+                    |> Element.el [ Font.color Colors.red ]
+                , False
                 )
 
-        fields =
-            Element.column [ Element.spacing 10 ]
-                [ Input.newPassword submitOnEnter
-                    { label = Input.labelLeft [] Element.none
-                    , onChange = Unlogged.ResetPasswordChanged
-                    , placeholder = Just (Input.placeholder [] (Element.text (Lang.newPassword lang)))
-                    , text = form.newPassword
+            else
+                ( [], Element.none, True )
+
+        ( acceptError, acceptAccepted ) =
+            if model.page == Unlogged.SignUp && not model.acceptTermsOfService then
+                ( Strings.loginMustAcceptTermsOfService lang
+                    |> Element.text
+                    |> Element.el [ Font.color Colors.red ]
+                , False
+                )
+
+            else
+                ( Element.none, True )
+
+        canSubmit =
+            case model.page of
+                Unlogged.Login ->
+                    True
+
+                Unlogged.SignUp ->
+                    passwordAccepted && emailAccepted && repeatAccepted && acceptAccepted
+
+                Unlogged.ForgotPassword ->
+                    True
+
+                Unlogged.ResetPassword _ ->
+                    passwordAccepted && repeatAccepted
+
+        -- (buttonMsg, mkButton) : (Ui.Action Unlogged.Msg, _)
+        ( buttonMsg, mkButton ) =
+            case ( model.page, model.newPasswordRequest, canSubmit ) of
+                ( _, _, False ) ->
+                    ( Ui.None, Ui.secondary )
+
+                ( Unlogged.ForgotPassword, RemoteData.Success _, _ ) ->
+                    ( Ui.None, Ui.secondary )
+
+                _ ->
+                    ( Ui.Msg Unlogged.ButtonClicked, Ui.primary )
+    in
+    Element.column [ Ui.p 10, Ui.s 10, Ui.wf ]
+        [ layout [ Ui.s 10, Ui.cx, Ui.wf ]
+            [ only [ Unlogged.Login, Unlogged.SignUp ] <|
+                Input.username [ Ui.cx, Ui.wf ]
+                    { label = Input.labelHidden <| Strings.dataUserUsername lang
+                    , placeholder = Just <| Input.placeholder [] <| Element.text <| Strings.dataUserUsername lang
+                    , onChange = Unlogged.UsernameChanged
+                    , text = model.username
+                    }
+            , only [ Unlogged.ForgotPassword, Unlogged.SignUp ] <|
+                Input.email (Ui.cx :: Ui.wf :: emailAttr)
+                    { label = Input.labelHidden <| Strings.dataUserEmailAddress lang
+                    , placeholder = Just <| Input.placeholder [] <| Element.text <| Strings.dataUserEmailAddress lang
+                    , onChange = Unlogged.EmailChanged
+                    , text = model.email
+                    }
+            , only [ Unlogged.SignUp ] emailError
+            , only [ Unlogged.Login, Unlogged.SignUp, Unlogged.ResetPassword "" ] <|
+                password (Ui.cx :: Ui.wf :: passwordAttr)
+                    { label = Input.labelHidden <| Strings.dataUserPassword lang
+                    , placeholder = Just <| Input.placeholder [] <| Element.text <| Strings.dataUserPassword lang
+                    , onChange = Unlogged.PasswordChanged
+                    , text = model.password
                     , show = False
                     }
-                , submitButton
+            , only [ Unlogged.SignUp, Unlogged.ResetPassword "" ] <| Utils.passwordStrengthElement model.password
+            , only [ Unlogged.SignUp, Unlogged.ResetPassword "" ] passwordError
+            , only [ Unlogged.SignUp, Unlogged.ResetPassword "" ] <|
+                Input.newPassword (Ui.cx :: Ui.wf :: repeatAttr)
+                    { label = Input.labelHidden <| Strings.dataUserPassword lang
+                    , placeholder = Just <| Input.placeholder [] <| Element.text <| Strings.loginRepeatPassword lang
+                    , onChange = Unlogged.RepeatPasswordChanged
+                    , text = model.repeatPassword
+                    , show = False
+                    }
+            , only [ Unlogged.SignUp, Unlogged.ResetPassword "" ] repeatError
+            , only [ Unlogged.SignUp ] <|
+                Input.checkbox []
+                    { label =
+                        Input.labelRight [ Ui.wf ] <|
+                            Element.paragraph [ Ui.wf ]
+                                [ Element.text <| Strings.loginAcceptTermsOfServiceBegining lang ++ " "
+                                , Ui.link []
+                                    { label = Strings.loginTermsOfService lang |> String.toLower
+                                    , action = Ui.NewTab "https://polymny.studio/cgu-consommateurs/"
+                                    }
+                                ]
+                    , icon = Input.defaultCheckbox
+                    , onChange = Unlogged.AcceptTermsOfServiceChanged
+                    , checked = model.acceptTermsOfService
+                    }
+            , only [ Unlogged.SignUp ] acceptError
+            , only [ Unlogged.SignUp ] <|
+                Input.checkbox []
+                    { label = Input.labelRight [] <| Element.text <| Strings.loginSignUpForTheNewsletter lang
+                    , icon = Input.defaultCheckbox
+                    , onChange = Unlogged.SignUpForNewsletterChanged
+                    , checked = model.signUpForNewsletter
+                    }
+            , mkButton [ Ui.cx, Ui.wf ]
+                { action = buttonMsg
+                , label = buttonText
+                }
+            ]
+        , only [ Unlogged.Login ] <|
+            Element.row [ Ui.s 10, Ui.cx ]
+                [ Ui.link []
+                    { action =
+                        if model.loginRequest == RemoteData.Loading Nothing then
+                            Ui.None
+
+                        else
+                            Ui.Msg <| Unlogged.PageChanged <| Unlogged.ForgotPassword
+                    , label = Lang.question Strings.loginForgottenPassword lang
+                    }
+                , Ui.link []
+                    { action =
+                        if model.loginRequest == RemoteData.Loading Nothing then
+                            Ui.None
+
+                        else
+                            Ui.Msg <| Unlogged.PageChanged <| Unlogged.SignUp
+                    , label = Lang.question Strings.loginNotRegisteredYet lang
+                    }
                 ]
-    in
-    Element.el [ Element.padding 10 ] fields
-
-
-maybe : Bool -> a -> Maybe a
-maybe check value =
-    if check then
-        Just value
-
-    else
-        Nothing
-
-
-activated : Lang -> Element Unlogged.Msg
-activated lang =
-    Element.column [ Element.spacing 10, Element.padding 10 ]
-        [ Ui.success (Element.text (Lang.accountActivated lang))
-        , Element.el [ Element.centerX ] (Ui.primaryLink { route = Route.Home, label = Element.text (Lang.goToPolymny lang) })
+        , formatError errorMessage
+        , formatSuccess successMessage
+        , Element.html <|
+            Html.form
+                [ Html.Attributes.method "POST"
+                , Html.Attributes.action (model.serverRoot ++ "/login")
+                , Html.Attributes.style "display" "none"
+                , Html.Attributes.id "loginform"
+                ]
+                [ Html.input [ Html.Attributes.type_ "text", Html.Attributes.name "username", Html.Attributes.value model.username ] []
+                , Html.input [ Html.Attributes.type_ "text", Html.Attributes.name "password", Html.Attributes.value model.password ] []
+                ]
         ]
 
 
-validateInvitationForm : Lang -> Unlogged.ValidateInvitationForm -> Element Unlogged.Msg
-validateInvitationForm lang form =
-    let
-        passwordMatch =
-            form.password == form.repeatPassword
+{-| Sup.
+-}
+viewStandalone : Maybe Unlogged.Model -> Html Unlogged.Msg
+viewStandalone model =
+    case model of
+        Just m ->
+            Element.layout
+                [ Ui.wf
+                , Ui.hf
+                , Font.size 18
+                , Font.family
+                    [ Font.typeface "Urbanist"
+                    , Font.typeface "Ubuntu"
+                    , Font.typeface "Cantarell"
+                    ]
+                , Font.color Colors.greyFont
+                ]
+                (view m)
 
-        errorMessages =
-            [ maybe (not passwordMatch) (Lang.passwordsDontMatch lang)
-            ]
-                |> List.filterMap (\x -> x)
-
-        errorElement =
-            case ( form.status, form.showMessage, not (List.isEmpty errorMessages) ) of
-                ( _, True, True ) ->
-                    Ui.error
-                        (Element.column
-                            [ Element.spacing 10 ]
-                            [ Element.text (Lang.errorsInSignUpForm lang)
-                            , errorMessages
-                                |> List.map Element.text
-                                |> Element.column [ Element.paddingXY 20 0 ]
-                            ]
-                        )
-
-                _ ->
-                    Element.none
-
-        msg =
-            case ( form.status, List.isEmpty errorMessages ) of
-                ( Status.NotSent, True ) ->
-                    Just Unlogged.ValidateInvitationSubmitted
-
-                ( Status.Error, True ) ->
-                    Just Unlogged.ValidateInvitationSubmitted
-
-                _ ->
-                    Just Unlogged.ValidateInvitationShowMessage
-
-        submitOnEnter =
-            case msg of
-                Just m ->
-                    [ Ui.onEnter m ]
-
-                _ ->
-                    []
-
-        submitButton =
-            case form.status of
-                Status.Success ->
-                    Element.none
-
-                _ ->
-                    Element.el [ Element.centerX ]
-                        (Ui.primaryButton
-                            { label =
-                                case form.status of
-                                    Status.Sent ->
-                                        Ui.spinner
-
-                                    _ ->
-                                        Element.text (Lang.signUp lang)
-                            , onPress = msg
-                            }
-                        )
-
-        header =
-            Element.el Ui.formTitle <|
-                Element.text (Lang.enterPasswords lang)
-
-        fields =
-            [ header
-            , errorElement
-            , Input.newPassword
-                submitOnEnter
-                { label = Input.labelLeft [] Element.none
-                , onChange = Unlogged.ValidateInvitationPasswordChanged
-                , placeholder = Just (Input.placeholder [] (Element.text (Lang.password lang)))
-                , text = form.password
-                , show = False
-                }
-            , Input.newPassword submitOnEnter
-                { label = Input.labelLeft [] Element.none
-                , onChange = Unlogged.ValidateInvitationRepeatPasswordChanged
-                , placeholder = Just (Input.placeholder [] (Element.text (Lang.repeatPassword lang)))
-                , text = form.repeatPassword
-                , show = False
-                }
-            , submitButton
-            ]
-    in
-    Element.column [ Element.padding 10, Element.spacing 10 ] fields
+        _ ->
+            Element.layout [] (Element.text "oops")

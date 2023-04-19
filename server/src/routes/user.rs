@@ -10,7 +10,8 @@ use tokio::fs::remove_dir_all;
 
 use rocket::form::Form;
 use rocket::http::{Cookie, CookieJar, SameSite, Status};
-use rocket::response::{content, status, Redirect};
+use rocket::response::content::RawHtml as Html;
+use rocket::response::Redirect;
 use rocket::serde::json::{json, Json, Value};
 use rocket::State as S;
 
@@ -20,7 +21,7 @@ use crate::db::session::Session;
 use crate::db::user::User;
 use crate::routes::global_flags;
 use crate::routes::Cors;
-use crate::templates::unlogged_html;
+use crate::templates::index_html;
 use crate::{Db, Error, Lang, Result};
 
 /// Creates then authentication cookies.
@@ -117,8 +118,7 @@ pub async fn activate<'a>(
     config: &S<Config>,
     key: String,
     cookies: &CookieJar<'_>,
-    lang: Lang,
-) -> Result<status::Accepted<content::RawHtml<String>>> {
+) -> Result<Redirect> {
     let mut user = User::get_by_activation_key(key, &db)
         .await?
         .ok_or(Error(Status::NotFound))?;
@@ -128,9 +128,7 @@ pub async fn activate<'a>(
     user.save(&db).await?;
     let session = user.save_session(&db).await?;
     add_cookies(&session.secret, &config, cookies);
-
-    let body = unlogged_html(json!({ "global": global_flags(&config, &lang) }));
-    Ok(status::Accepted(Some(content::RawHtml(body))))
+    Ok(Redirect::to("/"))
 }
 
 /// A struct that serves for form veryfing.
@@ -189,6 +187,12 @@ pub async fn login_external<'a>(
     Cors::ok(&config.home, Redirect::to(config.root.clone()))
 }
 
+/// Route to allow CORS request from home page.
+#[options("/login")]
+pub fn login_cors(config: &S<Config>) -> Cors<()> {
+    Cors::new(&config.home, ())
+}
+
 /// The login page.
 #[post("/login", data = "<login>")]
 pub async fn login(
@@ -196,10 +200,31 @@ pub async fn login(
     config: &S<Config>,
     cookies: &CookieJar<'_>,
     login: Json<LoginForm>,
+) -> Cors<Result<Value>> {
+    match login_wrapper(db, config, cookies, login).await {
+        Ok(v) => Cors::ok(&config.home, v),
+        Err(Error(e)) => Cors::err(&config.home, e),
+    }
+}
+
+/// Content of the login function.
+pub async fn login_wrapper(
+    db: Db,
+    config: &S<Config>,
+    cookies: &CookieJar<'_>,
+    login: Json<LoginForm>,
 ) -> Result<Value> {
     let user = User::get_by_username(&login.username, &db)
-        .await?
-        .ok_or(Error(Status::Unauthorized))?;
+        .await
+        .map_err(|_| Error(Status::Unauthorized))?;
+
+    let user = match user {
+        Some(user) => user,
+        None => match User::get_by_email(&login.username, &db).await {
+            Ok(Some(u)) => u,
+            _ => return Err(Error(Status::Unauthorized)),
+        },
+    };
 
     user.test_password(&login.password)?;
 
@@ -254,7 +279,7 @@ pub async fn request_new_password<'a>(
 ) -> Cors<Status> {
     let mut user = match User::get_by_email(&form.email, &db).await {
         Ok(Some(user)) => user,
-        _ => return Cors::new(&config.home, Status::NotFound),
+        _ => return Cors::new(&config.home, Status::Ok),
     };
 
     match user.request_change_password(&config.mailer, &db).await {
@@ -286,7 +311,7 @@ pub async fn change_password(
     form: Json<ChangePasswordForm>,
     config: &S<Config>,
     cookies: &CookieJar<'_>,
-) -> Result<()> {
+) -> Result<Value> {
     let mut user = match (&form.username_and_old_password, &form.key) {
         (None, None) => return Err(Error(Status::BadRequest)),
         (Some((username, old_password)), _) => {
@@ -302,8 +327,9 @@ pub async fn change_password(
     let session = user.save_session(&db).await?;
     add_cookies(&session.secret, &config, cookies);
     user.save(&db).await?;
+    let json = user.to_json(&db).await?;
 
-    Ok(())
+    Ok(json)
 }
 
 /// Link to the form that reset the user's password.
@@ -313,17 +339,17 @@ pub async fn reset_password<'a>(
     config: &S<Config>,
     key: String,
     lang: Lang,
-) -> Cors<Result<status::Accepted<content::RawHtml<String>>>> {
+) -> Cors<Result<Html<String>>> {
     let user = User::get_by_reset_password_key(Some(key), &db).await;
 
     match user {
-        Ok(Some(user)) => user,
+        Ok(Some(_)) => (),
         Ok(None) => return Cors::err(&config.home, Status::NotFound),
         _ => return Cors::err(&config.home, Status::InternalServerError),
-    };
+    }
 
-    let body = unlogged_html(json!({ "global": global_flags(&config, &lang) }));
-    Cors::ok(&config.home, status::Accepted(Some(content::RawHtml(body))))
+    let body = index_html(json!({ "user": json!(null), "global": global_flags(&config, &lang) }));
+    Cors::ok(&config.home, Html(body))
 }
 
 /// The type to change a user's email address.
@@ -341,6 +367,10 @@ pub async fn request_change_email(
     config: &S<Config>,
     form: Json<ChangeEmailForm>,
 ) -> Result<()> {
+    if User::get_by_email(&form.new_email, &db).await?.is_some() {
+        return Err(Error(Status::BadRequest));
+    }
+
     user.request_change_email(form.0.new_email, &config.mailer, &db)
         .await?;
     Ok(())
@@ -353,11 +383,11 @@ pub async fn validate_email<'a>(
     config: &S<Config>,
     db: Db,
     lang: Lang,
-) -> Cors<Result<status::Accepted<content::RawHtml<String>>>> {
+) -> Cors<Result<Html<String>>> {
     match User::validate_change_email(key, &db).await {
         Ok(_) => {
-            let body = unlogged_html(json!({ "global": global_flags(&config, &lang) }));
-            Cors::ok(&config.home, status::Accepted(Some(content::RawHtml(body))))
+            let body = index_html(json!({"user": null, "global": global_flags(&config, &lang) }));
+            Cors::ok(&config.home, Html(body))
         }
         Err(Error(s)) => Cors::err(&config.home, s),
     }
@@ -421,7 +451,7 @@ pub async fn validate_invitation<'a>(
     key: String,
     cookies: &CookieJar<'_>,
     lang: Lang,
-) -> Result<status::Accepted<content::RawHtml<String>>> {
+) -> Result<Html<String>> {
     let user = User::get_by_activation_key(key, &db)
         .await?
         .ok_or(Error(Status::NotFound))?;
@@ -429,9 +459,10 @@ pub async fn validate_invitation<'a>(
     let session = user.save_session(&db).await?;
     add_cookies(&session.secret, &config, cookies);
 
-    let body = unlogged_html(json!({ "global": global_flags(&config, &lang) }));
+    let json = user.to_json(&db).await?;
+    let body = index_html(json!({"user": json, "global": global_flags(&config, &lang) }));
 
-    Ok(status::Accepted(Some(content::RawHtml(body))))
+    Ok(Html(body))
 }
 
 /// The form for validating inscription
@@ -452,7 +483,7 @@ pub async fn request_invitation<'a>(
     cookies: &CookieJar<'_>,
     form: Json<RequestInvitationForm>,
     lang: Lang,
-) -> Result<status::Accepted<content::RawHtml<String>>> {
+) -> Result<Html<String>> {
     let mut user = User::get_by_activation_key(form.key.to_string(), &db)
         .await?
         .ok_or(Error(Status::NotFound))?;
@@ -463,6 +494,7 @@ pub async fn request_invitation<'a>(
     let session = user.save_session(&db).await?;
     add_cookies(&session.secret, &config, cookies);
 
-    let body = unlogged_html(json!({ "global": global_flags(&config, &lang) }));
-    Ok(status::Accepted(Some(content::RawHtml(body))))
+    let json = user.to_json(&db).await?;
+    let body = index_html(json!({"user": json, "global": global_flags(&config, &lang) }));
+    Ok(Html(body))
 }

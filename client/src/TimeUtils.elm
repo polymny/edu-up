@@ -1,91 +1,62 @@
-module TimeUtils exposing (timeToString)
+module TimeUtils exposing (formatDuration, formatTime, formatDate)
+
+{-| This module provides functions to help deal with tough times.
+
+@docs formatDuration, formatTime, formatDate
+
+-}
 
 import Lang exposing (Lang)
+import Strings
 import Time
 
 
-monthToString : Lang -> Time.Month -> String
-monthToString lang month =
-    case lang of
-        Lang.FrFr ->
-            case month of
-                Time.Jan ->
-                    "Janvier"
+{-| Helper to format month.
+-}
+formatMonth : Lang -> Time.Month -> String
+formatMonth lang month =
+    case month of
+        Time.Jan ->
+            Strings.dateMonthJanuary lang
 
-                Time.Feb ->
-                    "Février"
+        Time.Feb ->
+            Strings.dateMonthFebruary lang
 
-                Time.Mar ->
-                    "Mars"
+        Time.Mar ->
+            Strings.dateMonthMarch lang
 
-                Time.Apr ->
-                    "Avril"
+        Time.Apr ->
+            Strings.dateMonthApril lang
 
-                Time.May ->
-                    "Mai"
+        Time.May ->
+            Strings.dateMonthMay lang
 
-                Time.Jun ->
-                    "Juin"
+        Time.Jun ->
+            Strings.dateMonthJune lang
 
-                Time.Jul ->
-                    "Juillet"
+        Time.Jul ->
+            Strings.dateMonthJuly lang
 
-                Time.Aug ->
-                    "Août"
+        Time.Aug ->
+            Strings.dateMonthAugust lang
 
-                Time.Sep ->
-                    "Septembre"
+        Time.Sep ->
+            Strings.dateMonthSeptember lang
 
-                Time.Oct ->
-                    "Octobre"
+        Time.Oct ->
+            Strings.dateMonthOctober lang
 
-                Time.Nov ->
-                    "Novembre"
+        Time.Nov ->
+            Strings.dateMonthNovember lang
 
-                Time.Dec ->
-                    "Décembre"
-
-        _ ->
-            case month of
-                Time.Jan ->
-                    "January"
-
-                Time.Feb ->
-                    "February"
-
-                Time.Mar ->
-                    "March"
-
-                Time.Apr ->
-                    "April"
-
-                Time.May ->
-                    "May"
-
-                Time.Jun ->
-                    "June"
-
-                Time.Jul ->
-                    "July"
-
-                Time.Aug ->
-                    "August"
-
-                Time.Sep ->
-                    "September"
-
-                Time.Oct ->
-                    "October"
-
-                Time.Nov ->
-                    "November"
-
-                Time.Dec ->
-                    "December"
+        Time.Dec ->
+            Strings.dateMonthDecember lang
 
 
-dateToString : Lang -> Time.Zone -> Int -> String
-dateToString l z t =
+{-| Helper to format dates.
+-}
+formatDate : Lang -> Time.Zone -> Int -> String
+formatDate l z t =
     let
         time =
             Time.millisToPosix (1000 * t)
@@ -94,7 +65,7 @@ dateToString l z t =
             String.fromInt (Time.toYear z time)
 
         month =
-            monthToString l (Time.toMonth z time)
+            formatMonth l (Time.toMonth z time)
 
         day =
             String.fromInt (Time.toDay z time)
@@ -107,14 +78,16 @@ dateToString l z t =
             month ++ " " ++ day ++ ", " ++ year
 
 
-timeToString : Lang -> Time.Zone -> Int -> String
-timeToString l z t =
+{-| Help to formar times.
+-}
+formatTime : Lang -> Time.Zone -> Int -> String
+formatTime l z t =
     let
         time =
             Time.millisToPosix (1000 * t)
 
         date =
-            dateToString l z t
+            formatDate l z t
 
         hours =
             String.pad 2 '0' (String.fromInt (Time.toHour z time))
@@ -131,3 +104,34 @@ timeToString l z t =
 
         _ ->
             date ++ " at " ++ hours ++ ":" ++ minutes ++ ":" ++ seconds
+
+
+{-| Helper to pretty print a duration.
+-}
+formatDuration : Int -> String
+formatDuration milliseconds =
+    let
+        seconds =
+            milliseconds // 1000
+
+        minutes =
+            seconds // 60
+
+        secs =
+            modBy 60 seconds
+
+        secsString =
+            if secs < 10 then
+                "0" ++ String.fromInt secs
+
+            else
+                String.fromInt secs
+
+        minutesString =
+            if minutes < 10 then
+                "0" ++ String.fromInt minutes
+
+            else
+                String.fromInt minutes
+    in
+    minutesString ++ ":" ++ secsString

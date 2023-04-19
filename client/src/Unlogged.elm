@@ -1,4 +1,7 @@
-module Unlogged exposing (main)
+module Unlogged exposing (..)
+
+{-| Module that makes the login form available as a standalone element.
+-}
 
 import Browser
 import Json.Decode as Decode
@@ -7,13 +10,13 @@ import Unlogged.Updates as Unlogged
 import Unlogged.Views as Unlogged
 
 
+{-| A main app for displaying the login form in another page (such as our portal).
+-}
 main : Program Decode.Value (Maybe Unlogged.Model) Unlogged.Msg
 main =
-    Browser.application
-        { init = Unlogged.init
-        , update = Unlogged.update
-        , view = Unlogged.view
+    Browser.element
+        { init = Unlogged.initStandalone
         , subscriptions = \_ -> Sub.none
-        , onUrlChange = \_ -> Unlogged.Noop
-        , onUrlRequest = Unlogged.onUrlRequest
+        , update = Unlogged.updateStandalone
+        , view = Unlogged.viewStandalone
         }

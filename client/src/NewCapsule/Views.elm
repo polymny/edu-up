@@ -1,310 +1,164 @@
-module NewCapsule.Views exposing (..)
+module NewCapsule.Views exposing (view)
 
-import Capsule exposing (Capsule)
-import Core.Types as Core
+{-| This module contains the new caspule page view.
+
+@docs view
+
+-}
+
+import App.Types as App
+import Config exposing (Config)
+import Data.Capsule as Data
+import Data.User as Data exposing (User)
 import Element exposing (Element)
-import Element.Background as Background
 import Element.Border as Border
-import Element.Font as Font
 import Element.Input as Input
-import Html.Attributes
-import Lang
 import NewCapsule.Types as NewCapsule
 import RemoteData
-import Route
+import Strings
 import Ui.Colors as Colors
+import Ui.Elements as Ui
 import Ui.Utils as Ui
-import User exposing (User)
+import Utils
 
 
-view : Core.Global -> User -> NewCapsule.Model -> ( Element Core.Msg, Maybe (Element Core.Msg) )
-view global user model =
+{-| The view function for the new capsule page.
+-}
+view : Config -> User -> NewCapsule.Model -> ( Element App.Msg, Element App.Msg )
+view config _ model =
     let
-        projectField =
-            if model.showProject then
-                Input.text []
-                    { label = Input.labelAbove [] (Element.text (Lang.projectName global.lang))
-                    , onChange = \x -> Core.NewCapsuleMsg (NewCapsule.ProjectChanged x)
-                    , text = model.project
-                    , placeholder = Nothing
-                    }
-
-            else
-                Element.none
-
-        capsuleField =
+        projectInput =
             Input.text []
-                { label = Input.labelAbove [] (Element.text (Lang.capsuleName global.lang))
-                , onChange = \x -> Core.NewCapsuleMsg (NewCapsule.NameChanged x)
-                , text = model.name
+                { label = Input.labelAbove [] (Ui.title (Strings.dataProjectProjectName config.clientState.lang))
+                , text = model.projectName
                 , placeholder = Nothing
+                , onChange = \x -> App.NewCapsuleMsg (NewCapsule.ProjectChanged x)
+                }
+                |> Utils.tern model.showProject Element.none
+
+        nameInput =
+            Input.text []
+                { label = Input.labelAbove [] (Ui.title (Strings.dataCapsuleCapsuleName config.clientState.lang))
+                , text = model.capsuleName
+                , placeholder = Nothing
+                , onChange = \x -> App.NewCapsuleMsg (NewCapsule.NameChanged x)
                 }
 
-        slidesLabel =
-            Element.column [ Element.spacing 5 ]
-                [ Element.text (Lang.slidesGroup global.lang)
-                , Element.el [ Font.size 10 ] (Element.text (Lang.slidesGroupSubtext global.lang))
-                ]
+        pageContent =
+            case ( model.slideUpload, model.capsuleUpdate ) of
+                ( RemoteData.Loading _, _ ) ->
+                    Ui.animatedEl Ui.spin [ Ui.cx ] (Ui.icon 60 Ui.spinner)
 
-        buttons =
-            Element.row [ Element.width Element.fill ]
-                [ Element.row [ Element.alignLeft ]
-                    [ case model.capsule of
-                        RemoteData.Success _ ->
-                            Ui.simpleButton
-                                { onPress = Just (Core.NewCapsuleMsg NewCapsule.Cancel)
-                                , label = Element.text (Lang.cancel global.lang)
-                                }
+                ( _, ( _, RemoteData.Loading _ ) ) ->
+                    Ui.animatedEl Ui.spin [ Ui.cx ] (Ui.icon 60 Ui.spinner)
 
-                        _ ->
-                            Element.none
-                    ]
-                , case model.capsule of
-                    RemoteData.Success _ ->
-                        Element.row [ Element.spacing 10, Element.alignRight ]
-                            [ Ui.simpleButton
-                                { onPress = Just (Core.NewCapsuleMsg NewCapsule.GoToPreparation)
-                                , label = Element.text (Lang.prepareSlides global.lang)
-                                }
-                            , Ui.primaryButton
-                                { onPress = Just (Core.NewCapsuleMsg NewCapsule.GoToAcquisition)
-                                , label = Element.text (Lang.startRecording global.lang)
-                                }
-                            ]
-
-                    _ ->
-                        Element.none
-                ]
-
-        form =
-            Element.column
-                [ Element.spacing 10, Ui.wf, Ui.hf ]
-                [ projectField, capsuleField, slidesLabel, gosView global user model, buttons ]
-
-        errorPopup =
-            case model.capsule of
-                RemoteData.Failure _ ->
-                    Just
-                        (Element.row
-                            [ Ui.wf, Ui.hf, Background.color Colors.darkTransparent ]
-                            [ Element.el [ Ui.wf, Ui.hf ] Element.none
-                            , Element.column [ Ui.wf, Ui.hf ]
-                                [ Element.el [ Ui.wf, Ui.hf ] Element.none
-                                , Element.column [ Ui.wf, Ui.hf ]
-                                    [ Element.el [ Ui.wf, Font.color Colors.white, Element.padding 10, Background.color Colors.navbar ]
-                                        (Element.el [ Element.centerX, Font.bold ] (Element.text (Lang.error global.lang)))
-                                    , Element.column [ Ui.wf, Ui.hf, Background.color Colors.whiteBis ]
-                                        [ Element.paragraph [ Font.center, Element.centerX, Element.centerY ]
-                                            [ Element.text (Lang.errorUploadingPdf global.lang) ]
-                                        , Element.el [ Element.alignBottom, Element.alignRight, Element.padding 10 ]
-                                            (Ui.primaryLink { route = Route.Home, label = Element.text (Lang.confirm global.lang) })
-                                        ]
-                                    ]
-                                , Element.el [ Ui.hf ] Element.none
-                                ]
-                            , Element.el [ Ui.wf, Ui.hf ] Element.none
-                            ]
-                        )
+                ( RemoteData.Success ( capsule, slides ), _ ) ->
+                    slidesView capsule slides
 
                 _ ->
-                    Nothing
+                    Element.none
+
+        bottomBar =
+            case ( model.slideUpload, model.capsuleUpdate ) of
+                ( RemoteData.Success _, ( _, RemoteData.NotAsked ) ) ->
+                    Element.row [ Ui.wf, Element.spacing 10 ]
+                        [ Ui.secondary []
+                            { action = Ui.Msg <| App.NewCapsuleMsg <| NewCapsule.Cancel
+                            , label = Element.text <| Strings.uiCancel config.clientState.lang
+                            }
+                        , Ui.secondary [ Element.alignRight ]
+                            { action = Ui.Msg <| App.NewCapsuleMsg <| NewCapsule.Submit <| NewCapsule.Preparation
+                            , label = Element.text <| Strings.stepsPreparationOrganizeSlides config.clientState.lang
+                            }
+                        , Ui.primary [ Element.alignRight ]
+                            { action = Ui.Msg <| App.NewCapsuleMsg <| NewCapsule.Submit <| NewCapsule.Acquisition
+                            , label = Element.text <| Strings.stepsAcquisitionStartRecording config.clientState.lang
+                            }
+                        ]
+
+                _ ->
+                    Element.none
     in
-    ( Element.row [ Ui.wf, Ui.hf, Element.padding 10 ]
-        [ Element.el [ Ui.wfp 1, Ui.hf ] Element.none
-        , Element.el [ Ui.wfp 8, Ui.hf ] form
-        , Element.el [ Ui.wfp 1, Ui.hf ] Element.none
+    ( Element.row [ Ui.wf, Ui.hf, Ui.p 10 ]
+        [ Element.el [ Ui.wfp 1 ] Element.none
+        , Element.column [ Ui.wfp 6, Element.spacing 10, Element.alignTop ]
+            [ projectInput, nameInput, pageContent, bottomBar ]
+        , Element.el [ Ui.wfp 1 ] Element.none
         ]
-    , errorPopup
+    , Element.none
     )
 
 
+{-| Shows the slides with the delimiters.
+-}
+slidesView : Data.Capsule -> List NewCapsule.Slide -> Element App.Msg
+slidesView capsule slides =
+    makeView capsule slides
+        |> Utils.regroupFixed 10
+        |> List.map
+            (List.indexedMap
+                (\i x ->
+                    case ( x, modBy 2 i == 0 ) of
+                        ( Just e, _ ) ->
+                            e
 
--- gosView global user model
+                        ( _, True ) ->
+                            Element.el [ Ui.wf ] Element.none
 
-
-gosView : Core.Global -> User -> NewCapsule.Model -> Element Core.Msg
-gosView _ _ model =
-    case model.capsule of
-        RemoteData.Success ( capsule, s ) ->
-            let
-                slides : List (List (Maybe Slide))
-                slides =
-                    regroupSlides 5 (List.indexedMap (\x y -> ( x, y )) s)
-
-                elements : List (List (Element Core.Msg))
-                elements =
-                    List.map (\( x, y ) -> buildSlides capsule x y) (prepare slides)
-            in
-            Element.column
-                [ Element.width Element.fill, Element.spacing 10 ]
-                (List.map (\x -> Element.row [ Element.width Element.fill ] x) elements)
-
-        _ ->
-            Element.el [ Element.padding 10, Element.centerX ] Ui.spinner
-
-
-type alias Slide =
-    ( Int, ( Int, Capsule.Slide ) )
-
-
-regroupSlides : Int -> List Slide -> List (List (Maybe Slide))
-regroupSlides number list =
-    case regroupSlidesAux number [] list of
-        [] ->
-            []
-
-        h :: t ->
-            ((List.map Just h ++ List.repeat (number - List.length h) Nothing)
-                :: List.map (\x -> List.map Just x) t
+                        ( _, False ) ->
+                            Element.el [ Ui.p 10 ] Element.none
+                )
             )
-                |> List.reverse
+        |> List.map (Element.row [ Ui.wf ])
+        |> Element.column [ Element.spacing 10, Ui.wf, Ui.hf ]
 
 
-regroupSlidesAux : Int -> List (List Slide) -> List Slide -> List (List Slide)
-regroupSlidesAux number current list =
-    case ( list, current ) of
-        ( [], _ ) ->
-            current
+makeView : Data.Capsule -> List NewCapsule.Slide -> List (Element App.Msg)
+makeView capsule input =
+    makeViewAux capsule [] input |> List.reverse
 
-        ( h :: t, [] ) ->
-            regroupSlidesAux number [ [ h ] ] t
 
-        ( h :: t, h2 :: t2 ) ->
-            if List.length h2 < number then
-                regroupSlidesAux number ((h2 ++ [ h ]) :: t2) t
+makeViewAux : Data.Capsule -> List (Element App.Msg) -> List NewCapsule.Slide -> List (Element App.Msg)
+makeViewAux capsule acc input =
+    case input of
+        h1 :: h2 :: t ->
+            makeViewAux capsule (delimiterView h1 h2 :: slideView capsule h1 :: acc) (h2 :: t)
+
+        h1 :: [] ->
+            slideView capsule h1 :: acc
+
+        [] ->
+            acc
+
+
+{-| Shows a slide of the capsule.
+-}
+slideView : Data.Capsule -> NewCapsule.Slide -> Element App.Msg
+slideView capsule ( i, _, s ) =
+    Element.el [ Ui.wf ]
+        (Element.image [ Border.color Colors.greyBorder, Ui.b 1, Ui.wf ]
+            { description = "Slide number " ++ String.fromInt i
+            , src = Data.assetPath capsule (s.uuid ++ ".png")
+            }
+        )
+
+
+{-| Show a vertical delimiter between two slides.
+
+If the slides belong to the same grain, the delimiter will be dashed, otherwise, it will be solid.
+
+-}
+delimiterView : NewCapsule.Slide -> NewCapsule.Slide -> Element App.Msg
+delimiterView ( index1, grain1, _ ) ( _, grain2, _ ) =
+    let
+        border =
+            if grain1 == grain2 then
+                Border.dashed
 
             else
-                regroupSlidesAux number ([ h ] :: h2 :: t2) t
-
-
-prepare : List (List (Maybe Slide)) -> List ( Maybe Slide, List (Maybe Slide) )
-prepare input =
-    case input of
-        [] ->
-            []
-
-        h :: [] ->
-            [ ( Nothing, h ) ]
-
-        _ :: [] :: _ ->
-            -- This should be unreachable
-            []
-
-        h1 :: (h2 :: t2) :: t ->
-            ( h2, h1 ) :: prepare ((h2 :: t2) :: t)
-
-
-buildSlides : Capsule -> Maybe Slide -> List (Maybe Slide) -> List (Element Core.Msg)
-buildSlides capsule nextSlide input =
-    let
-        emptyPadding =
-            Element.el [ Element.height Element.fill, Element.paddingXY 10 0 ]
-                (Element.el
-                    [ Element.height Element.fill
-                    , Border.widthEach { left = 2, right = 0, top = 0, bottom = 0 }
-                    , Element.htmlAttribute (Html.Attributes.style "border-style" "none")
-                    ]
-                    Element.none
-                )
-
-        emptyFilling =
-            Element.el
-                [ Element.width Element.fill
-                , Element.height Element.fill
-                ]
-                Element.none
+                Border.solid
     in
-    case input of
-        [] ->
-            []
-
-        [ Nothing ] ->
-            [ emptyFilling, emptyPadding ]
-
-        [ Just ( index1, ( gos1, slide1 ) ) ] ->
-            let
-                head =
-                    viewSlide capsule (Just ( index1, ( gos1, slide1 ) ))
-
-                tail =
-                    case nextSlide of
-                        Just ( index2, ( gos2, _ ) ) ->
-                            let
-                                borderStyle =
-                                    if gos1 == gos2 then
-                                        Border.dashed
-
-                                    else
-                                        Border.solid
-
-                                delimiter =
-                                    Input.button [ Element.paddingXY 10 0, Element.height Element.fill ]
-                                        { label =
-                                            Element.el
-                                                [ Element.centerX
-                                                , Border.widthEach { left = 2, right = 0, top = 0, bottom = 0 }
-                                                , Border.color Colors.black
-                                                , borderStyle
-                                                , Element.height Element.fill
-                                                ]
-                                                Element.none
-                                        , onPress = Just (Core.NewCapsuleMsg (NewCapsule.SlideClicked index2))
-                                        }
-                            in
-                            [ delimiter ]
-
-                        _ ->
-                            [ emptyPadding ]
-            in
-            head :: tail
-
-        (Just ( index1, ( gos1, slide1 ) )) :: (Just ( index2, ( gos2, slide2 ) )) :: t ->
-            let
-                borderStyle =
-                    if gos1 == gos2 then
-                        Border.dashed
-
-                    else
-                        Border.solid
-
-                delimiter =
-                    Input.button [ Element.paddingXY 10 0, Element.height Element.fill ]
-                        { label =
-                            Element.el
-                                [ Element.centerX
-                                , Border.widthEach { left = 2, right = 0, top = 0, bottom = 0 }
-                                , Border.color Colors.black
-                                , borderStyle
-                                , Element.height Element.fill
-                                ]
-                                Element.none
-                        , onPress = Just (Core.NewCapsuleMsg (NewCapsule.SlideClicked index2))
-                        }
-            in
-            viewSlide capsule (Just ( index1, ( gos1, slide1 ) ))
-                :: delimiter
-                :: buildSlides capsule nextSlide (Just ( index2, ( gos2, slide2 ) ) :: t)
-
-        (Just ( index1, ( gos1, slide1 ) )) :: Nothing :: t ->
-            viewSlide capsule (Just ( index1, ( gos1, slide1 ) ))
-                :: emptyPadding
-                :: emptyFilling
-                :: emptyPadding
-                :: buildSlides capsule nextSlide t
-
-        Nothing :: t ->
-            emptyFilling
-                :: emptyPadding
-                :: buildSlides capsule nextSlide t
-
-
-viewSlide : Capsule -> Maybe Slide -> Element Core.Msg
-viewSlide capsule slide =
-    case slide of
-        Nothing ->
-            Element.el [ Element.width Element.fill ] Element.none
-
-        Just ( _, ( _, s ) ) ->
-            Element.image
-                [ Border.color Colors.grey, Border.width 1, Element.width Element.fill ]
-                { description = "", src = Capsule.assetPath capsule (s.uuid ++ ".png") }
+    Input.button [ Ui.px 10, Ui.hf ]
+        { label = Element.el [ border, Ui.cx, Ui.hf, Ui.bl 2, Border.color Colors.black ] Element.none
+        , onPress = Just (App.NewCapsuleMsg (NewCapsule.DelimiterClicked (grain1 == grain2) index1))
+        }

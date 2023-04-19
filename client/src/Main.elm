@@ -1,21 +1,20 @@
 module Main exposing (main)
 
+import App.Types as App
+import App.Updates as App
+import App.Utils as App
+import App.Views as App
 import Browser
-import Core.Subscriptions as Core
-import Core.Types as Core
-import Core.Updates as Core
-import Core.Utils as Core
-import Core.Views as Core
 import Json.Decode as Decode
 
 
-main : Program Decode.Value (Maybe Core.Model) Core.Msg
+main : Program Decode.Value App.MaybeModel App.MaybeMsg
 main =
     Browser.application
-        { init = Core.init
-        , update = Core.update
-        , view = Core.view
-        , subscriptions = Core.subscriptions
-        , onUrlChange = Core.OnUrlChange
-        , onUrlRequest = Core.onUrlRequest
+        { init = App.init
+        , update = App.update
+        , view = App.view
+        , subscriptions = App.subs
+        , onUrlChange = \x -> App.LoggedMsg (App.OnUrlChange x)
+        , onUrlRequest = \x -> App.LoggedMsg (App.onUrlRequest x)
         }

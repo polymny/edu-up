@@ -1,148 +1,133 @@
-module Unlogged.Updates exposing (..)
+port module Unlogged.Updates exposing (..)
 
-import Api
-import Browser.Navigation as Nav
-import Core.Ports as Ports
-import Http
-import Lang
-import Status
+{-| This module contains the unlogged updates of the app.
+-}
+
+import Api.User as Api
+import Browser.Navigation
+import Data.Types as Data
+import Keyboard
+import RemoteData
 import Unlogged.Types as Unlogged
 
 
-update : Unlogged.Msg -> Maybe Unlogged.Model -> ( Maybe Unlogged.Model, Cmd Unlogged.Msg )
+{-| Updates the unlogged part of the app.
+-}
+update : Unlogged.Msg -> Unlogged.Model -> ( Unlogged.Model, Cmd Unlogged.Msg )
 update msg model =
+    let
+        root =
+            model.serverRoot
+
+        sortBy =
+            { key = Data.Name, ascending = False }
+    in
+    case ( msg, model.page ) of
+        ( Unlogged.UsernameChanged newUsername, _ ) ->
+            ( { model | username = newUsername }, Cmd.none )
+
+        ( Unlogged.EmailChanged newEmail, _ ) ->
+            ( { model | email = newEmail }, Cmd.none )
+
+        ( Unlogged.PasswordChanged newPassword, _ ) ->
+            ( { model | password = newPassword }, Cmd.none )
+
+        ( Unlogged.RepeatPasswordChanged newRepeatPassword, _ ) ->
+            ( { model | repeatPassword = newRepeatPassword }, Cmd.none )
+
+        ( Unlogged.AcceptTermsOfServiceChanged v, _ ) ->
+            ( { model | acceptTermsOfService = v }, Cmd.none )
+
+        ( Unlogged.SignUpForNewsletterChanged v, _ ) ->
+            ( { model | signUpForNewsletter = v }, Cmd.none )
+
+        ( Unlogged.PageChanged newPage, _ ) ->
+            ( { model | page = newPage }, Cmd.none )
+
+        ( Unlogged.ButtonClicked, Unlogged.Login ) ->
+            ( { model | loginRequest = RemoteData.Loading Nothing }
+            , Api.login
+                root
+                sortBy
+                model.username
+                model.password
+                (\x -> Unlogged.LoginRequestChanged x)
+            )
+
+        ( Unlogged.ButtonClicked, Unlogged.ForgotPassword ) ->
+            ( { model | newPasswordRequest = RemoteData.Loading Nothing }
+            , Api.requestNewPassword root model.email (\x -> Unlogged.NewPasswordRequestChanged x)
+            )
+
+        ( Unlogged.ButtonClicked, Unlogged.ResetPassword key ) ->
+            ( { model | newPasswordRequest = RemoteData.Loading Nothing }
+            , Api.resetPassword
+                sortBy
+                key
+                model.password
+                (\x -> Unlogged.ResetPasswordRequestChanged x)
+            )
+
+        ( Unlogged.ButtonClicked, Unlogged.SignUp ) ->
+            ( { model | signUpRequest = RemoteData.Loading Nothing }
+            , Api.signUp root model (\x -> Unlogged.SignUpRequestChanged x)
+            )
+
+        ( Unlogged.LoginRequestChanged (RemoteData.Success _), _ ) ->
+            -- This never happens on the full app, it only happens when embedding the form on the portal (in the full
+            -- app, this case is caught in App.Updates).
+            ( model, submitForm "loginform" )
+
+        ( Unlogged.LoginRequestChanged data, _ ) ->
+            ( { model | loginRequest = data }, Cmd.none )
+
+        ( Unlogged.NewPasswordRequestChanged data, _ ) ->
+            ( { model | newPasswordRequest = data }, Cmd.none )
+
+        ( Unlogged.ResetPasswordRequestChanged (RemoteData.Success _), _ ) ->
+            ( model, Browser.Navigation.load model.serverRoot )
+
+        ( Unlogged.ResetPasswordRequestChanged data, _ ) ->
+            ( { model | resetPasswordRequest = data }, Cmd.none )
+
+        ( Unlogged.SignUpRequestChanged data, _ ) ->
+            ( { model | signUpRequest = data }, Cmd.none )
+
+        ( Unlogged.Noop, _ ) ->
+            ( model, Cmd.none )
+
+
+port submitForm : String -> Cmd msg
+
+
+{-| Sup.
+-}
+updateStandalone : Unlogged.Msg -> Maybe Unlogged.Model -> ( Maybe Unlogged.Model, Cmd Unlogged.Msg )
+updateStandalone msg model =
     case model of
         Just m ->
-            let
-                ( a, b ) =
-                    updateInner msg m
-            in
-            ( Just a, b )
+            update msg m |> Tuple.mapFirst Just
 
         _ ->
             ( Nothing, Cmd.none )
 
 
-updateInner : Unlogged.Msg -> Unlogged.Model -> ( Unlogged.Model, Cmd Unlogged.Msg )
-updateInner msg { global, page } =
-    case ( msg, page ) of
-        ( Unlogged.Noop, _ ) ->
-            ( { global = global, page = page }, Cmd.none )
-
-        ( Unlogged.LangChanged newLang, _ ) ->
-            ( { global = { global | lang = newLang }, page = page }
-            , Ports.setLanguage (Lang.toString newLang)
-            )
-
-        ( Unlogged.LoginUsernameChanged s, Unlogged.Login form ) ->
-            ( { global = global, page = Unlogged.Login { form | username = s } }, Cmd.none )
-
-        ( Unlogged.LoginPasswordChanged s, Unlogged.Login form ) ->
-            ( { global = global, page = Unlogged.Login { form | password = s } }, Cmd.none )
-
-        ( Unlogged.LoginSubmitted, Unlogged.Login form ) ->
-            ( { global = global, page = Unlogged.Login { form | status = Status.Sent } }
-            , Api.login (successError Unlogged.LoginSuccess Unlogged.LoginFailed) form
-            )
-
-        ( Unlogged.LoginFailed, Unlogged.Login form ) ->
-            ( { global = global, page = Unlogged.Login { form | status = Status.Error } }, Cmd.none )
-
-        ( Unlogged.LoginSuccess, Unlogged.Login form ) ->
-            ( { global = global, page = Unlogged.Login form }, Nav.reload )
-
-        ( Unlogged.SignUpUsernameChanged s, Unlogged.SignUp form ) ->
-            ( { global = global, page = Unlogged.SignUp { form | username = s } }, Cmd.none )
-
-        ( Unlogged.SignUpPasswordChanged s, Unlogged.SignUp form ) ->
-            ( { global = global, page = Unlogged.SignUp { form | password = s } }, Cmd.none )
-
-        ( Unlogged.SignUpRepeatPasswordChanged s, Unlogged.SignUp form ) ->
-            ( { global = global, page = Unlogged.SignUp { form | repeatPassword = s } }, Cmd.none )
-
-        ( Unlogged.SignUpEmailChanged s, Unlogged.SignUp form ) ->
-            ( { global = global, page = Unlogged.SignUp { form | email = s } }, Cmd.none )
-
-        ( Unlogged.SignUpConditionsChanged s, Unlogged.SignUp form ) ->
-            ( { global = global, page = Unlogged.SignUp { form | acceptConditions = s } }, Cmd.none )
-
-        ( Unlogged.SignUpRegisterNewsletterChanged s, Unlogged.SignUp form ) ->
-            ( { global = global, page = Unlogged.SignUp { form | registerNewsletter = s } }, Cmd.none )
-
-        ( Unlogged.SignUpSubmitted, Unlogged.SignUp form ) ->
-            ( { global = global, page = Unlogged.SignUp { form | status = Status.Sent } }
-            , Api.signUp (successError Unlogged.SignUpSuccess Unlogged.SignUpFailed) form
-            )
-
-        ( Unlogged.SignUpSuccess, Unlogged.SignUp form ) ->
-            ( { global = global, page = Unlogged.SignUp { form | status = Status.Success } }, Cmd.none )
-
-        ( Unlogged.SignUpFailed, Unlogged.SignUp form ) ->
-            ( { global = global, page = Unlogged.SignUp { form | status = Status.Error } }, Cmd.none )
-
-        ( Unlogged.SignUpShowMessage, Unlogged.SignUp form ) ->
-            ( { global = global, page = Unlogged.SignUp { form | status = Status.Error, showMessage = True } }, Cmd.none )
-
-        ( Unlogged.ForgotPasswordEmailChanged s, Unlogged.ForgotPassword form ) ->
-            ( { global = global, page = Unlogged.ForgotPassword { form | email = s } }, Cmd.none )
-
-        ( Unlogged.ForgotPasswordSubmitted, Unlogged.ForgotPassword form ) ->
-            ( { global = global, page = Unlogged.ForgotPassword { form | status = Status.Sent } }
-            , Api.requestNewPassword (successError Unlogged.ForgotPasswordSuccess Unlogged.ForgotPasswordFailed) form
-            )
-
-        ( Unlogged.ForgotPasswordFailed, Unlogged.ForgotPassword form ) ->
-            ( { global = global, page = Unlogged.ForgotPassword { form | status = Status.Error } }, Cmd.none )
-
-        ( Unlogged.ForgotPasswordSuccess, Unlogged.ForgotPassword form ) ->
-            ( { global = global, page = Unlogged.ForgotPassword { form | status = Status.Success } }, Cmd.none )
-
-        ( Unlogged.ResetPasswordChanged new, Unlogged.ResetPassword form ) ->
-            ( { global = global, page = Unlogged.ResetPassword { form | newPassword = new } }, Cmd.none )
-
-        ( Unlogged.ResetPasswordSubmitted, Unlogged.ResetPassword form ) ->
-            ( { global = global, page = Unlogged.ResetPassword { form | status = Status.Sent } }
-            , Api.changePasswordFromKey (successError Unlogged.ResetPasswordSuccess Unlogged.Noop) form
-            )
-
-        ( Unlogged.ResetPasswordSuccess, Unlogged.ResetPassword _ ) ->
-            ( { global = global, page = page }, Nav.load "/" )
-
-        ( Unlogged.GoToPage p, _ ) ->
-            ( { global = global, page = p }, Cmd.none )
-
-        ( Unlogged.GoToUrl u, _ ) ->
-            ( { global = global, page = page }, Nav.load u )
-
-        ( Unlogged.ValidateInvitationPasswordChanged s, Unlogged.ValidateInvitation form ) ->
-            ( { global = global, page = Unlogged.ValidateInvitation { form | password = s } }, Cmd.none )
-
-        ( Unlogged.ValidateInvitationRepeatPasswordChanged s, Unlogged.ValidateInvitation form ) ->
-            ( { global = global, page = Unlogged.ValidateInvitation { form | repeatPassword = s } }, Cmd.none )
-
-        ( Unlogged.ValidateInvitationSubmitted, Unlogged.ValidateInvitation form ) ->
-            ( { global = global, page = Unlogged.ValidateInvitation { form | status = Status.Sent } }
-            , Api.validateInvitation (successError Unlogged.ValidateInvitationSuccess Unlogged.ValidateInvitationFailed) form
-            )
-
-        ( Unlogged.ValidateInvitationSuccess, Unlogged.ValidateInvitation form ) ->
-            ( { global = global, page = Unlogged.ValidateInvitation { form | status = Status.Success } }, Nav.load "/" )
-
-        ( Unlogged.ValidateInvitationFailed, Unlogged.ValidateInvitation form ) ->
-            ( { global = global, page = Unlogged.ValidateInvitation { form | status = Status.Error } }, Cmd.none )
-
-        ( Unlogged.ValidateInvitationShowMessage, Unlogged.ValidateInvitation form ) ->
-            ( { global = global, page = Unlogged.ValidateInvitation { form | status = Status.Error, showMessage = True } }, Cmd.none )
-
-        ( _, _ ) ->
-            ( { global = global, page = page }, Cmd.none )
-
-
-successError : Unlogged.Msg -> Unlogged.Msg -> Result Http.Error () -> Unlogged.Msg
-successError onSuccess onError result =
-    case result of
-        Ok _ ->
-            onSuccess
+{-| Keyboard shortcuts of the unlogged page.
+-}
+shortcuts : Keyboard.RawKey -> Unlogged.Msg
+shortcuts msg =
+    case Keyboard.rawValue msg of
+        "Enter" ->
+            Unlogged.ButtonClicked
 
         _ ->
-            onError
+            Unlogged.Noop
+
+
+{-| Subscriptions of the page.
+-}
+subs : Sub Unlogged.Msg
+subs =
+    Sub.batch
+        [ Keyboard.ups shortcuts
+        ]

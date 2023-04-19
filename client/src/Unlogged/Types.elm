@@ -1,177 +1,148 @@
 module Unlogged.Types exposing (..)
 
-import Browser
-import Browser.Navigation
-import Core.Types as Core
-import Core.Utils as Core
+{-| This module contains the login form.
+-}
+
+import Data.User as Data exposing (User)
 import Json.Decode as Decode
 import Lang exposing (Lang)
-import Log
-import Status exposing (Status)
-import Url
+import RemoteData
+import Url exposing (Url)
 
 
+{-| The model for the login form.
+-}
 type alias Model =
-    { global : Core.Global
+    { serverRoot : String
+    , lang : Lang
     , page : Page
-    }
-
-
-type alias LoginForm =
-    { username : String
-    , password : String
-    , status : Status
-    }
-
-
-type alias SignUpForm =
-    { username : String
-    , password : String
-    , repeatPassword : String
+    , username : String
     , email : String
-    , acceptConditions : Bool
-    , registerNewsletter : Bool
-    , status : Status
-    , showMessage : Bool
-    }
-
-
-type alias ForgotPasswordForm =
-    { email : String
-    , status : Status
-    }
-
-
-type alias ResetPasswordForm =
-    { key : String
-    , newPassword : String
-    , status : Status
-    }
-
-
-type alias ValidateInvitationForm =
-    { key : String
     , password : String
     , repeatPassword : String
-    , status : Status
-    , showMessage : Bool
+    , acceptTermsOfService : Bool
+    , signUpForNewsletter : Bool
+    , loginRequest : RemoteData.WebData User
+    , newPasswordRequest : RemoteData.WebData ()
+    , resetPasswordRequest : RemoteData.WebData User
+    , signUpRequest : RemoteData.WebData ()
     }
 
 
+{-| The different states in which the UI can be.
+-}
 type Page
-    = Login LoginForm
-    | SignUp SignUpForm
-    | ForgotPassword ForgotPasswordForm
-    | ResetPassword ResetPasswordForm
-    | ValidateInvitation ValidateInvitationForm
-    | Activated
+    = Login
+    | SignUp
+    | ForgotPassword
+    | ResetPassword String
 
 
-initLoginForm : LoginForm
-initLoginForm =
-    { username = "", password = "", status = Status.NotSent }
+{-| Checks if two pages are the same.
+-}
+comparePage : Page -> Page -> Bool
+comparePage page1 page2 =
+    case ( page1, page2 ) of
+        ( Login, Login ) ->
+            True
+
+        ( SignUp, SignUp ) ->
+            True
+
+        ( ForgotPassword, ForgotPassword ) ->
+            True
+
+        ( ResetPassword _, ResetPassword _ ) ->
+            True
+
+        _ ->
+            False
 
 
-initSignUpForm : SignUpForm
-initSignUpForm =
-    { username = ""
+{-| Message type.
+-}
+type Msg
+    = UsernameChanged String
+    | EmailChanged String
+    | PasswordChanged String
+    | RepeatPasswordChanged String
+    | AcceptTermsOfServiceChanged Bool
+    | SignUpForNewsletterChanged Bool
+    | PageChanged Page
+    | LoginRequestChanged (RemoteData.WebData User)
+    | NewPasswordRequestChanged (RemoteData.WebData ())
+    | ResetPasswordRequestChanged (RemoteData.WebData User)
+    | SignUpRequestChanged (RemoteData.WebData ())
+    | ButtonClicked
+    | Noop
+
+
+{-| Initializes the unlogged model.
+-}
+init : Lang -> String -> Maybe Url -> Model
+init lang serverRoot url =
+    { serverRoot = serverRoot
+    , lang = lang
+    , page = Maybe.map fromUrl url |> Maybe.withDefault Login
+    , username = ""
+    , email = ""
     , password = ""
     , repeatPassword = ""
-    , email = ""
-    , acceptConditions = False
-    , registerNewsletter = True
-    , status = Status.NotSent
-    , showMessage = False
+    , acceptTermsOfService = False
+    , signUpForNewsletter = False
+    , loginRequest = RemoteData.NotAsked
+    , newPasswordRequest = RemoteData.NotAsked
+    , resetPasswordRequest = RemoteData.NotAsked
+    , signUpRequest = RemoteData.NotAsked
     }
 
 
-initForgotPasswordForm : ForgotPasswordForm
-initForgotPasswordForm =
-    { email = "", status = Status.NotSent }
-
-
-init : Decode.Value -> Url.Url -> Browser.Navigation.Key -> ( Maybe Model, Cmd Msg )
-init flags url key =
+{-| Tries to convert a URL to the corresponding page. Returns Login if the route wasn't found.
+-}
+fromUrl : Url -> Page
+fromUrl url =
     let
-        global =
-            Decode.decodeValue (Decode.field "global" (Core.decodeGlobal key)) flags
+        tmp =
+            String.split "/" url.path |> List.drop 1
 
+        rev =
+            List.reverse tmp
+
+        -- this allows for trailing slash
         split =
-            String.split "/" url.path
+            case List.head rev of
+                Just x ->
+                    if x == "" then
+                        List.drop 1 rev |> List.reverse
 
-        page =
-            case split of
-                "" :: "reset-password" :: k :: _ ->
-                    ResetPassword { key = k, newPassword = "", status = Status.NotSent }
-
-                "" :: "validate-invitation" :: k :: _ ->
-                    ValidateInvitation { key = k, password = "", repeatPassword = "", status = Status.NotSent, showMessage = False }
-
-                "" :: "activate" :: _ ->
-                    Activated
-
-                "" :: "validate-email" :: _ ->
-                    Activated
+                    else
+                        List.reverse rev
 
                 _ ->
-                    Login initLoginForm
+                    tmp
+    in
+    case split of
+        "reset-password" :: id :: [] ->
+            ResetPassword id
+
+        _ ->
+            Login
+
+
+{-| Initializes the model for a standalone use.
+-}
+initStandalone : Decode.Value -> ( Maybe Model, Cmd Msg )
+initStandalone flags =
+    let
+        lang =
+            Decode.decodeValue (Decode.field "lang" Decode.string) flags
+                |> Result.toMaybe
+                |> Maybe.andThen Lang.fromString
+                |> Maybe.withDefault Lang.default
 
         model =
-            case global of
-                Ok g ->
-                    Just (Model g page)
-
-                _ ->
-                    let
-                        _ =
-                            Log.debug "global" global
-                    in
-                    Nothing
+            Decode.decodeValue (Decode.field "root" Decode.string) flags
+                |> Result.toMaybe
+                |> Maybe.map (\x -> init lang x Nothing)
     in
     ( model, Cmd.none )
-
-
-onUrlRequest : Browser.UrlRequest -> Msg
-onUrlRequest url =
-    case url of
-        Browser.Internal u ->
-            GoToUrl (Url.toString u)
-
-        Browser.External _ ->
-            --ExternalUrl u
-            Noop
-
-
-type Msg
-    = Noop
-    | LangChanged Lang
-    | LoginUsernameChanged String
-    | LoginPasswordChanged String
-    | LoginSubmitted
-    | LoginFailed
-    | LoginSuccess
-    | SignUpUsernameChanged String
-    | SignUpEmailChanged String
-    | SignUpPasswordChanged String
-    | SignUpRepeatPasswordChanged String
-    | SignUpConditionsChanged Bool
-    | SignUpRegisterNewsletterChanged Bool
-    | SignUpSubmitted
-    | SignUpSuccess
-    | SignUpFailed
-    | SignUpShowMessage
-    | ForgotPasswordEmailChanged String
-    | ForgotPasswordSubmitted
-    | ForgotPasswordFailed
-    | ForgotPasswordSuccess
-    | ResetPasswordChanged String
-    | ResetPasswordSubmitted
-    | ResetPasswordSuccess
-    | GoToPage Page
-    | GoToUrl String
-    | ValidateInvitationPasswordChanged String
-    | ValidateInvitationRepeatPasswordChanged String
-    | ValidateInvitationSubmitted
-    | ValidateInvitationSuccess
-    | ValidateInvitationFailed
-    | ValidateInvitationShowMessage

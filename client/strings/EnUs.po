@@ -1,0 +1,1235 @@
+msgid ""
+msgstr ""
+"Project-Id-Version: \n"
+"POT-Creation-Date: \n"
+"PO-Revision-Date: \n"
+"Last-Translator: \n"
+"Language-Team: \n"
+"Language: en_US\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+"X-Generator: Poedit 3.2.2\n"
+
+#. Verb to connect to the server.
+msgid "Login.login"
+msgstr "Login"
+
+#. Verb to disconnect from the server.
+msgid "Login.logout"
+msgstr "Logout"
+
+#. Verb to sign up to the server.
+msgid "Login.signUp"
+msgstr "Sign up"
+
+#. The connection has failed.
+msgid "Login.loginFailed"
+msgstr "Login failed"
+
+#. The terms of service of the application.
+msgid "Login.termsOfService"
+msgstr "Terms of service"
+
+#. Begning of the sentence that the user pronounces when accepting the terms of service.
+msgid "Login.acceptTermsOfServiceBegining"
+msgstr "I read and accept the"
+
+#. Sentence that the user pronounces when accepting the terms of service.
+msgid "Login.acceptTermsOfService"
+msgstr "I read and accept the terms of service"
+
+#. Adjective describing a user that subscribed to the newsletter.
+msgid "Login.subscribedToTheNewsletter"
+msgstr "Subsribed to the newsletter"
+
+#. Sentence that the user pronounces when singing up to the newsletter.
+msgid "Login.signUpForTheNewsletter"
+msgstr "I sign up to the newsletter"
+
+#. Given address e-mail does not belong in the database.
+msgid "Login.noSuchEmail"
+msgstr "This e-mail address does not belong to any account"
+
+#. A mail has been sent to the user.
+msgid "Login.mailSent"
+msgstr "An e-mail has been sent to you"
+
+#. Question to ask to a user if they're not registered into the app yet.
+msgid "Login.notRegisteredYet"
+msgstr "Not registered yet"
+
+#. Forgotten password.
+msgid "Login.forgottenPassword"
+msgstr "Forgotten password"
+
+#. Verb to ask a new password.
+msgid "Login.requestNewPassword"
+msgstr "Request new password"
+
+#. Action to reset a password.
+msgid "Login.resetPassword"
+msgstr "Reset password"
+
+#. Action to change the password.
+msgid "Login.changePassword"
+msgstr "Change password"
+
+#. The password has been changed.
+msgid "Login.passwordChanged"
+msgstr "Password changed"
+
+#. The current password.
+msgid "Login.currentPassword"
+msgstr "Current password"
+
+#. A new password.
+msgid "Login.newPassword"
+msgstr "New password"
+
+#. Order to repeat the password to make sure it's correct.
+msgid "Login.repeatPassword"
+msgstr "Repeat password"
+
+#. The e-mail address in not correct.
+msgid "Login.incorrectEmailAddress"
+msgstr "The e-mail address is incorrect"
+
+#. Username or email already exist.
+msgid "Login.usernameOrEmailAlreadyExist"
+msgstr "An account with this username or e-mail address already exists"
+
+#. The password is wrong.
+msgid "Login.wrongPassword"
+msgstr "The password is incorrect"
+
+#. The username or the password is wrong.
+msgid "Login.wrongUsernameOrPassword"
+msgstr "The username or the password is incorrec"
+
+#. An unknown error occured while logging in.
+msgid "Login.unknownError"
+msgstr "An unknown error occured"
+
+#. The username must have at least 3 characters
+msgid "Login.usernameAtLeastThreeCharacters"
+msgstr "The username must have at least three characters"
+
+#. The two passwords don't match.
+msgid "Login.passwordsDontMatch"
+msgstr "The two passwords don't match"
+
+#. The form contains errors.
+msgid "Login.formContainsError"
+msgid_plural ""
+msgstr[0] "The form contain an error"
+msgstr[1] "The form contains errors"
+
+#. You must accept the terms of service.
+msgid "Login.mustAcceptTermsOfService"
+msgstr "You must accept the terms of service"
+
+#. The complexity of the password is insufficient.
+msgid "Login.insufficientPasswordComplexity"
+msgstr "The complexity of the password is insufficient"
+
+#. The complexity of the password is acceptable.
+msgid "Login.acceptablePasswordComplexity"
+msgstr "The complexity of the password is acceptable"
+
+#. The complexity of the password is strong.
+msgid "Login.strongPasswordComplexity"
+msgstr "The complexity of the password is strong"
+
+#. The password must contain more than 6 characters.
+msgid "Login.passwordTooShort"
+msgstr "The password must contain at least 6 characters"
+
+#. Your account has been successfully activated.
+msgid "Login.accountActivated"
+msgstr "Your account has been successfulylly activated"
+
+#. Either the username or the e-mail address.
+msgid "Login.usernameOrEmail"
+msgstr "Username or e-mail address"
+
+#. Delete account.
+msgid "Login.deleteAccount"
+msgstr "Delete account"
+
+#. Delete account confirm.
+msgid "Login.confirmDeleteAccount"
+msgstr ""
+"All your capsules will be deleted, and the published videos will no longer "
+"be accessible"
+
+#. Disk usage.
+msgid "Login.diskUsage"
+msgstr "Size"
+
+#. Drive space.
+msgid "Login.driveSpace"
+msgstr "Drive space"
+
+#. Giga byte.
+msgid "Login.gigabyte"
+msgstr "GB"
+
+#. A user username.
+msgid "Data.User.username"
+msgstr "Username"
+
+#. A user password.
+msgid "Data.User.password"
+msgstr "Password"
+
+#. A user email address.
+msgid "Data.User.emailAddress"
+msgstr "E-mail address"
+
+#. The user's current email address.
+msgid "Data.User.currentEmailAddress"
+msgstr "Current e-mail address"
+
+#. The user's new email address.
+msgid "Data.User.newEmailAddress"
+msgstr "New e-mail address"
+
+#. A user which have verified its email address.
+msgid "Data.User.verifiedUser"
+msgid_plural ""
+msgstr[0] "Verified user"
+msgstr[1] "Verified users"
+
+#. Plan that a user can register to.
+msgid "Data.User.plan"
+msgstr "Plan"
+
+#. The name of a project.
+msgid "Data.Project.projectName"
+msgstr "Project name"
+
+#. Action to rename a project.
+msgid "Data.Project.renameProject"
+msgstr "Rename project"
+
+#. Action to delete a project.
+msgid "Data.Project.deleteProject"
+msgstr "Delete project"
+
+#. The capsule itself.
+msgid "Data.Capsule.capsule"
+msgid_plural ""
+msgstr[0] "Capsule"
+msgstr[1] "Capsules"
+
+#. The project itself.
+msgid "Data.Capsule.project"
+msgid_plural ""
+msgstr[0] "Project"
+msgstr[1] "Projects"
+
+#. The hash id of a capsule.
+msgid "Data.Capsule.hashid"
+msgstr "Hash id"
+
+#. The name of a capsule.
+msgid "Data.Capsule.capsuleName"
+msgstr "Capsule name"
+
+#. A group of many slides that are recorded together.
+msgid "Data.Capsule.grain"
+msgid_plural ""
+msgstr[0] "Grain"
+msgstr[1] "Grains"
+
+#. A slide.
+msgid "Data.Capsule.slide"
+msgid_plural ""
+msgstr[0] "Slide"
+msgstr[1] "Slides"
+
+#. A line of a prompt.
+msgid "Data.Capsule.line"
+msgid_plural ""
+msgstr[0] "Line"
+msgstr[1] "Lines"
+
+#. The last modification of a capsule.
+msgid "Data.Capsule.lastModification"
+msgstr "Last modification"
+
+#. A new capsule that can be created.
+msgid "Data.Capsule.newCapsule"
+msgstr "New capsule"
+
+#. Action to rename a capsule.
+msgid "Data.Capsule.renameCapsule"
+msgstr "Rename capsule"
+
+#. Action to delete a capsule.
+msgid "Data.Capsule.deleteCapsule"
+msgstr "Delete capsule"
+
+#. The number of capsules.
+msgid "Data.Capsule.capsuleNumber"
+msgstr "Capsule number"
+
+#. The progression of a capsule.
+msgid "Data.Capsule.progress"
+msgstr "Progress"
+
+#. The possible actions on a capsule or a project.
+msgid "Data.Capsule.action"
+msgid_plural ""
+msgstr[0] "Action"
+msgstr[1] "Actions"
+
+#. Capsule that have been produced
+msgid "Data.Capsule.produced"
+msgid_plural ""
+msgstr[0] "Produced"
+msgstr[1] "Produced"
+
+#. Capsule that have been published
+msgid "Data.Capsule.published"
+msgid_plural ""
+msgstr[0] "Published"
+msgstr[1] "Published"
+
+#. Role of a user of a capsule.
+msgid "Data.Capsule.Role.role"
+msgstr "Role"
+
+#. Owner of a capsule.
+msgid "Data.Capsule.Role.owner"
+msgstr "Owner"
+
+#. User that have write access to a capsule.
+msgid "Data.Capsule.Role.write"
+msgstr "Write"
+
+#. User that have read access to a capsule.
+msgid "Data.Capsule.Role.read"
+msgstr "Read"
+
+#. Step of preparation of content.
+msgid "Steps.Preparation.preparation"
+msgstr "Preparation"
+
+#. Verb corresponding to the preparation step.
+msgid "Steps.Preparation.prepare"
+msgstr "Prepare"
+
+#. New project.
+msgid "Steps.Preparation.newProject"
+msgstr "New project"
+
+#. A sentence that explains how the solid lines separates grains whereas dashed lines don't.
+msgid "Steps.Preparation.dashedLineExplanation"
+msgstr "Slides separated by a dashed line will be recorded in one go"
+
+#. Action to organize slides.
+msgid "Steps.Preparation.organizeSlides"
+msgstr "Organize slides"
+
+#. A sentence that explains that changing slides will destroy records.
+msgid "Steps.Preparation.dndWillBreak"
+msgstr "This change will destroy some of your records"
+
+#. Select a pdf file.
+msgid "Steps.Preparation.selectPdf"
+msgstr "Select PDF"
+
+#. An error occured while uploading PDF.
+msgid "Steps.Preparation.errorUploadingPdf"
+msgstr "An error occured while uploading PDF"
+
+#. An error converting the PDF.
+msgid "Steps.Preparation.errorConvertingPdf"
+msgstr "An error occured while reading PDF"
+
+#. Replace slide / add external resource.
+msgid "Steps.Preparation.replaceSlideOrAddExternalResource"
+msgstr "Replace slide / add external resource"
+
+#. Replace slide.
+msgid "Steps.Preparation.replaceSlide"
+msgstr "Replace slide"
+
+#. Question to ask which page of the PDF should be used.
+msgid "Steps.Preparation.whichPage"
+msgstr "Which page of the PDF do you want to use"
+
+#. Order to insert a a number greather than zero.
+msgid "Steps.Preparation.insertNumberGreaterThanZero"
+msgstr "Insert a number greater than zero"
+
+#. An error occured, maybe the page number is incorrect.
+msgid "Steps.Preparation.maybePageNumberIsIncorrect"
+msgstr ""
+"An error occured while changing the slide, maybe the page number is incorrect"
+
+#. Delete the extra resource.
+msgid "Steps.Preparation.deleteResource"
+msgstr "Delete resource"
+
+#. Add a slide.
+msgid "Steps.Preparation.addSlide"
+msgstr "Add slide"
+
+#. Create a new grain.
+msgid "Steps.Preparation.createGrain"
+msgstr "Create grain"
+
+#. Create a new project.
+msgid "Steps.Preparation.createNewProject"
+msgstr "Create a new project"
+
+#. Select a project.
+msgid "Steps.Preparation.selectProject"
+msgstr "Select a project"
+
+#. Enter a new name for the capsule.
+msgid "Steps.Preparation.enterNewNameForCapsule"
+msgstr "Enter a new name for the capsule"
+
+#. When editing the prompt, go the the next slide.
+msgid "Steps.Preparation.goToNextSlide"
+msgstr "Go to the next slide"
+
+#. When editing the prompt, go the the previous slide.
+msgid "Steps.Preparation.goToPreviousSlide"
+msgstr "Go to the previous slide"
+
+#. Step of video and audio acquisition.
+msgid "Steps.Acquisition.acquisition"
+msgstr "Acquisition"
+
+#. Action to start the recording.
+msgid "Steps.Acquisition.startRecording"
+msgstr "Start recording"
+
+#. Action to record a video.
+msgid "Steps.Acquisition.record"
+msgstr "Record"
+
+#. The system is ready for recording.
+msgid "Steps.Acquisition.readyForRecording"
+msgstr "Ready for recording"
+
+#. The system is currently recording
+msgid "Steps.Acquisition.recording"
+msgstr "Recording"
+
+#. The recording is stopped.
+msgid "Steps.Acquisition.recordingStopped"
+msgstr "Recording stopped"
+
+#. Invert slide and prompt.
+msgid "Steps.Acquisition.invertSlideAndPrompt"
+msgstr "Invert slide and prompt"
+
+#. Records.
+msgid "Steps.Acquisition.recordList"
+msgid_plural ""
+msgstr[0] "Record"
+msgstr[1] "Records"
+
+#. Records will be lost.
+msgid "Steps.Acquisition.nonValidatedRecordsWillBeLost"
+msgstr "Non validated records will be lost"
+
+#. Saved record label.
+msgid "Steps.Acquisition.savedRecord"
+msgstr "Saved record"
+
+#. Saved record label.
+msgid "Steps.Acquisition.deleteRecord"
+msgstr "Delete saved record"
+
+#. Action to play a record.
+msgid "Steps.Acquisition.playRecord"
+msgstr "Play record"
+
+#. Action to play a record.
+msgid "Steps.Acquisition.stopRecord"
+msgstr "Stop playing record"
+
+#. Action to validate a record.
+msgid "Steps.Acquisition.validateRecord"
+msgstr "Validate record"
+
+#. Refresh the device list.
+msgid "Steps.Acquisition.refreshDeviceList"
+msgstr "Refresh device list"
+
+#. Detecting evices.
+msgid "Steps.Acquisition.detectingDevices"
+msgstr "Detecting devices"
+
+#. Binding webcam.
+msgid "Steps.Acquisition.bindingWebcam"
+msgstr "Binding webcam"
+
+#. Error detecting devices.
+msgid "Steps.Acquisition.errorDetectingDevices"
+msgstr "Error detecting devices"
+
+#. Quetion asking if the webcam is authorized.
+msgid "Steps.Acquisition.areDevicesAuthorized"
+msgstr "Are the webcam and microphone authorized"
+
+#. Error binding webcam.
+msgid "Steps.Acquisition.errorBindingWebcam"
+msgstr "Error binding devices"
+
+#. Question asking if the webcam is used by another software.
+msgid "Steps.Acquisition.isWebcamUsed"
+msgstr "Is the webcam used by another software"
+
+#. Error uploading record.
+msgid "Steps.Acquisition.errorUploadingRecord"
+msgstr "Error uploading record, please try again"
+
+#. Starts recording the pointer.
+msgid "Steps.Acquisition.recordPointer"
+msgstr "Record pointer"
+
+#. First line of help.
+msgid "Steps.Acquisition.Help.first"
+msgstr "Use the right arrow on the keyboard to start recording"
+
+#. Second line of help.
+msgid "Steps.Acquisition.Help.second"
+msgstr "If you have a prompt, the right arrow will go through the lines of the prompt"
+
+#. Third line of help.
+msgid "Steps.Acquisition.Help.third"
+msgstr "If you have multiple slides in the grain, the right arrow will go through the slides of the grain"
+
+#. Fourth line of help.
+msgid "Steps.Acquisition.Help.fourth"
+msgstr "You can then use the right arrow to end your recording"
+
+#. Reinitialize all devices.
+msgid "Steps.Acquisition.reinitializeDevices"
+msgstr "Reinitialize all devices"
+
+#. Step of video production.
+msgid "Steps.Production.production"
+msgstr "Production"
+
+#. Verb corresponding to the action of production.
+msgid "Steps.Production.produce"
+msgstr "Produce"
+
+#. Description of the action to produce the video.
+msgid "Steps.Production.produceVideo"
+msgstr "Produce video"
+
+#. Description of the action to produce a grain.
+msgid "Steps.Production.produceGrain"
+msgstr "Produce grain"
+
+#. Insert the video.
+msgid "Steps.Production.useVideo"
+msgstr "Use video"
+
+#. Capsule production task.
+msgid "Tasks.productionCapsule"
+msgstr "Production"
+
+#. Can't use video because there is no record.
+msgid "Steps.Production.cantUseVideoBecauseNoRecord"
+msgstr "You cannot use the video because there is no record for this grain"
+
+#. Can't use video because audio only.
+msgid "Steps.Production.cantUserVideoBecauseAudioOnly"
+msgstr "You cannot use the video because the record only contains audio"
+
+#. Webcam size.
+msgid "Steps.Production.webcamSize"
+msgstr "Webcam size"
+
+#. Small webcam size.
+msgid "Steps.Production.small"
+msgstr "Small"
+
+#. Medium webcam size.
+msgid "Steps.Production.medium"
+msgstr "Medium"
+
+#. Large webcam size.
+msgid "Steps.Production.large"
+msgstr "Large"
+
+#. Fullscreen webcam.
+msgid "Steps.Production.fullscreen"
+msgstr "Fullscreen"
+
+#. Opacity of the webcam.
+msgid "Steps.Production.opacity"
+msgstr "Opacity"
+
+#. Webcam position.
+msgid "Steps.Production.webcamPosition"
+msgstr "Webcam position"
+
+#. Top left corner.
+msgid "Steps.Production.topLeft"
+msgstr "Top left corner"
+
+#. Top right corner.
+msgid "Steps.Production.topRight"
+msgstr "Top right corner"
+
+#. Bottom left corner.
+msgid "Steps.Production.bottomLeft"
+msgstr "Bottom left corner"
+
+#. Bottom right corner.
+msgid "Steps.Production.bottomRight"
+msgstr "Bottom right corner"
+
+#. A custom value for a parameter.
+msgid "Steps.Production.custom"
+msgstr "Custom"
+
+#. Key (operation to remove green screen).
+msgid "Steps.Production.key"
+msgstr "Key"
+
+#. Key color (color to remove).
+msgid "Steps.Production.keyColor"
+msgstr "Key color"
+
+#. Activate the keying.
+msgid "Steps.Production.activateKeying"
+msgstr "Activate keying"
+
+#. Activate the fading.
+msgid "Steps.Production.activateFading"
+msgstr "Activate fading"
+
+#. Sentence to watch the video.
+msgid "Steps.Production.watchVideo"
+msgstr "Watch video"
+
+#. Sentence to watch the grain.
+msgid "Steps.Production.watchGrain"
+msgstr "Watch grain"
+
+#. Currently producing video.
+msgid "Steps.Production.producingVideo"
+msgstr "Currently producing video"
+
+#. Cancel the production.
+msgid "Steps.Production.cancelProduction"
+msgstr "Cancel production"
+
+#. Current produced video.
+msgid "Steps.Production.currentProducedVideo"
+msgstr "Current produced video"
+
+#. The video has not been produced yet.
+msgid "Steps.Production.videoNotProduced"
+msgstr "Video has not been produced yet"
+
+#. Download the video.
+msgid "Steps.Production.downloadVideo"
+msgstr "Download video"
+
+#. Step of video publication.
+msgid "Steps.Publication.publication"
+msgstr "Publication"
+
+#. Verb to publish the video.
+msgid "Steps.Publication.publish"
+msgstr "Publish"
+
+#. Currently publishing video.
+msgid "Steps.Publication.publishingVideo"
+msgstr "Currently publishing video"
+
+#. Setence to describe the publication of the video.
+msgid "Steps.Publication.publishVideo"
+msgstr "Publish video"
+
+#. Private video.
+msgid "Steps.Publication.Privacy.private"
+msgstr "Private"
+
+#. A sentence that explains private videos.
+msgid "Steps.Publication.Privacy.explainPrivate"
+msgstr "The video will be visible only by explicitly authorized users"
+
+#. Unlisted video.
+msgid "Steps.Publication.Privacy.unlisted"
+msgstr "Unlisted"
+
+#. A sentence that explains unlisted videos.
+msgid "Steps.Publication.Privacy.explainUnlisted"
+msgstr ""
+"The video will be visible by anyone who knows the URL, Polymny Studio will "
+"not share the video's URL"
+
+#. Warning because private videos are not ready yet.
+msgid "Steps.Publication.Privacy.privateVideosNotAvailable"
+msgstr ""
+"This feature is not ready yet: no users except you will be able to watch the "
+"video"
+
+#. Public video.
+msgid "Steps.Publication.Privacy.public"
+msgstr "Public"
+
+#. A sentence that explains public videos.
+msgid "Steps.Publication.Privacy.explainPublic"
+msgstr ""
+"The video will be visible by anyone who knows the URL, Polymny Studio may, "
+"in the future, share the video's URL via a search engine, a recommendation "
+"system, etc"
+
+#. Privacy settings.
+msgid "Steps.Publication.Privacy.privacySettings"
+msgstr "Privacy settings"
+
+#. Cancel publication.
+msgid "Steps.Publication.cancelPublication"
+msgstr "Cancel publication"
+
+#. Unpublish the video.
+msgid "Steps.Publication.unpublishVideo"
+msgstr "Unpublish video"
+
+#. Use prompt as subtitles.
+msgid "Steps.Publication.promptSubtitles"
+msgstr "Use prompt to generate subtitles"
+
+#. Copy video url.
+msgid "Steps.Publication.copyVideoUrl"
+msgstr "Copy video URL"
+
+#. Not produced yet.
+msgid "Steps.Publication.notProducedYet"
+msgstr "Video has not been produced yet. You will be able to publish it once it is produced."
+
+#. Share capsule with someone.
+msgid "Steps.Config.share"
+msgstr "Share"
+
+#. Share capsule with someone, long sentence.
+msgid "Steps.Config.shareWith"
+msgstr "Share the capsule with"
+
+#. Error sharing capsule.
+msgid "Steps.Config.errorSharing"
+msgstr "Error sharing capsule"
+
+#. People with access to the capsule.
+msgid "Steps.Config.people"
+msgstr "People"
+
+#. Export a capsule.
+msgid "Steps.Config.exportCapsule"
+msgstr "Export capsule"
+
+#. Admin dashboard.
+msgid "Admin.dashboard"
+msgstr "Dashboard"
+
+#. All users.
+msgid "Admin.users"
+msgstr "Users"
+
+#. Admin can invite a user.
+msgid "Admin.inviteUser"
+msgstr "Invite a user"
+
+#. An error to the user.
+msgid "Ui.error"
+msgstr "Error"
+
+#. A warning to the user.
+msgid "Ui.warning"
+msgstr "Warning"
+
+#. The question to ask to make sure the user really wants to delete a capsule.
+msgid "Ui.Warning.confirmDeleteCapsule"
+msgstr "Do you really want to delete the capsule"
+
+#. The question to ask to make sure the user really wants to delete a project.
+msgid "Ui.Warning.confirmDeleteProject"
+msgstr "Do you really want to delete the project"
+
+#. The text in the button to confirm an action.
+msgid "Ui.confirm"
+msgstr "Confirm"
+
+#. The text in the button to cancel an action.
+msgid "Ui.cancel"
+msgstr "Cancel"
+
+#. Something is loading.
+msgid "Ui.loading"
+msgstr "Loading"
+
+#. Something is being uploaded.
+msgid "Ui.uploading"
+msgstr "Uploading"
+
+#. Something is transcoding.
+msgid "Ui.transcoding"
+msgstr "Transcoding"
+
+#. The admin can edit a user.
+msgid "Admin.editUser"
+msgstr "Edit user"
+
+#. The admin can delete a user.
+msgid "Admin.deleteUser"
+msgstr "Delete user"
+
+#. The question to confirm the deletion of a user.
+msgid "Admin.deleteUserConfirm"
+msgstr "Do you really want to delete the user"
+
+#. Go to polymny home.
+msgid "Navigation.goToPolymny"
+msgstr "Go to Polymny"
+
+#. Go to the settings page.
+msgid "Navigation.settings"
+msgstr "Settings"
+
+#. Go to the grain recording page.
+msgid "Navigation.recordGrain"
+msgstr "Record this grain"
+
+#. Go to the record.
+msgid "Navigation.watchRecord"
+msgstr "Watch the record"
+
+#. The next thing.
+msgid "Navigation.next"
+msgstr "Next"
+
+#. The previous thing.
+msgid "Navigation.previous"
+msgstr "Previous"
+
+#. Close this popup.
+msgid "Navigation.close"
+msgstr "Close"
+
+#. Sentence to go back home.
+msgid "Navigation.clickHereToGoBackHome"
+msgstr "Click here to go back home"
+
+#. The famous error 404.
+msgid "Navigation.error404"
+msgstr "Error 404"
+
+#. The requested page was not found.
+msgid "Navigation.notFound"
+msgstr "The page you requested was not found"
+
+#. Increase zoom level.
+msgid "Actions.zoomIn"
+msgstr "Zoom in"
+
+#. Decrease zoom level.
+msgid "Actions.zoomOut"
+msgstr "Zoom out"
+
+#. Move to the next slide.
+msgid "Actions.goToNextSlide"
+msgstr "Go to the next slide"
+
+#. Move to the previous slide.
+msgid "Actions.goToPreviousSlide"
+msgstr "Go to the previous slide"
+
+#. Edit the prompt text.
+msgid "Actions.editPrompt"
+msgstr "Edit prompt text"
+
+#. Delete a slide.
+msgid "Actions.deleteSlide"
+msgstr "Delete slide"
+
+#. The question to ask to confirm a deletion of a slide.
+msgid "Actions.Confirm.deleteSlide"
+msgstr "Do you really want to delete this slide"
+
+#. Delete a extra.
+msgid "Actions.deleteExtra"
+msgstr "Delete extra"
+
+#. The question to ask to confirm a deletion of an extra.
+msgid "Actions.Confirm.deleteExtra"
+msgstr "Do you really want to delete this extra"
+
+#. A webcam.
+msgid "Device.webcam"
+msgstr "Webcam"
+
+#. The resolution of a webcam.
+msgid "Device.resolution"
+msgstr "Resolution"
+
+#. When a device is disabled.
+msgid "Device.disabled"
+msgstr "Disabled"
+
+#. A microphone.
+msgid "Device.microphone"
+msgstr "Microphone"
+
+#. The January month.
+msgid "Date.Month.january"
+msgstr "January"
+
+#. The February month.
+msgid "Date.Month.february"
+msgstr "February"
+
+#. The March month.
+msgid "Date.Month.march"
+msgstr "March"
+
+#. The April month.
+msgid "Date.Month.april"
+msgstr "April"
+
+#. The May month.
+msgid "Date.Month.may"
+msgstr "May"
+
+#. The June month.
+msgid "Date.Month.june"
+msgstr "June"
+
+#. The July month.
+msgid "Date.Month.july"
+msgstr "July"
+
+#. The August month.
+msgid "Date.Month.august"
+msgstr "August"
+
+#. The September month.
+msgid "Date.Month.september"
+msgstr "September"
+
+#. The October month.
+msgid "Date.Month.october"
+msgstr "October"
+
+#. The November month.
+msgid "Date.Month.november"
+msgstr "November"
+
+#. The December month.
+msgid "Date.Month.december"
+msgstr "December"
+
+#. The version of the application.
+msgid "Config.version"
+msgstr "Version"
+
+#. The commit of the application.
+msgid "Config.commit"
+msgstr "Commit"
+
+#. The source code of the application.
+msgid "Config.source"
+msgstr "Source"
+
+#. The lang of the application.
+msgid "Config.lang"
+msgstr "Lang"
+
+#. The license of the code.
+msgid "Config.license"
+msgstr "License GNU Affero V3"
+
+#. Welcome on Polymny.
+msgid "Intro.welcomeOnPolymny"
+msgstr "Welcome on Polymny Studio"
+
+#. There are no projects hier.
+msgid "Intro.noProjectsYet"
+msgstr "It looks like you have no projects yet"
+
+#. Sentence to explain that the first step is to upload PDF.
+msgid "Intro.toStartYouNeedToUploadPdf"
+msgstr "To start recording, you need to choose a PDF slides from your computer"
+
+#. Sentence to give an example of PDF file.
+msgid "Intro.exampleOfPdfFile"
+msgstr ""
+"For example, a PDF export version of Microsoft PowerPoint or LibreOffice "
+"Impress in HD format"
+
+#. Sentence to exaplin that after the slides have been uploaded, you may record.
+msgid "Intro.afterSlidesUploadYouCanRecord"
+msgstr "Once the slides have been uploaded, the recording can start"
+
+#. Capsule general options.
+msgid "Steps.Options.options"
+msgstr "Options"
+
+#. Sentence to explain that these are default options for the production.
+msgid "Steps.Options.optionsExplanation"
+msgstr "Default production options"
+
+#. Sentence to reset the options to the default values.
+msgid "Steps.Production.resetOptions"
+msgstr "Reset options"
+
+#. General options.
+msgid "Steps.Options.generalOptions"
+msgstr "General options"
+
+#. Sound track.
+msgid "Steps.Options.soundTrack"
+msgstr "Sound track"
+
+#. Upload sound track.
+msgid "Steps.Options.uploadTrack"
+msgstr "Add a sound track"
+
+#. Upload sound track.
+msgid "Steps.Options.replaceTrack"
+msgstr "Replace sound track"
+
+#. No sound track.
+msgid "Steps.Options.noTrack"
+msgstr "No track"
+
+#. Delete track action.
+msgid "Actions.Confirm.deleteTrack"
+msgstr "Do you really want to delete this track"
+
+#. Delete track hint.
+msgid "Actions.deleteTrack"
+msgstr "Delete track"
+
+#. Abort track upload hint.
+msgid "Actions.abortTrack"
+msgstr "Abort track upload"
+
+#. Volume of the sound track.
+msgid "Steps.Options.volume"
+msgstr "Sound track volume"
+
+#. Play sound track preview.
+msgid "Steps.Options.playPreview"
+msgstr "Play sound track preview"
+
+#. Stop sound track preview.
+msgid "Steps.Options.stopPreview"
+msgstr "Stop sound track preview"
+
+#. Delete project.
+msgid "Actions.deleteProject"
+msgstr "Delete project"
+
+#. Delete capsule.
+msgid "Actions.deleteCapsule"
+msgstr "Delete capsule"
+
+#. Duplicate a capsule.
+msgid "Actions.duplicateCapsule"
+msgstr "Duplicate capsule"
+
+#. Rename project.
+msgid "Actions.renameProject"
+msgstr "Rename project"
+
+#. Rename capsule.
+msgid "Actions.renameCapsule"
+msgstr "Rename capsule"
+
+#. Add capsule.
+msgid "Actions.addCapsule"
+msgstr "Add capsule"
+
+#. Export capsule.
+msgid "Actions.exportCapsule"
+msgstr "Export capsule"
+
+#. Watch the capsule video.
+msgid "Actions.watchCapsule"
+msgstr "Watch the capsule"
+
+#. Delete a capsule.
+msgid "Actions.Confirm.deleteCapsule"
+msgstr "Do you really want to delete this capsule"
+
+#. Leave a capsule.
+msgid "Actions.Confirm.leaveCapsule"
+msgstr "Do you really want to leave this capsule"
+
+#. Leave a capsule.
+msgid "Actions.leaveCapsule"
+msgstr "Leave capsule"
+
+#. Delete a project.
+msgid "Actions.Confirm.deleteProject"
+msgstr "Do you really want to delete this project"
+
+#. Delete project warning.
+msgid "Actions.Confirm.deleteProjectWarning"
+msgstr "Deleting a project deletes all its capsules or unsubscribe you from them."
+
+#. Warning.
+msgid "Ui.warning"
+msgstr "Warning"
+
+#. Rename project warning.
+msgid "Actions.Confirm.renameProjectWarning"
+msgstr "Renaming a project renames all its capsules of which you have to write access."
+
+#. Delete record.
+msgid "Actions.deleteRecord"
+msgstr "Delete record"
+
+#. Delete a record.
+msgid "Actions.Confirm.deleteRecord"
+msgstr "Do you really want to delete this record"
+
+#. Profile button.
+msgid "Ui.Profile"
+msgstr "Profile"
+
+#. Change email.
+msgid "Ui.Profile.changeEmail"
+msgstr "Change email"
+
+#. Change password.
+msgid "Ui.Profile.changePassword"
+msgstr "Password"
+
+#. DeleteAccount.
+msgid "Ui.Profile.deleteAccount"
+msgstr "Delete account"
+
+#. Profile username.
+msgid "Ui.Profile.username"
+msgstr "Username"
+
+#. Profile email.
+msgid "Ui.Profile.email"
+msgstr "Email"
+
+#. Profile projects and capsules.
+msgid "Ui.Profile.projectsAndCapsules"
+msgstr "Projects and capsules"
+
+#. Profile produced.
+msgid "Ui.Profile.produced"
+msgid_plural ""
+msgstr[0] "Produced capsule"
+msgstr[1] "Produced capsule"
+
+#. Profile published.
+msgid "Ui.Profile.published"
+msgid_plural ""
+msgstr[0] "Published capsule"
+msgstr[1] "Published capsules"
+
+#. Client tasks.
+msgid "Ui.tasksClient"
+msgstr "Client tasks"
+
+#. Server tasks.
+msgid "Ui.tasksServer"
+msgstr "Server tasks"
+
+#. No tasks.
+msgid "Ui.tasksNone"
+msgstr "No tasks"
+
+#. Help.
+msgid "Ui.help"
+msgstr "Help"
+
+#. Of.
+msgid "Ui.Of"
+msgstr "of"
+
+#. GB.
+msgid "Ui.GB"
+msgstr "GB"
+
+#. Storage.
+msgid "Ui.Storage"
+msgstr "Storage"
+
+#. Websocket.
+msgid "Ui.webSocketNotWorking"
+msgstr "The websocket is disconnected"
+
+#. Connected.
+msgid "Ui.connected"
+msgstr "Connected"
+
+#. Disconnected.
+msgid "Ui.disconnected"
+msgstr "Disconnected"
+
+#. Information
+msgid "Ui.info"
+msgstr "Information"
+
+#. This icon indicates the state of the websocket.
+msgid "Ui.iconIndicatesWebSocketBroken"
+msgstr "This icon indicates that the websocket is disconnected"
+
+#. If the websocket is not working, Polymny Studio won't work correctly.
+msgid "Ui.noWebSocketWillCauseProblems"
+msgstr "If the websocket is not working, Polymny Studio won't work correctly"
+
+#. Wait, refresh, or contact admin.
+msgid "Ui.webSocketWaitRefreshContactAdmin"
+msgstr "You can wait or try to refresh the page, or contact the administrator if the problem persists"
+
+#. Go back to the old client.
+msgid "Ui.goBackToOldClient"
+msgstr "Go back to the old version"
+
+#. Upload record task.
+msgid "Tasks.uploadRecord"
+msgstr "Upload record"
+
+#. Upload track task.
+msgid "Tasks.uploadTrack"
+msgstr "Upload track"
+
+#. Upload extra task.
+msgid "Tasks.uploadExtra"
+msgstr "Upload extra"
+
+#. Capsule export task.
+msgid "Tasks.exportCapsule"
+msgstr "Capsule export"
+
+#. Capsule import task.
+msgid "Tasks.importCapsule"
+msgstr "Capsule import"
+
+#. Capsule publication task.
+msgid "Tasks.publicationCapsule"
+msgstr "Publication"
+
+#. Extra transcoding task.
+msgid "Tasks.transcodeExtra"
+msgstr "Transcode extra"
+
+#. Unknown task.
+msgid "Tasks.unknown"
+msgstr "Unknown task"

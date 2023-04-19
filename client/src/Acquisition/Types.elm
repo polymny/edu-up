@@ -1,505 +1,308 @@
-module Acquisition.Types exposing (..)
+port module Acquisition.Types exposing
+    ( Model, State(..), Record, recordDuration, encodeRecord, decodeRecord, init, Msg(..), pointerCanvasId, PointerStyle, PointerMode(..), encodePointerStyle
+    , clearPointer, promptFirstSentenceId, promptSecondSentenceId, setPointerStyle, withCapsuleAndGos
+    )
 
-import Acquisition.Ports as Ports
-import Capsule exposing (Capsule)
+{-| This module contains the types for the acqusition page, where a user can record themself.
+
+@docs Model, State, Record, recordDuration, encodeRecord, decodeRecord, init, Msg, pointerCanvasId, PointerStyle, PointerMode, encodePointerStyle
+
+-}
+
+import Data.Capsule as Data exposing (Capsule)
+import Device
 import Json.Decode as Decode exposing (Decoder)
 import Json.Encode as Encode
-import List.Extra
-import Status exposing (Status)
+import Route exposing (Route)
+import Time
+import Utils
 
 
+{-| The different state of loading in which the acquisition page can be.
+-}
 type State
     = DetectingDevices
     | BindingWebcam
-    | ErrorDetectingDevices
-    | ErrorBindingWebcam
+    | Ready
+    | Error
 
 
-isError : State -> Bool
-isError state =
-    case state of
-        ErrorDetectingDevices ->
-            True
-
-        ErrorBindingWebcam ->
-            True
-
-        _ ->
-            False
-
-
-type alias Model =
-    { capsule : Capsule
-    , gos : Int
-    , currentSlide : Int
-    , currentLine : Int
-    , recording : Bool
-    , webcamBound : Bool
-    , records : List Record
-    , showSettings : Bool
-    , chosenDevice : Device
-    , uploading : Maybe Float
+{-| The type for the model of the acquisition page.
+-}
+type alias Model a b =
+    { capsule : a
+    , gos : b
     , state : State
-    , status : Status
-    , mattingEnabled : Bool
-    , recordPlaying : Maybe Record
-    , downsampling : Float
+    , deviceLevel : Maybe Float
+    , showSettings : Bool
+    , recording : Maybe Time.Posix
+    , currentSlide : Int
+    , currentSentence : Int
+    , currentReplacementPrompt : Maybe String
+    , nextReplacementPrompt : Maybe String
+    , records : List Record
+    , recordPlaying : Maybe ( Int, Record )
+    , savedRecord : Maybe Data.Record
+    , deleteRecord : Bool
+    , pointerStyle : PointerStyle
+    , warnLeaving : Maybe Route
+    , showHelp : Bool
     }
 
 
+{-| Changes the capsule id and the gos id into the real capsule and real gos.
+-}
+withCapsuleAndGos : Capsule -> Data.Gos -> Model String Int -> Model Capsule Data.Gos
+withCapsuleAndGos capsule gos model =
+    { capsule = capsule
+    , gos = gos
+    , state = model.state
+    , deviceLevel = model.deviceLevel
+    , showSettings = model.showSettings
+    , recording = model.recording
+    , currentSlide = model.currentSlide
+    , currentSentence = model.currentSentence
+    , currentReplacementPrompt = model.currentReplacementPrompt
+    , nextReplacementPrompt = model.nextReplacementPrompt
+    , records = model.records
+    , recordPlaying = model.recordPlaying
+    , savedRecord = model.savedRecord
+    , deleteRecord = model.deleteRecord
+    , pointerStyle = model.pointerStyle
+    , warnLeaving = model.warnLeaving
+    , showHelp = model.showHelp
+    }
+
+
+{-| A record stored in the memory of the client.
+-}
 type alias Record =
-    { events : List Capsule.Event
-    , webcamBlob : Encode.Value
+    { events : List Data.Event
+    , deviceBlob : Encode.Value
     , pointerBlob : Maybe Encode.Value
-    , matted : Maybe Capsule.TaskStatus
-    , device : Maybe Device
-    , downsampling : Maybe Float
     , old : Bool
     }
 
 
+{-| Gets the duration of a record.
+-}
+recordDuration : Record -> Int
+recordDuration record =
+    record.events
+        |> List.reverse
+        |> List.head
+        |> Maybe.map .time
+        |> Maybe.withDefault 0
+
+
+{-| Decodes a record received from JavaScript.
+-}
 decodeRecord : Decoder Record
 decodeRecord =
-    Decode.map7 Record
-        (Decode.field "events" (Decode.list Capsule.decodeEvent))
+    Decode.map4 Record
+        (Decode.field "events" (Decode.list Data.decodeEvent))
         (Decode.field "webcam_blob" Decode.value)
         (Decode.field "pointer_blob" (Decode.nullable Decode.value))
-        (Decode.field "matted" (Decode.nullable Capsule.decodeTaskStatus))
-        (Decode.maybe (Decode.field "device" decodeDevice))
-        (Decode.field "downsampling" (Decode.nullable Decode.float))
         (Decode.succeed False)
 
 
+{-| Encodes a record so it can be sent to JavaScript.
+-}
 encodeRecord : Record -> Encode.Value
 encodeRecord record =
     Encode.object
-        [ ( "events", Encode.list Capsule.encodeEvent record.events )
-        , ( "webcam_blob", record.webcamBlob )
+        [ ( "events", Encode.list Data.encodeEvent record.events )
+        , ( "webcam_blob", record.deviceBlob )
         , ( "pointer_blob", record.pointerBlob |> Maybe.withDefault Encode.null )
         ]
 
 
-type alias Submodel =
-    { capsule : Capsule
-    , gos : Int
-    , devices : Devices
-    , chosenDevice : Device
-    , currentSlide : Int
-    , currentLine : Int
-    , recording : Bool
-    , webcamBound : Bool
-    , records : List Record
-    , showSettings : Bool
-    , uploading : Maybe Float
-    , status : Status
-    , mattingEnabled : Bool
-    , recordPlaying : Maybe Record
-    , downsampling : Float
+{-| The style of the pointer.
+-}
+type alias PointerStyle =
+    { mode : PointerMode
+    , color : String
+    , size : Int
     }
 
 
-toSubmodel : Devices -> Model -> Submodel
-toSubmodel devices model =
-    { capsule = model.capsule
-    , gos = model.gos
-    , devices = devices
-    , chosenDevice = model.chosenDevice
-    , currentSlide = model.currentSlide
-    , currentLine = model.currentLine
-    , recording = model.recording
-    , webcamBound = model.webcamBound
-    , records = model.records
-    , showSettings = model.showSettings
-    , uploading = model.uploading
-    , status = model.status
-    , mattingEnabled = model.mattingEnabled
-    , recordPlaying = model.recordPlaying
-    , downsampling = model.downsampling
-    }
-
-
-init : Bool -> Float -> Maybe Devices -> { a | videoDeviceId : Maybe String, resolution : Maybe String, audioDeviceId : Maybe String } -> Capsule -> Int -> ( Model, Cmd Msg )
-init matting downsampling devices chosenDeviceIds capsule id =
-    let
-        records =
-            let
-                gos =
-                    List.head (List.drop id capsule.structure)
-            in
-            case ( Maybe.map .record gos, gos ) of
-                ( Just (Just r), Just g ) ->
-                    [ { webcamBlob = Encode.string (Capsule.assetPath capsule (r.uuid ++ ".webm"))
-                      , pointerBlob =
-                            r.pointerUuid
-                                |> Maybe.map (\x -> x ++ ".webm")
-                                |> Maybe.map (Capsule.assetPath capsule)
-                                |> Maybe.map Encode.string
-                      , events = g.events
-                      , matted = r.matted
-                      , device = Nothing
-                      , downsampling = r.downsampling
-                      , old = True
-                      }
-                    ]
-
-                _ ->
-                    []
-
-        model =
-            { capsule = capsule
-            , gos = id
-            , currentLine = 0
-            , currentSlide = 0
-            , recording = False
-            , webcamBound = False
-            , records = records
-            , showSettings = False
-            , chosenDevice =
-                case devices of
-                    Just d ->
-                        deviceFromIds d chosenDeviceIds
-
-                    _ ->
-                        { video = Nothing, resolution = Nothing, audio = Nothing }
-            , uploading = Nothing
-            , state =
-                case devices of
-                    Just _ ->
-                        BindingWebcam
-
-                    _ ->
-                        DetectingDevices
-            , status = Status.NotSent
-            , mattingEnabled = matting
-            , recordPlaying = Nothing
-            , downsampling = downsampling
-            }
-    in
-    ( model
-    , case devices of
-        Just d ->
-            let
-                sub =
-                    toSubmodel d model
-            in
-            bindWebcam sub.chosenDevice
-
-        Nothing ->
-            Ports.findDevices False
-    )
-
-
-bindWebcam : Device -> Cmd msg
-bindWebcam device =
-    Ports.bindWebcam ( encodeDevice device, encodeRecordingOptions device )
-
-
-type alias Resolution =
-    { width : Int
-    , height : Int
-    }
-
-
-type alias VideoDevice =
-    { deviceId : String
-    , groupId : String
-    , label : String
-    , resolutions : List Resolution
-    }
-
-
-type alias AudioDevice =
-    { deviceId : String
-    , groupId : String
-    , label : String
-    }
-
-
-format : Resolution -> String
-format r =
-    String.fromInt r.width ++ "x" ++ String.fromInt r.height
-
-
-type alias Devices =
-    { video : List VideoDevice
-    , audio : List AudioDevice
-    }
-
-
-type alias Device =
-    { video : Maybe VideoDevice
-    , resolution : Maybe Resolution
-    , audio : Maybe AudioDevice
-    }
-
-
-type SetCanvas
-    = ChangeStyle Style
-    | ChangeColor String
-    | ChangeSize Int
-    | Erase
-
-
-type Style
+{-| The mode of the pointer: pointer or brush.
+-}
+type PointerMode
     = Pointer
     | Brush
 
 
-encodeSetCanvas : SetCanvas -> Encode.Value
-encodeSetCanvas setCanvas =
-    case setCanvas of
-        ChangeStyle Pointer ->
-            Encode.object [ ( "ty", Encode.string "ChangeStyle" ), ( "style", Encode.string "Pointer" ) ]
+{-| Encodes a pointer mode in json.
+-}
+encodePointerMode : PointerMode -> Encode.Value
+encodePointerMode mode =
+    Encode.string <|
+        case mode of
+            Pointer ->
+                "Pointer"
 
-        ChangeStyle Brush ->
-            Encode.object [ ( "ty", Encode.string "ChangeStyle" ), ( "style", Encode.string "Brush" ) ]
-
-        ChangeColor color ->
-            Encode.object [ ( "ty", Encode.string "ChangeColor" ), ( "color", Encode.string color ) ]
-
-        ChangeSize size ->
-            Encode.object [ ( "ty", Encode.string "ChangeSize" ), ( "size", Encode.int size ) ]
-
-        Erase ->
-            Encode.object [ ( "ty", Encode.string "Erase" ) ]
+            Brush ->
+                "Brush"
 
 
-type Msg
-    = Noop
-    | RefreshDevices
-    | DevicesReceived Devices
-    | WebcamBound
-    | PointerBound
-    | InvertAcquisition
-    | StartRecording
-    | StopRecording
-    | RecordArrived Record
-    | StartPointerRecording Record
-    | PointerRecordArrived Record
-    | ToggleSettings
-    | VideoDeviceChanged (Maybe VideoDevice)
-    | ResolutionChanged Resolution
-    | AudioDeviceChanged AudioDevice
-    | NextSentence
-    | PlayRecord Record
-    | StopPlayingRecord
-    | NextSlideReceived
-    | PlayRecordFinished
-    | UploadRecord Record
-    | CapsuleUpdated (Maybe Capsule)
-    | ProgressReceived Float
-    | DeviceDetectionFailed
-    | WebcamBindingFailed
-    | UploadRecordFailed
-    | UploadRecordFailedAck
-    | IncreasePromptSize
-    | DecreasePromptSize
-    | SetCanvas SetCanvas
-    | ToggleMatting Int
-
-
-defaultDevice : Devices -> Device
-defaultDevice devices =
-    { video = List.head devices.video
-    , resolution = List.head devices.video |> Maybe.map (List.head << .resolutions) |> Maybe.withDefault Nothing
-    , audio = List.head devices.audio
-    }
-
-
-videoDeviceFromId : List VideoDevice -> String -> Maybe (Maybe VideoDevice)
-videoDeviceFromId devices id =
-    case id of
-        "disabled" ->
-            Just Nothing
-
-        _ ->
-            List.Extra.find (\x -> x.deviceId == id) devices |> Maybe.map Just
-
-
-resolutionFromString : List Resolution -> String -> Maybe Resolution
-resolutionFromString devices id =
-    List.Extra.find (\x -> format x == id) devices
-
-
-audioDeviceFromId : List AudioDevice -> String -> Maybe AudioDevice
-audioDeviceFromId devices id =
-    List.Extra.find (\x -> x.deviceId == id) devices
-
-
-deviceFromIds : Devices -> { a | videoDeviceId : Maybe String, resolution : Maybe String, audioDeviceId : Maybe String } -> Device
-deviceFromIds devices { videoDeviceId, resolution, audioDeviceId } =
-    let
-        default =
-            defaultDevice devices
-
-        video =
-            case videoDeviceId of
-                Nothing ->
-                    default.video
-
-                Just "disabled" ->
-                    Nothing
-
-                Just x ->
-                    case videoDeviceFromId devices.video x of
-                        Nothing ->
-                            default.video
-
-                        Just Nothing ->
-                            Nothing
-
-                        Just y ->
-                            y
-
-        realResolution =
-            case resolution of
-                Nothing ->
-                    Maybe.andThen (\x -> List.head x.resolutions) video
-
-                Just x ->
-                    Maybe.andThen
-                        (\v ->
-                            case resolutionFromString v.resolutions x of
-                                Nothing ->
-                                    List.head v.resolutions
-
-                                Just r ->
-                                    Just r
-                        )
-                        video
-
-        audio =
-            case audioDeviceId of
-                Nothing ->
-                    default.audio
-
-                Just x ->
-                    case audioDeviceFromId devices.audio x of
-                        Nothing ->
-                            default.audio
-
-                        Just a ->
-                            Just a
-    in
-    { video = video, resolution = realResolution, audio = audio }
-
-
-encodeVideoDevice : VideoDevice -> Maybe Resolution -> Encode.Value
-encodeVideoDevice video resolution =
-    case resolution of
-        Just r ->
-            Encode.object
-                [ ( "deviceId", Encode.object [ ( "exact", Encode.string video.deviceId ) ] )
-                , ( "width", Encode.object [ ( "exact", Encode.int r.width ) ] )
-                , ( "height", Encode.object [ ( "exact", Encode.int r.height ) ] )
-                ]
-
-        _ ->
-            Encode.object
-                [ ( "deviceId", Encode.object [ ( "exact", Encode.string video.deviceId ) ] ) ]
-
-
-encodeMaybeVideoDevice : Maybe VideoDevice -> Maybe Resolution -> Encode.Value
-encodeMaybeVideoDevice video resolution =
-    case video of
-        Just v ->
-            encodeVideoDevice v resolution
-
-        _ ->
-            Encode.bool False
-
-
-encodeAudioDevice : AudioDevice -> Encode.Value
-encodeAudioDevice audio =
-    Encode.object [ ( "deviceId", Encode.object [ ( "exact", Encode.string audio.deviceId ) ] ) ]
-
-
-encodeMaybeAudioDevice : Maybe AudioDevice -> Encode.Value
-encodeMaybeAudioDevice audio =
-    Maybe.map encodeAudioDevice audio |> Maybe.withDefault (Encode.bool False)
-
-
-encodeDevice : Device -> Encode.Value
-encodeDevice device =
+{-| Encodes a pointer style in json.
+-}
+encodePointerStyle : PointerStyle -> Encode.Value
+encodePointerStyle style =
     Encode.object
-        [ ( "video", encodeMaybeVideoDevice device.video device.resolution )
-        , ( "audio", encodeMaybeAudioDevice device.audio )
+        [ ( "mode", encodePointerMode style.mode )
+        , ( "color", Encode.string style.color )
+        , ( "size", Encode.int style.size )
         ]
 
 
-decodeDevice : Decoder Device
-decodeDevice =
-    Decode.map3 Device
-        (Decode.maybe (Decode.field "video" decodeVideoDevice))
-        (Decode.maybe (Decode.field "resolution" decodeResolution))
-        (Decode.maybe (Decode.field "audio" decodeAudioDevice))
+{-| The default pointer style value.
+-}
+defaultPointerStyle : PointerStyle
+defaultPointerStyle =
+    { mode = Pointer
+    , size = 10
+    , color = "rgb(255,0,0)"
+    }
 
 
-encodeRecordingOptions : Device -> Encode.Value
-encodeRecordingOptions device =
-    case ( device.video, device.audio ) of
-        ( Just _, Just _ ) ->
-            Encode.object
-                [ ( "videoBitsPerSecond", Encode.int 2500000 )
-                , ( "audioBitsPerSecond", Encode.int 128000 )
-                , ( "mimeType", Encode.string "video/webm;codecs=opus,vp8" )
-                ]
+{-| Initializes a model from the capsule and the grain we want to record.
 
-        ( Nothing, Just _ ) ->
-            Encode.object
-                [ ( "audioBitsPerSecond", Encode.int 128000 )
-                , ( "mimeType", Encode.string "video/webm;codecs=opus" )
-                ]
+It returns Nothing if the grain is not in the capsule.
 
-        ( Just _, Nothing ) ->
-            Encode.object
-                [ ( "videoBitsPerSecond", Encode.int 2500000 )
-                , ( "mimeType", Encode.string "video/webm;codecs=vp8" )
-                ]
+-}
+init : Int -> Capsule -> Maybe ( Model String Int, Cmd Msg )
+init gos capsule =
+    case List.drop gos capsule.structure of
+        h :: _ ->
+            Just <|
+                ( { capsule = capsule.id
+                  , gos = gos
+                  , state = DetectingDevices
+                  , deviceLevel = Nothing
+                  , showSettings = False
+                  , recording = Nothing
+                  , currentSlide = 0
+                  , currentSentence = 0
+                  , currentReplacementPrompt = Nothing
+                  , nextReplacementPrompt = Nothing
+                  , records =
+                        case Data.recordPath capsule h of
+                            Just recordPath ->
+                                [ { events = h.events
+                                  , deviceBlob = Encode.string recordPath
+                                  , pointerBlob = Data.pointerPath capsule h |> Maybe.map Encode.string
+                                  , old = True
+                                  }
+                                ]
+
+                            _ ->
+                                []
+                  , recordPlaying = Nothing
+                  , savedRecord = h.record
+                  , deleteRecord = False
+                  , pointerStyle = defaultPointerStyle
+                  , warnLeaving = Nothing
+                  , showHelp = False
+                  }
+                , Cmd.batch [ Device.detectDevices Nothing False, setupCanvas, setPointerStyle defaultPointerStyle ]
+                )
 
         _ ->
-            Encode.object []
+            Nothing
 
 
-devicesReceived : Sub Msg
-devicesReceived =
-    Ports.devicesReceived
-        (\x ->
-            case Decode.decodeValue decodeDevices x of
-                Ok o ->
-                    DevicesReceived o
+{-| The message type of the module.
+-}
+type Msg
+    = DeviceChanged
+    | StartEditingPrompt
+    | StopEditingPrompt
+    | StartEditingSecondPrompt
+    | StopEditingSecondPrompt
+    | CurrentSentenceChanged String
+    | NextSentenceChanged String
+    | DetectDevicesFinished
+    | DeviceBound
+    | BindingDeviceFailed
+    | DeviceLevel Float
+    | ToggleSettings
+    | StartRecording
+    | StartPointerRecording Int Record
+    | StopRecording
+    | PointerRecordFinished
+    | PreviousSentence
+    | NextSentence Bool
+    | RecordArrived ( Maybe Int, Record )
+    | PlayRecordFinished
+    | PlayRecord ( Int, Record )
+    | StopRecord
+    | RequestCameraPermission String
+    | UploadRecord Record
+    | DeleteRecord Utils.Confirmation
+    | EscapePressed
+    | SetPointerMode PointerMode
+    | SetPointerColor String
+    | SetPointerSize Int
+    | ClearPointer
+    | Leave Utils.Confirmation
+    | ToggleHelp
+    | ReinitializeDevices
 
-                _ ->
-                    Noop
-        )
+
+{-| Alias for the setup canvas port.
+-}
+setupCanvas : Cmd msg
+setupCanvas =
+    setupCanvasPort pointerCanvasId
 
 
-decodeResolution : Decoder Resolution
-decodeResolution =
-    Decode.map2 Resolution
-        (Decode.field "width" Decode.int)
-        (Decode.field "height" Decode.int)
+{-| Port for initializing the canvas on which the user can draw or point.
+-}
+port setupCanvasPort : String -> Cmd msg
 
 
-decodeVideoDevice : Decoder VideoDevice
-decodeVideoDevice =
-    Decode.map4 VideoDevice
-        (Decode.field "deviceId" Decode.string)
-        (Decode.field "groupId" Decode.string)
-        (Decode.field "label" Decode.string)
-        (Decode.field "resolutions" (Decode.list decodeResolution))
+{-| Id of the canvas on which the pointer will be drawn.
+-}
+pointerCanvasId : String
+pointerCanvasId =
+    "pointer-canvas"
 
 
-decodeAudioDevice : Decoder AudioDevice
-decodeAudioDevice =
-    Decode.map3 AudioDevice
-        (Decode.field "deviceId" Decode.string)
-        (Decode.field "groupId" Decode.string)
-        (Decode.field "label" Decode.string)
+{-| Id of the first line of the prompt.
+-}
+promptFirstSentenceId : String
+promptFirstSentenceId =
+    "prompt-first-sentence"
 
 
-decodeDevices : Decoder Devices
-decodeDevices =
-    Decode.map2 Devices
-        (Decode.field "video" (Decode.list decodeVideoDevice))
-        (Decode.field "audio" (Decode.list decodeAudioDevice))
+{-| Id of the second line of the prompt.
+-}
+promptSecondSentenceId : String
+promptSecondSentenceId =
+    "prompt-second-sentence"
+
+
+{-| Helper to change the pointer style.
+-}
+setPointerStyle : PointerStyle -> Cmd msg
+setPointerStyle style =
+    setPointerStylePort <| encodePointerStyle style
+
+
+{-| Port to change the pointer style.
+-}
+port setPointerStylePort : Encode.Value -> Cmd msg
+
+
+{-| Helper to clear the pointer canvas.
+-}
+clearPointer : Cmd msg
+clearPointer =
+    clearPointerPort pointerCanvasId
+
+
+{-| Port to clear the canvas.
+-}
+port clearPointerPort : String -> Cmd msg

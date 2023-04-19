@@ -79,7 +79,7 @@ const INDEX_HTML_BEFORE_FLAGS: &str = r#"<!doctype HTML>
     <head>
         <meta charset="utf-8">
         <meta name="viewport" content="width=device-width, initial-scale=1">
-        <link rel="icon" href="/dist/favicon.ico"/>
+        <link rel="icon" type="image/png" href="/dist/favicon.ico"/>
         <link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.7.2/css/all.css" integrity="sha384-fnmOCqbTlWIlj8LyTjo7mOUStjsKC4pOpQbqyi7RrhN7udi9RwhKkMHpvLbHG9Sr" crossorigin="anonymous">
         <style>
             .blink {
@@ -91,12 +91,25 @@ const INDEX_HTML_BEFORE_FLAGS: &str = r#"<!doctype HTML>
                     opacity: 0;
                 }
             }
+
+            @font-face {
+                font-family: "Urbanist";
+                src: url("/dist/fonts/Urbanist-Regular.woff2");
+            }
+
+            @font-face {
+                font-family: "Urbanist";
+                font-weight: bold;
+                src: url("/dist/fonts/Urbanist-Bold.woff2");
+            }
         </style>
     </head>
     <body>
         <div id="root"></div>
         <script src="/dist/js/main.js"></script>
-        <script src="/dist/ports.js"></script>
+        <script src="/dist/js/ports.js"></script>
+        <script src="/dist/js/old-main.js"></script>
+        <script src="/dist/js/old-ports.js"></script>
         <script src="/dist/jszip.min.js"></script>
         <script>
             var flags = "#;
@@ -107,7 +120,7 @@ const INDEX_HTML_BEFORE_FLAGS: &str = r#"<!doctype HTML>
     <head>
         <meta charset="utf-8">
         <meta name="viewport" content="width=device-width, initial-scale=1">
-        <link rel="icon" href="/dist/favicon.ico"/>
+        <link rel="icon" type="image/png" href="/dist/favicon.ico"/>
         <link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.7.2/css/all.css" integrity="sha384-fnmOCqbTlWIlj8LyTjo7mOUStjsKC4pOpQbqyi7RrhN7udi9RwhKkMHpvLbHG9Sr" crossorigin="anonymous">
         <style>
             .blink {
@@ -118,112 +131,61 @@ const INDEX_HTML_BEFORE_FLAGS: &str = r#"<!doctype HTML>
                 50% {
                     opacity: 0;
                 }
+            }
+
+            @font-face {
+                font-family: "Urbanist";
+                src: url("/dist/fonts/Urbanist-Regular.woff2");
+            }
+
+            @font-face {
+                font-family: "Urbanist";
+                font-weight: bold;
+                src: url("/dist/fonts/Urbanist-Bold.woff2");
             }
         </style>
     </head>
     <body>
         <div id="root"></div>
         <script src="/dist/js/main.min.js"></script>
-        <script src="/dist/ports.js"></script>
+        <script src="/dist/js/ports.js"></script>
+        <script src="/dist/js/old-main.min.js"></script>
+        <script src="/dist/js/old-ports.js"></script>
         <script src="/dist/jszip.min.js"></script>
         <script>
             var flags = "#;
 
 const INDEX_HTML_AFTER_FLAGS: &str = r#";
-            flags.global = flags.global || {};
-            flags.global.width = window.innerWidth;
-            flags.global.height = window.innerHeight;
-            flags.global.storage_language = localStorage.getItem('language');
-            flags.global.acquisitionInverted = localStorage.getItem('acquisitionInverted') === "true";
-            flags.global.zoomLevel = parseInt(localStorage.getItem('zoomLevel'), 10);
-            if (isNaN(flags.global.zoomLevel)) {
-                flags.global.zoomLevel = null;
-            }
-            flags.global.videoDeviceId = localStorage.getItem('videoDeviceId');
-            flags.global.audioDeviceId = localStorage.getItem('audioDeviceId');
-            flags.global.resolution = localStorage.getItem('resolution');
-            flags.global.sortBy = JSON.parse(localStorage.getItem('sortBy')) || ["lastModified", false];
-            flags.global.promptSize = parseInt(localStorage.getItem('promptSize'), 10) || 25;
-            flags.global.matting = localStorage.getItem('matting') === "true";
-            flags.global.downsampling = parseFloat(localStorage.getItem('downsampling'));
-            var app = Elm.Main.init({
-                flags: flags,
-                node: document.getElementById('root')
-            });
-            setupPorts(app);
-        </script>
-    </body>
-</html>
-"#;
+            if (window.location.pathname.startsWith('/o')) {
+                // Fix old flags case and load old client
 
-#[cfg(debug_assertions)]
-const UNLOGGED_HTML_BEFORE_FLAGS: &str = r#"<!doctype HTML>
-<html>
-    <head>
-        <meta charset="utf-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1">
-        <link rel="icon" href="/dist/favicon.ico"/>
-        <link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.7.2/css/all.css" integrity="sha384-fnmOCqbTlWIlj8LyTjo7mOUStjsKC4pOpQbqyi7RrhN7udi9RwhKkMHpvLbHG9Sr" crossorigin="anonymous">
-        <style>
-            .blink {
-                animation: blinker 1s linear infinite;
-            }
+                flags.global = flags.global.serverConfig || {};
+                flags.global.socket_root = flags.global.socketRoot;
+                flags.global.video_root = flags.global.videoRoot;
+                flags.global.registration_disabled = flags.global.registrationDisabled;
+                flags.global.request_language = flags.global.requestLanguage;
 
-            @keyframes blinker {
-                50% {
-                    opacity: 0;
+                flags.global.width = window.innerWidth;
+                flags.global.height = window.innerHeight;
+                flags.global.storage_language = localStorage.getItem('language');
+                flags.global.acquisitionInverted = localStorage.getItem('acquisitionInverted') === "true";
+                flags.global.zoomLevel = parseInt(localStorage.getItem('zoomLevel'), 10);
+                if (isNaN(flags.global.zoomLevel)) {
+                    flags.global.zoomLevel = null;
                 }
+                flags.global.videoDeviceId = localStorage.getItem('videoDeviceId');
+                flags.global.audioDeviceId = localStorage.getItem('audioDeviceId');
+                flags.global.resolution = localStorage.getItem('resolution');
+                flags.global.sortBy = JSON.parse(localStorage.getItem('sortBy')) || ["lastModified", false];
+                flags.global.promptSize = parseInt(localStorage.getItem('promptSize'), 10) || 25;
+                var app = Elm.OldMain.init({
+                    flags: flags,
+                    node: document.getElementById('root')
+                });
+                setupPorts(app);
+            } else {
+               init(document.getElementById('root'), flags);
             }
-        </style>
-    </head>
-    <body>
-        <div id="root"></div>
-        <script src="/dist/js/unlogged.js"></script>
-        <script src="/dist/ports.js"></script>
-        <script>
-            var flags = "#;
-
-#[cfg(not(debug_assertions))]
-const UNLOGGED_HTML_BEFORE_FLAGS: &str = r#"<!doctype HTML>
-<html>
-    <head>
-        <meta charset="utf-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1">
-        <link rel="icon" href="/dist/favicon.ico"/>
-        <link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.7.2/css/all.css" integrity="sha384-fnmOCqbTlWIlj8LyTjo7mOUStjsKC4pOpQbqyi7RrhN7udi9RwhKkMHpvLbHG9Sr" crossorigin="anonymous">
-        <style>
-            .blink {
-                animation: blinker 1s linear infinite;
-            }
-
-            @keyframes blinker {
-                50% {
-                    opacity: 0;
-                }
-            }
-        </style>
-    </head>
-    <body>
-        <div id="root"></div>
-        <script src="/dist/js/unlogged.min.js"></script>
-        <script src="/dist/ports.js"></script>
-        <script>
-            var flags = "#;
-
-const UNLOGGED_HTML_AFTER_FLAGS: &str = r#";
-            flags.global = flags.global || {};
-            flags.global.width = window.innerWidth;
-            flags.global.height = window.innerHeight;
-            flags.global.language = localStorage.getItem('language');
-            flags.global.sortBy = JSON.parse(localStorage.getItem('sortBy')) || ["lastModified", false];
-            flags.global.promptSize = parseInt(localStorage.getItem('promptSize'), 10) || 25;
-            flags.global.matting = localStorage.getItem('matting') === "true";
-            flags.global.downsampling = parseFloat(localStorage.getItem('downsampling'));
-            var app = Elm.Unlogged.init({
-                flags: flags,
-                node: document.getElementById('root')
-            });
-            setupPorts(app);
         </script>
     </body>
 </html>
@@ -274,14 +236,6 @@ pub fn index_html(flags: Value) -> String {
     format!(
         "{}{}{}",
         INDEX_HTML_BEFORE_FLAGS, flags, INDEX_HTML_AFTER_FLAGS
-    )
-}
-
-/// This functions formats the index.html page for unlogged users.
-pub fn unlogged_html(flags: Value) -> String {
-    format!(
-        "{}{}{}",
-        UNLOGGED_HTML_BEFORE_FLAGS, flags, UNLOGGED_HTML_AFTER_FLAGS
     )
 }
 

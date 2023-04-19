@@ -1,24 +1,35 @@
 module Publication.Types exposing (..)
 
-import Capsule exposing (Capsule)
+{-| This module holds the types for the publication page.
+-}
+
+import Data.Capsule exposing (Capsule)
+import Data.Types as Data
 
 
-type alias Model =
-    { capsule : Capsule
+type alias Model a =
+    { capsule : a
     , showPrivacyPopup : Bool
     }
 
 
-init : Capsule -> Model
+withCapsule : Capsule -> Model String -> Model Capsule
+withCapsule capsule model =
+    { capsule = capsule
+    , showPrivacyPopup = model.showPrivacyPopup
+    }
+
+
+init : Capsule -> Model String
 init capsule =
-    { capsule = capsule, showPrivacyPopup = False }
+    { capsule = capsule.id
+    , showPrivacyPopup = False
+    }
 
 
 type Msg
-    = Publish
-    | Published
-    | Unpublish
-    | Cancel
-    | PrivacyChanged Capsule.Privacy
-    | PromptSubtitlesChanged Bool
-    | TogglePrivacyPopup
+    = TogglePrivacyPopup
+    | SetPrivacy Data.Privacy
+    | SetPromptSubtitles Bool
+    | PublishVideo
+    | UnpublishVideo

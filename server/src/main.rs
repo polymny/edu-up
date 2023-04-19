@@ -1,5 +1,5 @@
 #[rocket::main]
 async fn main() -> Result<(), rocket::Error> {
-    let _rocket = polymny::rocket().await?;
+    let _ = polymny::rocket().await?;
     Ok(())
 }

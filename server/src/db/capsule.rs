@@ -135,11 +135,18 @@ impl Default for WebcamSettings {
     }
 }
 
-/// The disabled task status.
-///
-/// This is a helper function for default value for matting in records.
-fn none() -> Option<TaskStatus> {
-    None
+/// The sound track for a capsule.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub struct SoundTrack {
+    /// The uuid of the file.
+    pub uuid: Uuid,
+
+    /// The name of the file.
+    pub name: String,
+
+    /// The volume of the sound track.
+    pub volume: f32,
 }
 
 /// A record, with an uuid, a resolution and a duration.
@@ -153,13 +160,6 @@ pub struct Record {
 
     /// The size of the record, if it contains video.
     pub size: Option<(u32, u32)>,
-
-    /// The state of the matting.
-    #[serde(default = "none")]
-    pub matted: Option<TaskStatus>,
-
-    /// The downsampling of the matting
-    pub downsampling: Option<f32>,
 }
 
 /// The type of a record event.
@@ -246,7 +246,7 @@ pub struct Gos {
     pub events: Vec<Event>,
 
     /// The webcam settings of the gos.
-    pub webcam_settings: WebcamSettings,
+    pub webcam_settings: Option<WebcamSettings>,
 
     /// Video/audio fade options
     #[serde(default)]
@@ -260,14 +260,14 @@ impl Gos {
             record: None,
             slides: vec![],
             events: vec![],
-            webcam_settings: WebcamSettings::default(),
+            webcam_settings: None,
             fade: Fade::none(),
         }
     }
 }
 
 /// Privacy settings for a video.
-#[derive(PgEnum, Serialize, Deserialize, Debug, PartialEq, Eq, Copy, Clone)]
+#[derive(PgEnum, Serialize, Deserialize, Debug, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum Privacy {
     /// Public video.
@@ -320,6 +320,9 @@ pub struct Capsule {
     /// The structure of the capsule.
     pub structure: Json<Vec<Gos>>,
 
+    /// The default webcam settings.
+    pub webcam_settings: Json<WebcamSettings>,
+
     /// The last time the capsule was modified.
     pub last_modified: NaiveDateTime,
 
@@ -329,8 +332,8 @@ pub struct Capsule {
     /// duration of produced video in ms
     pub duration_ms: i32,
 
-    /// Background of the capsule.
-    pub background: Option<Uuid>,
+    /// The sound track of the capsule.
+    pub sound_track: Json<Option<SoundTrack>>,
 
     /// The user that has rights on the capsule.
     #[many_to_many(capsules, Role)]
@@ -360,10 +363,11 @@ impl Capsule {
             Privacy::Public,
             true,
             Json(vec![]),
+            Json(WebcamSettings::default()),
             Utc::now().naive_utc(),
             0,
             0,
-            None,
+            Json(None),
         )
         .save(&db)
         .await?;
@@ -402,12 +406,13 @@ impl Capsule {
             "published": self.published,
             "privacy": self.privacy,
             "structure": self.structure.0,
+            "webcam_settings": self.webcam_settings.0,
             "last_modified": self.last_modified.timestamp(),
             "users": users,
             "prompt_subtitles": self.prompt_subtitles,
             "disk_usage": self.disk_usage,
             "duration_ms": self.duration_ms,
-            "background": self.background,
+            "sound_track": self.sound_track.0,
         }))
     }
 
@@ -442,10 +447,11 @@ impl Capsule {
     }
 
     /// Notify the users that a capsule has been publicated.
-    pub async fn notify_video_upload(&self, id: &str, db: &Db, sock: &WebSockets) -> Result<()> {
+    pub async fn notify_video_upload(&self, slide_id: &str, capsule_id: &str, db: &Db, sock: &WebSockets) -> Result<()> {
         let text = json!({
             "type": "video_upload_finished",
-            "id": id,
+            "capsule_id": capsule_id,
+            "slide_id": slide_id,
         });
 
         for (user, _) in self.users(&db).await? {
@@ -481,7 +487,8 @@ impl Capsule {
     /// Notify the users that a capsule in under production.
     pub async fn notify_video_upload_progress(
         &self,
-        id: &str,
+        slide_id: &str,
+        capsule_id: &str,
         msg: &str,
         db: &Db,
         sock: &WebSockets,
@@ -489,7 +496,8 @@ impl Capsule {
         let text = json!({
             "type": "video_upload_progress",
             "msg": msg.parse::<f32>().map_err(|_|Error(Status::InternalServerError))?,
-            "id": id,
+            "capsule_id": capsule_id,
+            "slide_id": slide_id,
         });
 
         for (user, _) in self.users(&db).await? {
@@ -513,25 +521,6 @@ impl Capsule {
         }
 
         Ok(())
-    }
-
-    /// Returns the list of matting processes to run.
-    pub fn matting_idle(&mut self) -> impl Iterator<Item = (i32, &mut Record)> {
-        self.structure
-            .0
-            .iter_mut()
-            .enumerate()
-            .filter_map(|(x, y)| y.record.as_mut().map(|z| (x as i32, z)))
-            .filter(|(_, x)| x.matted == Some(TaskStatus::Idle))
-    }
-
-    /// Sets the last modified to now.
-    pub fn is_matting_running(&self) -> bool {
-        self.structure
-            .0
-            .iter()
-            .filter_map(|x| x.record.as_ref())
-            .any(|x| x.matted == Some(TaskStatus::Running))
     }
 
     /// Retrieves the owner of a capsule.
