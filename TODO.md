@@ -60,3 +60,23 @@
  - [x] plus de boutons (copier l'URL de la vidéo)
  - [x] bouton dupliquer la capsule
  - [x] long text sur project name / capsule name
+
+# Matting
+ - [ ] dans record:
+    - [ ] option camera, acitver ou non le matting
+    - [ ] si option matting activé, live preview du matting
+    - [ ] validation record, lance le matting si activé dans les settings
+ - [ ] dans production:
+    - [ ] activer désactiver le matting 
+        (si idle, alors waiting)
+    - [ ] choisir le downsampling ratio 
+        (check lors du lancement de la production si il est différent de ce qui a déjà été fait)
+    - [ ] ajouter background
+    - [ ] supprimer background
+    - [ ] modifier background
+    - [ ] modifier keying (activé si matting activé)
+ - [ ] task:
+    - [ ] task matting en cours
+    - [ ] motifier python matting pour avoir le progress
+    - [ ] passer le progress dans le task
+ 
