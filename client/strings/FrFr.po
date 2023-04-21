@@ -521,7 +521,7 @@ msgstr "Réinitialiser tous les périphériques"
 
 #. Toggle matting.
 msgid "Steps.Acquisition.toggleMatting"
-msgstr "Utiliser le fond vert virtuel"
+msgstr "Utiliser le fond vert virtuel. (Le fond vert virtuel en direct n'est qu'une prévisualisation. L'enregistrement avec le fond vert virtuel final avec une meilleure qualité sera effectué après la validation de l'enregistrement.)"
 
 #. Step of video production.
 msgid "Steps.Production.production"

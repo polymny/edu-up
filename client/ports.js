@@ -1,8 +1,11 @@
-class Camera {
+class GreenedCamera {
     constructor() {
 
         this.selfieSegmentation = new SelfieSegmentation({
             locateFile: (file) => {
+                if (file === "selfie_segmentation_solution_simd_wasm_bin.js") {
+                    return `/dist/${file}`;
+                }
                 return `https://cdn.jsdelivr.net/npm/@mediapipe/selfie_segmentation/${file}`;
             }
         });
@@ -39,6 +42,7 @@ class Camera {
             return;
         }
         this.selfieSegmentation.send({ image: this.video });
+        console.warn("ok");
     }
 
     reset(video) {
@@ -113,7 +117,7 @@ function init(node, flags) {
     const videoId = "video";
 
     // The greened camera.
-    let camera = new Camera();
+    let camera = new GreenedCamera();
 
     // The audio and video for the level checks when adding soundtracks.
     let soundtrackCheck = {
@@ -596,7 +600,7 @@ function init(node, flags) {
         await element.play();
 
         camera.reset(element);
-        camera = new Camera();
+        camera = new GreenedCamera();
         camera.reset(element);
         camera.start();
     }
@@ -915,7 +919,7 @@ function init(node, flags) {
 
 
         camera.reset(video);
-        camera = new Camera();
+        camera = new GreenedCamera();
         camera.reset(video);
         camera.start();
 

@@ -755,17 +755,17 @@ settingsPopup user config model =
                 , Element.column [ Ui.wf, Ui.s 10 ] [ reinitTitle, reinitButton ]
                 ]
     in
-    Element.column [ Ui.wf, Ui.hf, Element.scrollbars ]
-        [ Element.row [ Ui.wf, Ui.hf, Element.scrollbars ]
+    Element.column [ Ui.wf, Ui.hf, Element.scrollbars, Ui.p 15 ]
+        [ Element.row [ Ui.wf, Ui.hf, Element.scrollbars, Ui.s 10 ]
             [ Element.el [ Ui.wf, Ui.hf, Element.scrollbars ] settings
-            , Element.column [ Ui.wf ]
-                [ Element.el [ Ui.wf ] <| devicePlayer user config model
+            , Element.column [ Ui.hf, Ui.wf ]
+                [ Element.el [ Ui.hf ] <| devicePlayer user config model
                 , if user.plan == PremiumLvl1 || user.plan == Admin then
                     Input.checkbox
                         [ Ui.p 10 ]
                         { checked = config.clientConfig.matting
                         , icon = Input.defaultCheckbox
-                        , label = Input.labelRight [] <| Element.text <| Strings.stepsAcquisitionToggleMatting lang
+                        , label = Input.labelRight [ Ui.wf ] <| Ui.paragraph [] <| Strings.stepsAcquisitionToggleMatting lang
                         , onChange = \_ -> App.AcquisitionMsg <| Acquisition.ToggleMatting
                         }
 
