@@ -153,6 +153,10 @@ const INDEX_HTML_AFTER_FLAGS: &str = r#";
             let elmAppScript = document.createElement('script');
             let portsScript = document.createElement('script');
 
+            function testElm(main) {
+                return typeof Elm !== "undefined" && Object.hasOwn(Elm, main);
+            }
+
             if (window.location.pathname.startsWith('/o')) {
                 // Fix old flags case and load old client
                 let cssScript = document.createElement('link');
@@ -167,7 +171,7 @@ const INDEX_HTML_AFTER_FLAGS: &str = r#";
                 head.appendChild(portsScript);
 
                 function startApp() {
-                    if (Elm === undefined || Elm.OldMain === undefined) {
+                    if (!testElm("OldMain")) {
                         setTimeout(startApp, 100);
                         return;
                     }
@@ -206,7 +210,7 @@ const INDEX_HTML_AFTER_FLAGS: &str = r#";
                 head.appendChild(portsScript);
 
                 function startApp() {
-                    if (Elm === undefined || Elm.Main === undefined) {
+                    if (!testElm("Main")) {
                         setTimeout(startApp, 100);
                         return;
                     }
@@ -227,6 +231,10 @@ const INDEX_HTML_AFTER_FLAGS: &str = r#";
             let elmAppScript = document.createElement('script');
             let portsScript = document.createElement('script');
 
+            function testElm(main) {
+                return typeof Elm !== "undefined" && Object.hasOwn(Elm, main);
+            }
+
             if (window.location.pathname.startsWith('/o')) {
                 // Fix old flags case and load old client
                 let cssScript = document.createElement('link');
@@ -241,7 +249,7 @@ const INDEX_HTML_AFTER_FLAGS: &str = r#";
                 head.appendChild(portsScript);
 
                 function startApp() {
-                    if (Elm === undefined || Elm.OldMain === undefined) {
+                    if (!testElm("OldMain")) {
                         setTimeout(startApp, 100);
                         return;
                     }
@@ -280,7 +288,7 @@ const INDEX_HTML_AFTER_FLAGS: &str = r#";
                 head.appendChild(portsScript);
 
                 function startApp() {
-                    if (Elm === undefined || Elm.Main === undefined) {
+                    if (!testElm("Main')) {
                         setTimeout(startApp, 100);
                         return;
                     }
