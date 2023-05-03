@@ -163,7 +163,7 @@ pub async fn edit_capsule(
     capsule.prompt_subtitles = prompt_subtitles;
     capsule.structure = EJson(structure);
     capsule.webcam_settings = EJson(webcam_settings);
-    capsule.sound_track = EJson(sound_track);
+    capsule.sound_track = sound_track.map(|x| EJson(x));
     capsule.set_changed();
     capsule.save(&db).await?;
 
@@ -783,8 +783,8 @@ pub async fn produce(
     let output_path = config.data_path.join(format!("{}", *id)).join("output.mp4");
 
     tokio::spawn(async move {
-        let sound_track_info = if let Some(sound_track) = &capsule.sound_track.0 {
-            format!("{}:{}", sound_track.uuid, sound_track.volume)
+        let sound_track_info = if let Some(sound_track) = &capsule.sound_track {
+            format!("{}:{}", sound_track.0.uuid, sound_track.0.volume)
         } else {
             "null".to_string()
         };
@@ -1416,9 +1416,9 @@ pub async fn sound_track(
     // Delete old track if any.
     let mut volume = 0.8;
     let old_track = capsule.sound_track;
-    if let Some(old_track) = old_track.0 {
-        let old_uuid = old_track.uuid;
-        volume = old_track.volume;
+    if let Some(old_track) = old_track {
+        let old_uuid = old_track.0.uuid;
+        volume = old_track.0.volume;
         let old_path = path.join(format!("{}", old_uuid)).with_extension("m4a");
         remove_file(&old_path).await.ok();
     }
@@ -1452,11 +1452,11 @@ pub async fn sound_track(
 
     // Save the track in the database.
     let sound_track = SoundTrack {
-        uuid: uuid,
+        uuid,
         name: name.to_string(),
-        volume: volume,
+        volume,
     };
-    capsule.sound_track = EJson(Some(sound_track));
+    capsule.sound_track = Some(EJson(sound_track));
     capsule.save(&db).await?;
 
     Ok(capsule.to_json(role, &db).await?)

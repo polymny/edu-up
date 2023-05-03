@@ -333,7 +333,7 @@ pub struct Capsule {
     pub duration_ms: i32,
 
     /// The sound track of the capsule.
-    pub sound_track: Json<Option<SoundTrack>>,
+    pub sound_track: Option<Json<SoundTrack>>,
 
     /// The user that has rights on the capsule.
     #[many_to_many(capsules, Role)]
@@ -367,7 +367,7 @@ impl Capsule {
             Utc::now().naive_utc(),
             0,
             0,
-            Json(None),
+            None,
         )
         .save(&db)
         .await?;
@@ -412,7 +412,7 @@ impl Capsule {
             "prompt_subtitles": self.prompt_subtitles,
             "disk_usage": self.disk_usage,
             "duration_ms": self.duration_ms,
-            "sound_track": self.sound_track.0,
+            "sound_track": self.sound_track.as_ref().map(|x| &x.0),
         }))
     }
 
@@ -447,7 +447,13 @@ impl Capsule {
     }
 
     /// Notify the users that a capsule has been publicated.
-    pub async fn notify_video_upload(&self, slide_id: &str, capsule_id: &str, db: &Db, sock: &WebSockets) -> Result<()> {
+    pub async fn notify_video_upload(
+        &self,
+        slide_id: &str,
+        capsule_id: &str,
+        db: &Db,
+        sock: &WebSockets,
+    ) -> Result<()> {
         let text = json!({
             "type": "video_upload_finished",
             "capsule_id": capsule_id,
