@@ -973,7 +973,7 @@ function init(node, flags) {
                         // app.ports.capsuleUpdated.send(capsule);
                     } catch (e) {
                         console.log(e)
-                        app.ports.uploadRecordFailed.send(null);
+                        app.ports.uploadRecordFailed.send(taskId);
                     }
                 }
 
@@ -1064,7 +1064,7 @@ function init(node, flags) {
                 // app.ports.capsuleUpdated.send(capsule);
             } catch (e) {
                 console.log(e)
-                app.ports.uploadRecordFailed.send(null);
+                app.ports.uploadRecordFailed.send(taskId);
             }
 
         }
@@ -1395,12 +1395,13 @@ function init(node, flags) {
                 let gos = this.capsule.structure[gosIndex];
 
                 for (let slideIndex = 0; slideIndex < gos.slides.length; slideIndex++) {
+                    let gosOrMinusOne = slideIndex !== 0 ? gosIndex : -1;
                     let slide = gos.slides[slideIndex];
                     let image = await this.capsuleContent.file(slide.uuid).async("blob");
                     image = image.slice(0, image.size, "image/png")
 
                     // Upload the slide.
-                    resp = await fetch("/api/add-slide/" + this.newCapsule.id + "/-1/-1", { method: "POST", body: image });
+                    resp = await fetch("/api/add-slide/" + this.newCapsule.id + "/" + gosOrMinusOne + "/-1", { method: "POST", body: image });
                     this.newCapsule = await resp.json();
 
                     // Find uuid of the slide we added.

@@ -21,6 +21,7 @@ import Html.Attributes
 import Lang exposing (Lang)
 import Material.Icons as Icons
 import Material.Icons.Types as Icons
+import RemoteData
 import Route exposing (Route)
 import Simple.Animation as Animation exposing (Animation)
 import Simple.Animation.Animated as Animated
@@ -81,6 +82,23 @@ navbar config page user =
 
                 _ ->
                     Ui.logo
+
+        errorMsg =
+            case page of
+                Just (App.Preparation m) ->
+                    case m.capsuleUpdate of
+                        RemoteData.Loading _ ->
+                            Ui.spinningSpinner [] 25
+
+                        RemoteData.Failure _ ->
+                            Ui.icon 25 Icons.error
+                                |> Element.el [ Font.color Colors.red ]
+
+                        _ ->
+                            Element.none
+
+                _ ->
+                    Element.none
 
         taskProgress : Maybe Float
         taskProgress =
@@ -164,7 +182,9 @@ navbar config page user =
                     , Ui.pr 5
                     , Ui.wfp 5
                     ]
-                    [ webSocketStatus
+                    [ Element.el [ Ui.wf ] Element.none
+                    , errorMsg
+                    , webSocketStatus
                     , Element.el
                         [ Ui.hf
                         , Ui.id "task-panel"
@@ -495,7 +515,7 @@ navButtons lang capsuleId page =
     let
         buttonWidth : Int
         buttonWidth =
-            100
+            120
 
         roundRadius : Int
         roundRadius =
@@ -544,6 +564,9 @@ navButtons lang capsuleId page =
 
                 App.Options _ ->
                     4
+
+                App.Collaboration _ ->
+                    5
 
                 _ ->
                     -1
@@ -632,6 +655,8 @@ navButtons lang capsuleId page =
         , makeButton (Route.Publication capsuleId) (Strings.stepsPublicationPublish lang) (selectorIndex /= 3)
         , separator
         , makeButton (Route.Options capsuleId) (Strings.stepsOptionsOptions lang) (selectorIndex /= 4)
+        , separator
+        , makeButton (Route.Collaboration capsuleId) (Strings.stepsCollaborationCollaboration lang) (selectorIndex /= 4)
         ]
 
 
@@ -659,6 +684,9 @@ bottombar config page =
 
                 Just (App.Options s) ->
                     "/o/capsule/preparation/" ++ s.capsule
+
+                Just (App.Collaboration s) ->
+                    "/o/capsule/settings/" ++ s.capsule
 
                 Just (App.Profile _) ->
                     "/o/settings/"

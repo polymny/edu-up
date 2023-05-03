@@ -13,13 +13,13 @@ doesn't allow circular module imports...
 import Acquisition.Types as Acquisition
 import App.Types as App
 import Browser.Navigation
+import Collaboration.Types as Collaboration
 import Config exposing (Config)
 import Data.Capsule as Data
 import Data.Types as Data
 import Data.User as Data exposing (User)
 import Home.Types as Home
 import Json.Decode as Decode
-import List exposing (product)
 import Options.Types as Options
 import Preparation.Types as Preparation
 import Production.Types as Production
@@ -110,8 +110,8 @@ init flags url key =
                     , Cmd.map App.LoggedMsg cm
                     )
 
-                ( Ok s, Ok c, Ok Nothing ) ->
-                    ( App.Unlogged <| Unlogged.init clientState.lang s.root (Just url)
+                ( Ok s, Ok _, Ok Nothing ) ->
+                    ( App.Unlogged <| Unlogged.init clientState.lang False s.root (Just url)
                     , Cmd.none
                     )
 
@@ -145,6 +145,9 @@ capsuleIdFromPage page =
             Just m.capsule
 
         App.Options m ->
+            Just m.capsule
+
+        App.Collaboration m ->
             Just m.capsule
 
         _ ->
@@ -232,6 +235,14 @@ pageFromRoute _ user route =
             , Cmd.none
             )
 
+        Route.Collaboration id ->
+            ( Data.getCapsuleById id user
+                |> Maybe.map Collaboration.init
+                |> Maybe.map App.Collaboration
+                |> Maybe.withDefault (App.Home Home.init)
+            , Cmd.none
+            )
+
         Route.Profile ->
             ( App.Profile Profile.init, Cmd.none )
 
@@ -261,6 +272,9 @@ routeFromPage page =
 
         App.Publication m ->
             Route.Publication m.capsule
+
+        App.Collaboration m ->
+            Route.Collaboration m.capsule
 
         App.Options m ->
             Route.Options m.capsule

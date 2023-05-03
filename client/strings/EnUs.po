@@ -1038,6 +1038,32 @@ msgstr "Play sound track preview"
 msgid "Steps.Options.stopPreview"
 msgstr "Stop sound track preview"
 
+#. Collaboration.
+msgid "Steps.Collaboration.collaboration"
+msgstr "Collaboration"
+
+#. Collaborators.
+msgid "Steps.Collaboration.collaborator"
+msgid_plural ""
+msgstr[0] "Collaborator"
+msgstr[1] "Collaborators"
+
+#. Add a collaborator.
+msgid "Steps.Collaboration.addCollaborator"
+msgstr "Add collaborator"
+
+#. Addition of a collaborator failed.
+msgid "Steps.Collaboration.addCollaboratorFailed"
+msgstr "Couldn't add collaborator"
+
+#. Is the username or email correct.
+msgid "Steps.Collaboration.addCollaboratorFailed2"
+msgstr "Is the username or email correct"
+
+#. Remove a collaborator.
+msgid "Steps.Collaboration.removeCollaborator"
+msgstr "Remove collaborator"
+
 #. Delete project.
 msgid "Actions.deleteProject"
 msgstr "Delete project"
@@ -1205,6 +1231,10 @@ msgstr "You can wait or try to refresh the page, or contact the administrator if
 #. Go back to the old client.
 msgid "Ui.goBackToOldClient"
 msgstr "Go back to the old version"
+
+#. Open Polymny.
+msgid "Ui.openPolymny"
+msgstr "Open Polymny"
 
 #. Upload record task.
 msgid "Tasks.uploadRecord"

@@ -329,6 +329,18 @@ pub async fn capsule_settings(
     index_without_cors(config, db, user, lang).await
 }
 
+/// The route to the collaborators of a capsule.
+#[get("/capsule/collaboration/<_id>")]
+pub async fn capsule_collaborators(
+    config: &S<Config>,
+    db: Db,
+    user: Option<User>,
+    _id: String,
+    lang: Lang,
+) -> Either<Html<String>, Redirect> {
+    index_without_cors(config, db, user, lang).await
+}
+
 /// The 404 catcher.
 #[catch(404)]
 pub async fn not_found<'a>(request: &'_ Request<'a>) -> Either<Html<String>, Redirect> {
@@ -560,10 +572,13 @@ pub async fn tmp<'a>(
 /// The route for static files.
 #[get("/<path..>")]
 pub async fn dist<'a>(
+    config: &S<Config>,
     path: PathBuf,
     partial_content: PartialContent,
-) -> Result<PartialContentResponse<'a>> {
-    partial_content
+) -> Cors<Result<PartialContentResponse<'a>>> {
+    let partial_content = partial_content
         .respond(PathBuf::from("dist").join(path))
-        .await
+        .await;
+
+    Cors::new(&config.home, partial_content)
 }

@@ -12,6 +12,8 @@ import Api.User as Api
 import App.Types as App
 import App.Utils as App
 import Browser.Navigation
+import Collaboration.Types as Collaboration
+import Collaboration.Updates as Collaboration
 import Config
 import Data.Capsule as Data
 import Data.Types as Data
@@ -49,10 +51,6 @@ update message model =
         -- When login succeeds
         ( App.UnloggedMsg (Unlogged.LoginRequestChanged (RemoteData.Success _)), App.Unlogged _ ) ->
             -- Reload page to fetch server data and connect to websocket
-            ( model, Browser.Navigation.reload )
-
-        -- When the user changes their password after reset
-        ( App.UnloggedMsg (Unlogged.ResetPasswordRequestChanged (RemoteData.Success _)), App.Unlogged _ ) ->
             ( model, Browser.Navigation.reload )
 
         -- When the user deletes their account
@@ -324,6 +322,9 @@ updateModel msg model =
                 App.OptionsMsg oMsg ->
                     Options.update oMsg model
 
+                App.CollaborationMsg cMsg ->
+                    Collaboration.update cMsg model
+
                 App.ProfileMsg sMsg ->
                     Profile.update sMsg model
 
@@ -561,7 +562,7 @@ subs m =
                         Options.subs
 
                     ( App.Profile _, _, _ ) ->
-                        Sub.none
+                        Profile.subs
 
                     _ ->
                         Sub.none
