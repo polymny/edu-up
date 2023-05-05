@@ -58,14 +58,21 @@ init gos capsule =
 {-| Message type of the app.
 -}
 type Msg
-    = ToggleVideo
-    | SetWidth (Maybe Int) -- Nothing means fullscreen
-    | SetAnchor Data.Anchor
-    | SetOpacity Float
-    | ImageMoved Float Float Float Float
+    = ImageMoved Float Float Float Float
     | HoldingImageChanged (Maybe ( Int, Float, Float ))
     | Produce
     | ResetOptions
+    | WebcamSettingsMsg WebcamSettingsMsg
+
+
+{-| All messages that change the webcam settings.
+-}
+type WebcamSettingsMsg
+    = Noop
+    | ToggleVideo
+    | SetWidth (Maybe Int) -- Nothing means fullscreen
+    | SetAnchor Data.Anchor
+    | SetOpacity Float
 
 
 {-| Changes the height preserving aspect ratio.

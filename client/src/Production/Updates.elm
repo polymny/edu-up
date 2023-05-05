@@ -45,57 +45,6 @@ update msg model =
                     in
                     updateModel capsule (resetOptions gos) model { m | webcamPosition = newPosition }
 
-                Production.ToggleVideo ->
-                    let
-                        newWebcamSettings =
-                            case ( recordSize, getWebcamSettings capsule gos ) of
-                                ( Just size, Data.Disabled ) ->
-                                    Nothing
-
-                                _ ->
-                                    Just Data.Disabled
-                    in
-                    updateModel capsule { gos | webcamSettings = newWebcamSettings } model m
-
-                Production.SetAnchor anchor ->
-                    let
-                        newWebcamSettings =
-                            case getWebcamSettings capsule gos of
-                                Data.Pip p ->
-                                    Data.Pip { p | anchor = anchor, position = ( 4, 4 ) }
-
-                                x ->
-                                    x
-                    in
-                    updateModel capsule { gos | webcamSettings = Just newWebcamSettings } model { m | webcamPosition = ( 4.0, 4.0 ) }
-
-                Production.SetOpacity opacity ->
-                    let
-                        newWebcamSettings =
-                            case getWebcamSettings capsule gos of
-                                Data.Pip p ->
-                                    Data.Pip { p | opacity = opacity }
-
-                                x ->
-                                    x
-                    in
-                    updateModel capsule { gos | webcamSettings = Just newWebcamSettings } model m
-
-                Production.SetWidth newWidth ->
-                    let
-                        newWebcamSettings =
-                            case ( recordSize, newWidth ) of
-                                ( Just _, Nothing ) ->
-                                    Data.setWebcamSettingsSize Nothing (getWebcamSettings capsule gos)
-
-                                ( Just _, Just width ) ->
-                                    Data.setWebcamSettingsSize (Just width) (getWebcamSettings capsule gos)
-
-                                _ ->
-                                    getWebcamSettings capsule gos
-                    in
-                    updateModel capsule { gos | webcamSettings = Just newWebcamSettings } model m
-
                 Production.HoldingImageChanged Nothing ->
                     -- User released mouse, update capsule
                     let
@@ -178,6 +127,60 @@ update msg model =
                             }
                     in
                     ( newModel, Api.produceCapsule capsule (\_ -> App.Noop) )
+
+                Production.WebcamSettingsMsg Production.Noop ->
+                    ( model, Cmd.none )
+
+                Production.WebcamSettingsMsg Production.ToggleVideo ->
+                    let
+                        newWebcamSettings =
+                            case ( recordSize, getWebcamSettings capsule gos ) of
+                                ( Just size, Data.Disabled ) ->
+                                    Nothing
+
+                                _ ->
+                                    Just Data.Disabled
+                    in
+                    updateModel capsule { gos | webcamSettings = newWebcamSettings } model m
+
+                Production.WebcamSettingsMsg (Production.SetAnchor anchor) ->
+                    let
+                        newWebcamSettings =
+                            case getWebcamSettings capsule gos of
+                                Data.Pip p ->
+                                    Data.Pip { p | anchor = anchor, position = ( 4, 4 ) }
+
+                                x ->
+                                    x
+                    in
+                    updateModel capsule { gos | webcamSettings = Just newWebcamSettings } model { m | webcamPosition = ( 4.0, 4.0 ) }
+
+                Production.WebcamSettingsMsg (Production.SetOpacity opacity) ->
+                    let
+                        newWebcamSettings =
+                            case getWebcamSettings capsule gos of
+                                Data.Pip p ->
+                                    Data.Pip { p | opacity = opacity }
+
+                                x ->
+                                    x
+                    in
+                    updateModel capsule { gos | webcamSettings = Just newWebcamSettings } model m
+
+                Production.WebcamSettingsMsg (Production.SetWidth newWidth) ->
+                    let
+                        newWebcamSettings =
+                            case ( recordSize, newWidth ) of
+                                ( Just _, Nothing ) ->
+                                    Data.setWebcamSettingsSize Nothing (getWebcamSettings capsule gos)
+
+                                ( Just _, Just width ) ->
+                                    Data.setWebcamSettingsSize (Just width) (getWebcamSettings capsule gos)
+
+                                _ ->
+                                    getWebcamSettings capsule gos
+                    in
+                    updateModel capsule { gos | webcamSettings = Just newWebcamSettings } model m
 
         _ ->
             ( model, Cmd.none )

@@ -5,12 +5,14 @@ import App.Types as App exposing (Page(..))
 import App.Utils as App
 import Config
 import Data.Capsule as Data
+import Data.Types as Data
 import Data.User as Data
 import File
 import FileValue
 import Json.Decode as Decode
 import Keyboard
 import Options.Types as Options
+import Production.Types as Production
 import RemoteData
 import Utils
 
@@ -26,7 +28,10 @@ update msg model =
     case ( model.page, maybeCapsule ) of
         ( App.Options m, Just capsule ) ->
             case msg of
-                Options.ToggleVideo ->
+                Options.WebcamSettingsMsg Production.Noop ->
+                    ( model, Cmd.none )
+
+                Options.WebcamSettingsMsg Production.ToggleVideo ->
                     let
                         newWebcamSettings =
                             case capsule.defaultWebcamSettings of
@@ -38,7 +43,7 @@ update msg model =
                     in
                     updateModelWebcamSettings capsule newWebcamSettings model m
 
-                Options.SetOpacity opacity ->
+                Options.WebcamSettingsMsg (Production.SetOpacity opacity) ->
                     let
                         newWebcamSettings =
                             case capsule.defaultWebcamSettings of
@@ -50,7 +55,7 @@ update msg model =
                     in
                     updateModelWebcamSettings capsule newWebcamSettings model m
 
-                Options.SetWidth newWidth ->
+                Options.WebcamSettingsMsg (Production.SetWidth newWidth) ->
                     let
                         newWebcamSettings =
                             case newWidth of
@@ -62,7 +67,7 @@ update msg model =
                     in
                     updateModelWebcamSettings capsule newWebcamSettings model m
 
-                Options.SetAnchor anchor ->
+                Options.WebcamSettingsMsg (Production.SetAnchor anchor) ->
                     let
                         newWebcamSettings =
                             case capsule.defaultWebcamSettings of

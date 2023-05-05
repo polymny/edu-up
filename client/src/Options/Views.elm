@@ -3,7 +3,8 @@ module Options.Views exposing (..)
 import App.Types as App
 import Config exposing (Config)
 import Data.Capsule as Data
-import Data.User exposing (User)
+import Data.Types as Data
+import Data.User as Data exposing (User)
 import Element exposing (Element)
 import Element.Background as Background
 import Element.Font as Font
@@ -11,8 +12,9 @@ import Element.Input as Input
 import Html.Attributes
 import Lang exposing (Lang)
 import Material.Icons as Icons
-import Material.Icons.Types exposing (Icon)
+import Material.Icons.Types
 import Options.Types as Options
+import Production.Types as Production
 import RemoteData
 import Route exposing (Route(..))
 import Strings
@@ -23,7 +25,7 @@ import Utils
 
 
 view : Config -> User -> Options.Model Data.Capsule -> ( Element App.Msg, Element App.Msg )
-view config _ model =
+view config user model =
     let
         -- Helper to get client lang
         lang =
@@ -49,7 +51,7 @@ view config _ model =
             [ Strings.stepsOptionsOptionsExplanation config.clientState.lang
                 |> title
             , Element.column [ Ui.s 10, Ui.pt 20, Ui.wf ]
-                [ defaultProd config model
+                [ defaultProd config user model
                 ]
             ]
         , Element.column [ Ui.s 10, Ui.p 100 ]
@@ -64,8 +66,8 @@ view config _ model =
     )
 
 
-defaultProd : Config -> Options.Model Data.Capsule -> Element App.Msg
-defaultProd config model =
+defaultProd : Config -> User -> Options.Model Data.Capsule -> Element App.Msg
+defaultProd config user model =
     let
         --- HELPERS ---
         -- Shortcut for lang
@@ -147,7 +149,7 @@ defaultProd config model =
                 { checked = model.capsule.defaultWebcamSettings /= Data.Disabled
                 , icon = Input.defaultCheckbox
                 , label = Input.labelRight [] <| Element.text <| Strings.stepsProductionUseVideo lang
-                , onChange = \_ -> App.OptionsMsg Options.ToggleVideo
+                , onChange = \_ -> App.OptionsMsg <| Options.WebcamSettingsMsg <| Production.ToggleVideo
                 }
 
         -- Whether the webcam size is disabled
@@ -171,7 +173,7 @@ defaultProd config model =
                     \x ->
                         case String.toInt x of
                             Just y ->
-                                App.OptionsMsg <| Options.SetWidth <| Just y
+                                App.OptionsMsg <| Options.WebcamSettingsMsg <| Production.SetWidth <| Just y
 
                             _ ->
                                 App.Noop
@@ -185,7 +187,7 @@ defaultProd config model =
                 Input.radio
                 [ Ui.s 10 ]
                 { label = Input.labelHidden <| Strings.stepsProductionWebcamSize lang
-                , onChange = \x -> App.OptionsMsg <| Options.SetWidth x
+                , onChange = \x -> App.OptionsMsg <| Options.WebcamSettingsMsg <| Production.SetWidth x
                 , options =
                     [ Input.option (Just 200) <| Element.text <| Strings.stepsProductionSmall lang
                     , Input.option (Just 400) <| Element.text <| Strings.stepsProductionMedium lang
@@ -224,7 +226,7 @@ defaultProd config model =
                 Input.radio
                 [ Ui.s 10 ]
                 { label = Input.labelHidden <| Strings.stepsProductionWebcamPosition lang
-                , onChange = \x -> App.OptionsMsg <| Options.SetAnchor x
+                , onChange = \x -> App.OptionsMsg <| Options.WebcamSettingsMsg <| Production.SetAnchor x
                 , options =
                     [ Input.option Data.TopLeft <| Element.text <| Strings.stepsProductionTopLeft lang
                     , Input.option Data.TopRight <| Element.text <| Strings.stepsProductionTopRight lang
@@ -251,7 +253,7 @@ defaultProd config model =
                     Input.slider
                     [ Element.behindContent <| Element.el [ Ui.wf, Ui.hpx 2, Ui.cy, Background.color Colors.greyBorder ] Element.none
                     ]
-                    { onChange = \x -> App.OptionsMsg <| Options.SetOpacity x
+                    { onChange = \x -> App.OptionsMsg <| Options.WebcamSettingsMsg <| Production.SetOpacity x
                     , label = Input.labelHidden <| Strings.stepsProductionOpacity lang
                     , max = 1
                     , min = 0

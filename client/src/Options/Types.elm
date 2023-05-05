@@ -8,6 +8,7 @@ import Acquisition.Types exposing (Msg(..))
 import Data.Capsule as Data exposing (Capsule)
 import File
 import FileValue
+import Production.Types as Production
 import RemoteData exposing (WebData)
 import Utils
 
@@ -38,11 +39,7 @@ withCapsule capsule model =
 {-| Message type of the app.
 -}
 type Msg
-    = SetOpacity Float
-    | SetWidth (Maybe Int) -- Nothing means fullscreen
-    | SetAnchor Data.Anchor
-    | ToggleVideo
-    | TrackUploadRequested
+    = TrackUploadRequested
     | TrackUploadReceived FileValue.File File.File
     | TrackUploadResponded (WebData Capsule)
     | DeleteTrack Utils.Confirmation (Maybe Data.SoundTrack)
@@ -53,6 +50,7 @@ type Msg
     | Stop
     | EscapePressed
     | EnterPressed
+    | WebcamSettingsMsg Production.WebcamSettingsMsg
 
 
 init : Capsule -> Model String
