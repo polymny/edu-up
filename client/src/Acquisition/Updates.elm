@@ -535,18 +535,6 @@ update msg model =
                     , Cmd.map App.ConfigMsg cmd
                     )
 
-                Acquisition.ToggleMatting ->
-                    let
-                        config : Config.Config
-                        config =
-                            model.config
-
-                        newConfig : Config.Config
-                        newConfig =
-                            { config | clientConfig = { clientConfig | matting = not clientConfig.matting } }
-                    in
-                    ( { model | config = newConfig }, Cmd.none )
-
         _ ->
             ( model, Cmd.none )
 

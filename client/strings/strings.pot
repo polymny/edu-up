@@ -489,10 +489,6 @@ msgstr ""
 msgid "Steps.Acquisition.Help.fourth"
 msgstr ""
 
-#. Toggle matting.
-msgid "Steps.Acquisition.toggleMatting"
-msgstr ""
-
 #. Step of video production.
 msgid "Steps.Production.production"
 msgstr ""

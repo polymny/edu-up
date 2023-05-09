@@ -629,7 +629,7 @@ devicePlayer user config model =
         -- Element displayed in front of the device feedback with some buttons to manage the device settings
         settingsElement : Element App.Msg
         settingsElement =
-            if not model.showSettings && model.recording == Nothing then
+            if not model.showSettings && model.recording == Nothing && model.recordPlaying == Nothing then
                 Ui.navigationElement
                     (Ui.Msg <| App.AcquisitionMsg <| Acquisition.ToggleSettings)
                     [ Ui.ab
@@ -642,18 +642,12 @@ devicePlayer user config model =
             else
                 Element.none
 
-        -- Element displayed in front of the device feedback to display the green screen video
-        greenedVideoElement : Element App.Msg
-        greenedVideoElement =
-            greenVideo (config.clientConfig.matting && (user.plan == PremiumLvl1 || user.plan == Admin))
-
         -- Element that shows the device feedback to the user
         player : Element App.Msg
         player =
             Element.el
                 [ Ui.wf
                 , Ui.at
-                , Element.inFront greenedVideoElement
                 , Element.inFront inFrontElement
                 , Element.inFront vumeterElement
                 , Element.inFront settingsElement
@@ -765,17 +759,6 @@ settingsPopup user config model =
             [ Element.el [ Ui.wf, Ui.hf, Element.scrollbars ] settings
             , Element.column [ Ui.hf, Ui.wf ]
                 [ Element.el [ Ui.hf ] <| devicePlayer user config model
-                , if user.plan == PremiumLvl1 || user.plan == Admin then
-                    Input.checkbox
-                        [ Ui.p 10 ]
-                        { checked = config.clientConfig.matting
-                        , icon = Input.defaultCheckbox
-                        , label = Input.labelRight [ Ui.wf ] <| Ui.paragraph [] <| Strings.stepsAcquisitionToggleMatting lang
-                        , onChange = \_ -> App.AcquisitionMsg <| Acquisition.ToggleMatting
-                        }
-
-                  else
-                    Element.none
                 ]
             ]
         , Ui.primary [ Ui.ab, Ui.ar ]

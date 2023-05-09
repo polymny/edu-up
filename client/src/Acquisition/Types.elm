@@ -249,7 +249,6 @@ type Msg
     | Leave Utils.Confirmation
     | ToggleHelp
     | ReinitializeDevices
-    | ToggleMatting
 
 
 {-| Alias for the setup canvas port.
