@@ -656,7 +656,7 @@ navButtons lang capsuleId page =
         , separator
         , makeButton (Route.Options capsuleId) (Strings.stepsOptionsOptions lang) (selectorIndex /= 4)
         , separator
-        , makeButton (Route.Collaboration capsuleId) (Strings.stepsCollaborationCollaboration lang) (selectorIndex /= 4)
+        , makeButton (Route.Collaboration capsuleId) (Strings.stepsCollaborationCollaboration lang) (selectorIndex /= 5)
         ]
 
 
