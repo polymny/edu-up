@@ -23,6 +23,7 @@ import Html.Attributes
 import Html.Events
 import Lang exposing (Lang)
 import Material.Icons
+import Material.Icons.Outlined
 import Strings
 import Time
 import TimeUtils
@@ -628,11 +629,15 @@ devicePlayer user config model =
         -- Element displayed in front of the device feedback with some buttons to manage the device settings
         settingsElement : Element App.Msg
         settingsElement =
-            if not model.showSettings then
+            if not model.showSettings && model.recording == Nothing then
                 Ui.navigationElement
                     (Ui.Msg <| App.AcquisitionMsg <| Acquisition.ToggleSettings)
-                    [ Font.color Colors.white, Ui.ab, Ui.ar, Ui.p 10 ]
-                    (Ui.icon 25 Material.Icons.settings)
+                    [ Ui.ab
+                    , Ui.ar
+                    , Ui.p 10
+                    , Element.behindContent <| Element.el [ Font.color Colors.white, Ui.cx, Ui.cy ] <| Ui.icon 30 Material.Icons.settings
+                    ]
+                    (Element.el [ Font.color Colors.black ] <| Ui.icon 30 Material.Icons.Outlined.settings)
 
             else
                 Element.none

@@ -42,7 +42,6 @@ class GreenedCamera {
             return;
         }
         this.selfieSegmentation.send({ image: this.video });
-        console.warn("ok");
     }
 
     reset(video) {
