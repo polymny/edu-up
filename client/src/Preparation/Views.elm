@@ -245,6 +245,19 @@ slideView config _ model ghost default s =
                                 }
                             ]
 
+                inFrontPrompt =
+                    slide.slide
+                        |> Maybe.map .prompt
+                        |> Maybe.map (String.split "\n")
+                        |> Maybe.andThen List.head
+                        |> Maybe.andThen (\x -> Utils.tern (x == "") Nothing (Just x))
+                        |> Maybe.map (String.left 30)
+                        |> Maybe.map (\x -> String.trim x ++ " ...")
+                        |> Maybe.map Element.text
+                        |> Maybe.map (Element.el [ Ui.p 5, Ui.r 5, Background.color Colors.greyBorder ])
+                        |> Maybe.map (Element.el [ Ui.cx, Ui.ab, Ui.p 5 ])
+                        |> Maybe.withDefault Element.none
+
                 slideElement =
                     case Maybe.andThen .extra slide.slide of
                         Just v ->
@@ -290,6 +303,7 @@ slideView config _ model ghost default s =
                 , Ui.pl 20
                 , Ui.id ("slide-" ++ String.fromInt slide.totalSlideId)
                 , Element.inFront inFrontButtons
+                , Element.inFront inFrontPrompt
                 ]
                 slideElement
 
