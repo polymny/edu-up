@@ -39,8 +39,6 @@ view config user model =
             model.capsule
             model.gos
             model.gos.webcamSettings
-            |> Element.map Production.WebcamSettingsMsg
-            |> Element.map App.ProductionMsg
         , rightColumn config user model
         ]
     , Element.none
@@ -49,7 +47,7 @@ view config user model =
 
 {-| The column with the controls of the production settings.
 -}
-leftColumn : Config -> User -> Data.Capsule -> Data.Gos -> Maybe Data.WebcamSettings -> Element Production.WebcamSettingsMsg
+leftColumn : Config -> User -> Data.Capsule -> Data.Gos -> Maybe Data.WebcamSettings -> Element App.Msg
 leftColumn config user capsule gos webcamSettings =
     let
         --- HELPERS ---
@@ -58,7 +56,7 @@ leftColumn config user capsule gos webcamSettings =
             config.clientState.lang
 
         -- Helper to create section titles
-        title : Bool -> String -> Element Production.WebcamSettingsMsg
+        title : Bool -> String -> Element App.Msg
         title disabled input =
             Element.text input
                 |> Element.el (disableAttrIf disabled ++ [ Font.size 22, Font.bold ])
@@ -107,12 +105,12 @@ leftColumn config user capsule gos webcamSettings =
                     Nothing
 
         -- Attributes to show things as disabled
-        disableAttr : List (Element.Attribute Production.WebcamSettingsMsg)
+        disableAttr : List (Element.Attribute App.Msg)
         disableAttr =
             [ Font.color Colors.greyFontDisabled ]
 
         -- Gives disable attributes if element is disabled
-        disableAttrIf : Bool -> List (Element.Attribute Production.WebcamSettingsMsg)
+        disableAttrIf : Bool -> List (Element.Attribute App.Msg)
         disableAttrIf disabled =
             if disabled then
                 disableAttr
@@ -123,13 +121,13 @@ leftColumn config user capsule gos webcamSettings =
         -- Gives disable attributes and remove msg if element is disabled
         disableIf :
             Bool
-            -> (List (Element.Attribute Production.WebcamSettingsMsg) -> { a | onChange : b -> Production.WebcamSettingsMsg } -> Element Production.WebcamSettingsMsg)
-            -> List (Element.Attribute Production.WebcamSettingsMsg)
-            -> { a | onChange : b -> Production.WebcamSettingsMsg }
-            -> Element Production.WebcamSettingsMsg
+            -> (List (Element.Attribute App.Msg) -> { a | onChange : b -> App.Msg } -> Element App.Msg)
+            -> List (Element.Attribute App.Msg)
+            -> { a | onChange : b -> App.Msg }
+            -> Element App.Msg
         disableIf disabled constructor attributes parameters =
             if disabled then
-                constructor (disableAttr ++ attributes) { parameters | onChange = \_ -> Production.Noop }
+                constructor (disableAttr ++ attributes) { parameters | onChange = \_ -> App.Noop }
 
             else
                 constructor attributes parameters
@@ -143,9 +141,8 @@ leftColumn config user capsule gos webcamSettings =
                 , action =
                     case webcamSettings of
                         Just _ ->
-                            Ui.None
+                            Ui.Msg <| App.ProductionMsg Production.ResetOptions
 
-                        -- Ui.Msg <| App.ProductionMsg Production.ResetOptions
                         Nothing ->
                             Ui.None
                 }
@@ -158,7 +155,7 @@ leftColumn config user capsule gos webcamSettings =
                 { checked = gos.record /= Nothing && webcamSettings /= Just Data.Disabled
                 , icon = Input.defaultCheckbox
                 , label = Input.labelRight [] <| Element.text <| Strings.stepsProductionUseVideo lang
-                , onChange = \_ -> Production.ToggleVideo
+                , onChange = \_ -> App.ProductionMsg <| Production.WebcamSettingsMsg <| Production.ToggleVideo
                 }
 
         -- Text that explains why the user can't use the video (if they can't)
@@ -194,10 +191,10 @@ leftColumn config user capsule gos webcamSettings =
                     \x ->
                         case String.toInt x of
                             Just y ->
-                                Production.SetWidth <| Just y
+                                App.ProductionMsg <| Production.WebcamSettingsMsg <| Production.SetWidth <| Just y
 
                             _ ->
-                                Production.Noop
+                                App.ProductionMsg <| Production.WebcamSettingsMsg <| Production.Noop
                 , placeholder = Nothing
                 , text = Maybe.map String.fromInt width |> Maybe.withDefault ""
                 }
@@ -208,7 +205,7 @@ leftColumn config user capsule gos webcamSettings =
                 Input.radio
                 [ Ui.s 10 ]
                 { label = Input.labelHidden <| Strings.stepsProductionWebcamSize lang
-                , onChange = \x -> Production.SetWidth <| x
+                , onChange = \x -> App.ProductionMsg <| Production.WebcamSettingsMsg <| Production.SetWidth <| x
                 , options =
                     [ Input.option (Just 200) <| Element.text <| Strings.stepsProductionSmall lang
                     , Input.option (Just 400) <| Element.text <| Strings.stepsProductionMedium lang
@@ -247,7 +244,7 @@ leftColumn config user capsule gos webcamSettings =
                 Input.radio
                 [ Ui.s 10 ]
                 { label = Input.labelHidden <| Strings.stepsProductionWebcamPosition lang
-                , onChange = \x -> Production.SetAnchor x
+                , onChange = \x -> App.ProductionMsg <| Production.WebcamSettingsMsg <| Production.SetAnchor x
                 , options =
                     [ Input.option Data.TopLeft <| Element.text <| Strings.stepsProductionTopLeft lang
                     , Input.option Data.TopRight <| Element.text <| Strings.stepsProductionTopRight lang
@@ -274,7 +271,7 @@ leftColumn config user capsule gos webcamSettings =
                     Input.slider
                     [ Element.behindContent <| Element.el [ Ui.wf, Ui.hpx 2, Ui.cy, Background.color Colors.greyBorder ] Element.none
                     ]
-                    { onChange = \x -> Production.SetOpacity x
+                    { onChange = \x -> App.ProductionMsg <| Production.WebcamSettingsMsg <| Production.SetOpacity x
                     , label = Input.labelHidden <| Strings.stepsProductionOpacity lang
                     , max = 1
                     , min = 0

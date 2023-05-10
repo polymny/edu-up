@@ -8,7 +8,7 @@ import App.Types as App
 import App.Utils as App
 import Browser.Events
 import Config
-import Data.Capsule as Data exposing (Capsule)
+import Data.Capsule as Data exposing (Capsule, WebcamSettings)
 import Data.Types as Data
 import Data.User as Data
 import Json.Decode as Decode
@@ -43,7 +43,7 @@ update msg model =
                                 _ ->
                                     ( 0.0, 0.0 )
                     in
-                    updateModel capsule (resetOptions gos) model { m | webcamPosition = newPosition }
+                    updateModel capsule (resetOptions capsule gos) model { m | webcamPosition = newPosition }
 
                 Production.HoldingImageChanged Nothing ->
                     -- User released mouse, update capsule
@@ -202,8 +202,8 @@ updateModel capsule gos model m =
 
 {-| Reset to default options. (Set to Nothing)
 -}
-resetOptions : Data.Gos -> Data.Gos
-resetOptions gos =
+resetOptions : Data.Capsule -> Data.Gos -> Data.Gos
+resetOptions capsule gos =
     { gos | webcamSettings = Nothing }
 
 
