@@ -26,6 +26,8 @@ import Production.Types as Production
 import Profile.Types as Profile
 import Publication.Types as Publication
 import Route exposing (Route)
+import Task
+import Time
 import Unlogged.Types as Unlogged
 import Url exposing (Url)
 
@@ -107,7 +109,8 @@ init flags url key =
                         , user = u
                         , page = page
                         }
-                    , Cmd.map App.LoggedMsg cm
+                    , Cmd.batch [ cm, Task.perform (App.ConfigMsg << Config.ZoneChanged) Time.here ]
+                        |> Cmd.map App.LoggedMsg
                     )
 
                 ( Ok s, Ok _, Ok Nothing ) ->
