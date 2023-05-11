@@ -331,7 +331,15 @@ deleteSlide slide capsule =
     let
         gosMapper : Gos -> Gos
         gosMapper gos =
-            { gos | slides = List.filter (\x -> x.uuid /= slide.uuid) gos.slides }
+            { gos
+                | slides = List.filter (\x -> x.uuid /= slide.uuid) gos.slides
+                , record =
+                    if List.any (\x -> x.uuid == slide.uuid) gos.slides then
+                        Nothing
+
+                    else
+                        gos.record
+            }
 
         newStructure : List Gos
         newStructure =

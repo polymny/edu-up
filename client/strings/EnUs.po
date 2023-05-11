@@ -342,6 +342,10 @@ msgstr "This change will destroy some of your records"
 msgid "Steps.Preparation.addSlideWillBreak"
 msgstr "Adding a slide to this grain will destroy the associated record"
 
+#. A sentence that explains that deleting a slide will destroy the record.
+msgid "Steps.Preparation.deleteSlideWillBreak"
+msgstr "Deleting this slide will destroy the record associated to the grain"
+
 #. Select a pdf file.
 msgid "Steps.Preparation.selectPdf"
 msgstr "Select PDF"

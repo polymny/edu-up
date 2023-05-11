@@ -343,6 +343,10 @@ msgstr "Ce déplacement va détruire certains de vos enregistrements"
 msgid "Steps.Preparation.addSlideWillBreak"
 msgstr "Ajouter un slide à ce grain va détruire l'enregistrement associé"
 
+#. A sentence that explains that deleting a slide will destroy the record.
+msgid "Steps.Preparation.deleteSlideWillBreak"
+msgstr "Supprimer ce slide va détruire l'enregistrement associé au grain"
+
 #. Select a pdf file.
 msgid "Steps.Preparation.selectPdf"
 msgstr "Choisir un PDF"

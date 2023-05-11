@@ -320,10 +320,31 @@ slideView config _ model ghost default s =
 {-| Popup to confirm the slide deletion.
 -}
 deleteSlideConfirmPopup : Lang -> Preparation.Model Capsule -> Data.Slide -> Element App.Msg
-deleteSlideConfirmPopup lang _ s =
-    Element.column [ Ui.wf, Ui.hf ]
+deleteSlideConfirmPopup lang model s =
+    let
+        willDestroyRecord : Bool
+        willDestroyRecord =
+            model.capsule.structure
+                |> List.filter (\x -> List.any (\y -> y.uuid == s.uuid) x.slides)
+                |> List.head
+                |> Maybe.map (\x -> x.record /= Nothing)
+                |> Maybe.withDefault False
+    in
+    Element.column [ Ui.wf, Ui.hf, Ui.s 10 ]
         [ Element.paragraph [ Ui.wf, Ui.cy, Font.center ]
             [ Element.text (Lang.question Strings.actionsConfirmDeleteSlide lang) ]
+        , if willDestroyRecord then
+            Element.paragraph [ Ui.wf, Ui.cy, Ui.pt 20, Font.center ]
+                [ Element.text (Lang.warning Strings.uiWarning lang) ]
+
+          else
+            Element.none
+        , if willDestroyRecord then
+            Element.paragraph [ Ui.wf, Ui.cy, Font.center ]
+                [ Element.text (Strings.stepsPreparationDeleteSlideWillBreak lang ++ ".") ]
+
+          else
+            Element.none
         , Element.row [ Ui.ab, Ui.ar, Ui.s 10 ]
             [ Ui.secondary []
                 { action = mkUiMsg (Preparation.DeleteSlide Utils.Cancel s)

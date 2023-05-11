@@ -316,6 +316,10 @@ msgstr ""
 msgid "Steps.Preparation.addSlideWillBreak"
 msgstr ""
 
+#. A sentence that explains that deleting a slide will destroy the record.
+msgid "Steps.Preparation.deleteSlideWillBreak"
+msgstr ""
+
 #. Select a pdf file.
 msgid "Steps.Preparation.selectPdf"
 msgstr ""
