@@ -312,6 +312,10 @@ msgstr ""
 msgid "Steps.Preparation.dndWillBreak"
 msgstr ""
 
+#. A sentence that explains that adding a slide will destroy the record.
+msgid "Steps.Preparation.addSlideWillBreak"
+msgstr ""
+
 #. Select a pdf file.
 msgid "Steps.Preparation.selectPdf"
 msgstr ""

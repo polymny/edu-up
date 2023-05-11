@@ -339,6 +339,10 @@ msgstr "Organiser les planches"
 msgid "Steps.Preparation.dndWillBreak"
 msgstr "Ce déplacement va détruire certains de vos enregistrements"
 
+#. A sentence that explains that adding a slide will destroy the record.
+msgid "Steps.Preparation.addSlideWillBreak"
+msgstr "Ajouter un slide à ce grain va détruire l'enregistrement associé"
+
 #. Select a pdf file.
 msgid "Steps.Preparation.selectPdf"
 msgstr "Choisir un PDF"

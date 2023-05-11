@@ -278,6 +278,16 @@ update msg model =
                                     )
                                     model
 
+                            Preparation.ConfirmAddSlide gos ->
+                                let
+                                    ( newModel, newCmd, newConfig ) =
+                                        updateExtra model.user
+                                            (Preparation.Select Utils.Confirm (Preparation.AddSlide gos))
+                                            m
+                                            model.config
+                                in
+                                ( { model | config = newConfig, page = App.Preparation newModel }, newCmd )
+
                     else
                         ( model, Cmd.none )
 
@@ -312,7 +322,26 @@ updateExtra user msg model config =
             Data.getCapsuleById model.capsule user
     in
     case ( msg, maybeCapsule ) of
-        ( Preparation.Select changeSlide, Just _ ) ->
+        ( Preparation.Select Utils.Request (Preparation.AddSlide gos), Just capsule ) ->
+            -- We need to check that the slide is not added to a gos with a record, otherwise, we need to delete the
+            -- record.
+            let
+                canChange =
+                    List.drop gos capsule.structure
+                        |> List.head
+                        |> Maybe.map (\x -> x.record == Nothing)
+                        |> Maybe.withDefault True
+            in
+            if canChange then
+                updateExtra user (Preparation.Select Utils.Confirm (Preparation.AddSlide gos)) model config
+
+            else
+                ( { model | popupType = Preparation.ConfirmAddSlide gos, displayPopup = True }, Cmd.none, config )
+
+        ( Preparation.Select Utils.Cancel (Preparation.AddSlide _), Just _ ) ->
+            ( { model | displayPopup = False }, Cmd.none, config )
+
+        ( Preparation.Select Utils.Confirm changeSlide, Just _ ) ->
             let
                 mimes =
                     case changeSlide of

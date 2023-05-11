@@ -654,6 +654,8 @@ pub async fn add_slide(
         prompt: String::new(),
     });
 
+    gos.record = None;
+
     capsule.set_changed();
     capsule.save(&db).await?;
 

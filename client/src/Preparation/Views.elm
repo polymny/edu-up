@@ -81,6 +81,9 @@ view config user model =
                     Preparation.ConfirmUpdateCapsulePopup c ->
                         confirmUpdateCapsulePopup lang
 
+                    Preparation.ConfirmAddSlide gos ->
+                        confirmAddSlidePopup lang gos
+
         groupedSlides : List (NeList Preparation.Slide)
         groupedSlides =
             model.slides
@@ -138,7 +141,7 @@ gosView config user model ( head, gos ) gosIndex =
                     -- Virtual gos, the button will create a new gos
                     Ui.primaryIcon [ Ui.cy ]
                         { icon = Icons.add
-                        , action = mkUiExtra (Preparation.Select (Preparation.AddGos (head.totalGosId // 2)))
+                        , action = mkUiExtra (Preparation.Select Utils.Confirm (Preparation.AddGos (head.totalGosId // 2)))
                         , tooltip = Strings.stepsPreparationCreateGrain config.clientState.lang
                         }
 
@@ -146,7 +149,7 @@ gosView config user model ( head, gos ) gosIndex =
                     -- Real gos, the button will add a slide at the end of the gos
                     Ui.primaryIcon [ Ui.cy ]
                         { icon = Icons.add
-                        , action = mkUiExtra (Preparation.Select (Preparation.AddSlide head.gosId))
+                        , action = mkUiExtra (Preparation.Select Utils.Request (Preparation.AddSlide head.gosId))
                         , tooltip = Strings.stepsPreparationAddSlide config.clientState.lang
                         }
 
@@ -226,7 +229,7 @@ slideView config _ model ghost default s =
                             , Ui.primaryIcon []
                                 { icon = Icons.image
                                 , tooltip = Strings.stepsPreparationReplaceSlideOrAddExternalResource lang
-                                , action = mkUiExtra (Preparation.Select (Preparation.ReplaceSlide dataSlide))
+                                , action = mkUiExtra (Preparation.Select Utils.Confirm (Preparation.ReplaceSlide dataSlide))
                                 }
                             , Ui.primaryIcon []
                                 { icon = Icons.delete
@@ -434,6 +437,26 @@ confirmUpdateCapsulePopup lang =
             , Ui.primary []
                 { label = Element.text <| Strings.uiConfirm lang
                 , action = mkUiMsg Preparation.ConfirmUpdateCapsule
+                }
+            ]
+        ]
+        |> Ui.popup 1 (Strings.uiWarning lang)
+
+
+{-| Popup to confirm add slide that will destroy records.
+-}
+confirmAddSlidePopup : Lang -> Int -> Element App.Msg
+confirmAddSlidePopup lang gos =
+    Element.column [ Ui.wf, Ui.hf, Ui.s 10 ]
+        [ Ui.paragraph [ Ui.cx, Ui.cy, Font.center ] (Strings.stepsPreparationAddSlideWillBreak lang ++ ".")
+        , Element.row [ Ui.ab, Ui.ar, Ui.s 10 ]
+            [ Ui.secondary []
+                { label = Element.text <| Strings.uiCancel lang
+                , action = mkUiMsg <| Preparation.Extra <| Preparation.Select Utils.Cancel <| Preparation.AddSlide gos
+                }
+            , Ui.primary []
+                { label = Element.text <| Strings.uiConfirm lang
+                , action = mkUiMsg <| Preparation.Extra <| Preparation.Select Utils.Confirm <| Preparation.AddSlide gos
                 }
             ]
         ]

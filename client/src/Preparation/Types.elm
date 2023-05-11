@@ -16,9 +16,9 @@ import Data.Capsule as Data exposing (Capsule)
 import DnDList
 import DnDList.Groups
 import File exposing (File)
+import Home.Types exposing (Msg(..))
 import RemoteData
 import Utils
-import Home.Types exposing (Msg(..))
 
 
 {-| The type for the model of the preparation page.
@@ -44,6 +44,7 @@ type PopupType
     | ChangeSlidePopup ChangeSlideForm
     | EditPromptPopup Data.Slide
     | ConfirmUpdateCapsulePopup Capsule
+    | ConfirmAddSlide Int
 
 
 {-| Transforms the capsule id into a real capsule.
@@ -114,7 +115,7 @@ type Msg
 {-| The type that handles all file upload.
 -}
 type ExtraMsg
-    = Select ChangeSlide
+    = Select Utils.Confirmation ChangeSlide
     | Selected ChangeSlide File (Maybe Int)
     | PageChanged String
     | PageCancel
