@@ -69,10 +69,14 @@ view config _ model =
                     Just p ->
                         [ title <| Strings.stepsProductionCurrentProducedVideo lang
                         , Element.el [ Ui.wf ] <| videoElement p
-                        , Element.column [ Ui.s 10 ]
-                            [ publicationInformationTitle
-                            , iframeCode
-                            ]
+                        , if model.capsule.published == Data.Done then
+                            Element.column [ Ui.s 10 ]
+                                [ publicationInformationTitle
+                                , iframeCode
+                                ]
+
+                          else
+                            Element.none
                         ]
 
                     Nothing ->
