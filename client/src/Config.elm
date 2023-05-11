@@ -619,7 +619,7 @@ update msg { serverConfig, clientConfig, clientState } =
 
                 PromptSizeChanged promptSize ->
                     ( { serverConfig = serverConfig
-                      , clientConfig = { clientConfig | promptSize = promptSize }
+                      , clientConfig = { clientConfig | promptSize = promptSize |> max 10 |> min 150 }
                       , clientState = clientState
                       }
                     , True

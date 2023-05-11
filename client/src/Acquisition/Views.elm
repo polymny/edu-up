@@ -243,37 +243,63 @@ view config user model =
         -- Displays the recording status
         statusElement : Element App.Msg
         statusElement =
-            Element.row [ Ui.wf, Ui.p 10 ]
-                [ Element.el [ Ui.cx ] <|
-                    let
-                        slideIndexDisplay =
-                            String.fromInt (model.currentSlide + 1)
-                                ++ " / "
-                                ++ String.fromInt (List.length model.gos.slides)
+            let
+                slideIndexDisplay =
+                    String.fromInt (model.currentSlide + 1)
+                        ++ " / "
+                        ++ String.fromInt (List.length model.gos.slides)
 
-                        slideIndexElement =
-                            Strings.dataCapsuleSlide lang 1
-                                ++ " "
-                                ++ slideIndexDisplay
-                                |> Element.text
+                slideIndexElement =
+                    Strings.dataCapsuleSlide lang 1
+                        ++ " "
+                        ++ slideIndexDisplay
+                        |> Element.text
 
-                        lineIndexElement =
-                            Strings.dataCapsuleLine lang 1
-                                ++ " "
-                                ++ lineIndexDisplay
-                                |> Element.text
+                lineIndexElement =
+                    Strings.dataCapsuleLine lang 1
+                        ++ " "
+                        ++ lineIndexDisplay
+                        |> Element.text
 
-                        promptLength =
-                            currentSlide
-                                |> Maybe.map .prompt
-                                |> Maybe.withDefault ""
-                                |> String.split "\n"
-                                |> List.length
-                                |> String.fromInt
+                promptLength =
+                    currentSlide
+                        |> Maybe.map .prompt
+                        |> Maybe.withDefault ""
+                        |> String.split "\n"
+                        |> List.length
 
-                        lineIndexDisplay =
-                            String.fromInt (model.currentSentence + 1) ++ " / " ++ promptLength
-                    in
+                lineIndexDisplay =
+                    String.fromInt (model.currentSentence + 1) ++ " / " ++ String.fromInt promptLength
+            in
+            Element.column [ Ui.wf, Ui.p 10, Ui.s 10 ]
+                [ Ui.primary [ Ui.cx ]
+                    { action =
+                        if model.state == Acquisition.Ready then
+                            Ui.Msg <| App.AcquisitionMsg <| Acquisition.NextSentence True
+
+                        else
+                            Ui.None
+                    , label =
+                        Element.text <|
+                            case
+                                ( model.recording
+                                , model.currentSentence + 1 == promptLength
+                                , model.currentSlide + 1 == List.length model.gos.slides
+                                )
+                            of
+                                ( Nothing, _, _ ) ->
+                                    Strings.stepsAcquisitionStartRecording lang
+
+                                ( _, True, False ) ->
+                                    Strings.stepsAcquisitionRecordingNextSlide lang
+
+                                ( _, True, True ) ->
+                                    Strings.stepsAcquisitionStopRecording lang
+
+                                _ ->
+                                    Strings.stepsAcquisitionRecordingNextLine lang
+                    }
+                , Element.el [ Ui.cx ] <|
                     case model.recording of
                         Just t ->
                             Element.row [ Ui.s 30 ]
@@ -352,7 +378,7 @@ view config user model =
 {-| Shows the element that contains the prompt text.
 -}
 promptElement : Config -> Acquisition.Model Data.Capsule Data.Gos -> Element App.Msg
-promptElement _ model =
+promptElement config model =
     let
         -- Whether a prompt exists in the grain
         hasPrompt : Bool
@@ -426,7 +452,7 @@ promptElement _ model =
         --
         -- Display navigation buttons that let the user move around the prompt text even if they're not recording
         navigationButtons =
-            Element.row [ Ui.ab, Ui.wf ]
+            Element.row [ Ui.ab, Ui.wf, Ui.p 10 ]
                 [ case ( model.recording, model.currentSentence > 0 && model.recording == Nothing ) of
                     ( Nothing, True ) ->
                         Ui.navigationElement
@@ -452,10 +478,28 @@ promptElement _ model =
                         |> Element.el [ Element.htmlAttribute (Html.Attributes.style "visibility" "hidden") ]
                 ]
 
+        -- Small icons to increase or decrease the size of the prompt
+        promptSizeIcons : Element App.Msg
+        promptSizeIcons =
+            Element.row [ Ui.s 10, Ui.p 10, Ui.ar, Ui.at ]
+                [ Ui.navigationElement
+                    (Ui.Msg <| App.ConfigMsg <| Config.PromptSizeChanged <| config.clientConfig.promptSize - 10)
+                    [ Ui.al ]
+                    (Ui.icon 25 Material.Icons.zoom_out)
+                , Ui.navigationElement
+                    (Ui.Msg <| App.ConfigMsg <| Config.PromptSizeChanged <| 40)
+                    [ Ui.al ]
+                    (Ui.icon 25 Material.Icons.youtube_searched_for)
+                , Ui.navigationElement
+                    (Ui.Msg <| App.ConfigMsg <| Config.PromptSizeChanged <| config.clientConfig.promptSize + 10)
+                    [ Ui.al ]
+                    (Ui.icon 25 Material.Icons.zoom_in)
+                ]
+
         -- Displays the current line of the prompt text
         currentSentencePrompt : String -> Element App.Msg
         currentSentencePrompt s =
-            Element.el [ Ui.cx, Font.center, Font.size 40 ]
+            Element.el [ Ui.cx, Font.center, Font.size config.clientConfig.promptSize ]
                 (Input.multiline
                     [ Background.color Colors.black
                     , Ui.b 0
@@ -476,7 +520,7 @@ promptElement _ model =
         -- Displays the next line of the prompt text
         nextSentencePrompt : String -> Element App.Msg
         nextSentencePrompt s =
-            Element.el [ Ui.cx, Font.center, Font.size 40, Font.color (Colors.grey 5) ]
+            Element.el [ Ui.cx, Font.center, Font.size config.clientConfig.promptSize, Font.color (Colors.grey 5) ]
                 (Input.multiline
                     [ Font.center
                     , Background.color Colors.black
@@ -500,10 +544,17 @@ promptElement _ model =
             Element.none
 
         ( _, Just s ) ->
-            Element.column [ Ui.wf, Background.color Colors.black, Font.color Colors.white, Ui.p 10, Ui.s 10 ]
+            Element.column
+                [ Ui.wf
+                , Background.color Colors.black
+                , Font.color Colors.white
+                , Ui.p 10
+                , Ui.s 10
+                , Element.inFront promptSizeIcons
+                , Element.inFront navigationButtons
+                ]
                 [ currentSentencePrompt s
                 , Maybe.withDefault "" nextSentence |> nextSentencePrompt
-                , navigationButtons
                 ]
 
         _ ->

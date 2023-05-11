@@ -419,6 +419,18 @@ msgstr "Acquisition"
 msgid "Steps.Acquisition.startRecording"
 msgstr "Start recording"
 
+#. Action to stop the recording.
+msgid "Steps.Acquisition.stopRecording"
+msgstr "Stop recording"
+
+#. Action to go to the next line during recording.
+msgid "Steps.Acquisition.recordingNextLine"
+msgstr "Go to the next line"
+
+#. Action to go to the next slide during recording.
+msgid "Steps.Acquisition.recordingNextSlide"
+msgstr "Go to the next slide"
+
 #. Action to record a video.
 msgid "Steps.Acquisition.record"
 msgstr "Record"
