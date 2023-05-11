@@ -697,6 +697,10 @@ msgstr ""
 msgid "Steps.Publication.notProducedYet"
 msgstr ""
 
+#. Show integration HTML code.
+msgid "Steps.Publication.integrationHtmlCode"
+msgstr ""
+
 #. Share capsule with someone.
 msgid "Steps.Config.share"
 msgstr ""

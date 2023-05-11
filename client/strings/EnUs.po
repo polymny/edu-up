@@ -736,6 +736,10 @@ msgstr "Copy video URL"
 msgid "Steps.Publication.notProducedYet"
 msgstr "Video has not been produced yet. You will be able to publish it once it is produced."
 
+#. Show integration HTML code.
+msgid "Steps.Publication.integrationHtmlCode"
+msgstr "HTML integration code"
+
 #. Share capsule with someone.
 msgid "Steps.Config.share"
 msgstr "Share"

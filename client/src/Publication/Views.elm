@@ -48,6 +48,20 @@ view config _ model =
                     )
                 )
 
+        -- Title for additionnal information of published capsule
+        publicationInformationTitle =
+            title <| Strings.stepsPublicationIntegrationHtmlCode lang
+
+        -- Text area showing the iframe code for the capsule
+        iframeCode =
+            Input.multiline []
+                { label = Input.labelHidden "HTML"
+                , onChange = \_ -> App.Noop
+                , placeholder = Nothing
+                , spellcheck = False
+                , text = Data.iframeHtml config model.capsule
+                }
+
         -- View of the video
         video =
             Element.column [ Ui.wf, Ui.hf, Element.spacing 10 ] <|
@@ -55,6 +69,10 @@ view config _ model =
                     Just p ->
                         [ title <| Strings.stepsProductionCurrentProducedVideo lang
                         , Element.el [ Ui.wf ] <| videoElement p
+                        , Element.column [ Ui.s 10 ]
+                            [ publicationInformationTitle
+                            , iframeCode
+                            ]
                         ]
 
                     Nothing ->
@@ -230,20 +248,6 @@ view config _ model =
                 Element.el [ Background.color Colors.redLight, Border.color Colors.red, Ui.b 1, Ui.r 10, Ui.p 10 ]
                     (Element.paragraph [] [ Element.text (Strings.stepsPublicationNotProducedYet lang) ])
 
-        -- Title for additionnal information of published capsule
-        publicationInformationTitle =
-            title "Code d'intégration HTML"
-
-        -- Text area showing the iframe code for the capsule
-        iframeCode =
-            Input.multiline []
-                { label = Input.labelHidden "HTML"
-                , onChange = \_ -> App.Noop
-                , placeholder = Nothing
-                , spellcheck = False
-                , text = Data.iframeHtml config model.capsule
-                }
-
         -- Menu for publication
         menu =
             Element.column [ Ui.wf, Ui.hf, Ui.s 30 ]
@@ -270,14 +274,10 @@ view config _ model =
                         , cantPublish
                         ]
                     ]
-                , Element.column [ Ui.s 10 ]
-                    [ publicationInformationTitle
-                    , iframeCode
-                    ]
                 ]
     in
     ( Element.row [ Ui.wf, Ui.hf, Ui.p 10, Ui.s 10 ]
-        [ menu, video ]
+        [ video, menu ]
     , if model.showPrivacyPopup then
         privacyPopup
 
