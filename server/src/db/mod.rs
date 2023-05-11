@@ -3,5 +3,6 @@
 pub mod capsule;
 pub mod notification;
 pub mod session;
+pub mod stats;
 pub mod task_status;
 pub mod user;

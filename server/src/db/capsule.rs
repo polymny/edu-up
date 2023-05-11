@@ -1,6 +1,7 @@
 //! This module contains everything that manage the capsule in the database.
-use chrono::{NaiveDateTime, Utc};
 use std::default::Default;
+
+use chrono::{NaiveDateTime, Utc};
 
 use ergol::prelude::*;
 use ergol::tokio_postgres::types::Json;

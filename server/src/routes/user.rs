@@ -4,6 +4,8 @@ use std::borrow::Cow;
 
 use time::Duration;
 
+use chrono::Utc;
+
 use serde::{Deserialize, Serialize};
 
 use tokio::fs::remove_dir_all;
@@ -125,6 +127,7 @@ pub async fn activate<'a>(
 
     user.activated = true;
     user.activation_key = None;
+    user.member_since = Some(Utc::now().naive_utc());
     user.save(&db).await?;
     let session = user.save_session(&db).await?;
     add_cookies(&session.secret, &config, cookies);

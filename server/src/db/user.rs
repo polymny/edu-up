@@ -2,6 +2,8 @@
 
 use futures::future::try_join_all;
 
+use chrono::{NaiveDateTime, Utc};
+
 use serde::{Deserialize, Serialize};
 
 use ergol::prelude::*;
@@ -47,7 +49,6 @@ pub enum Plan {
 
 /// A user of polymny.
 #[ergol]
-#[derive(Serialize)]
 pub struct User {
     /// The id of the user.
     #[id]
@@ -91,6 +92,12 @@ pub struct User {
 
     /// The disk quota of user
     pub disk_quota: i32,
+
+    /// Date where the user has registered for the first time.
+    pub member_since: Option<NaiveDateTime>,
+
+    /// Date where the user has last visited.
+    pub last_visited: Option<NaiveDateTime>,
 }
 
 impl User {
@@ -163,6 +170,8 @@ impl User {
                 unsubscribe_key,
                 Plan::Free,
                 config.quota_disk_free,
+                None,
+                None,
             )
         } else {
             User::create(
@@ -177,6 +186,8 @@ impl User {
                 unsubscribe_key,
                 Plan::Free,
                 config.quota_disk_free,
+                Some(Utc::now().naive_utc()),
+                None,
             )
         };
 
@@ -459,6 +470,8 @@ impl User {
                             unsubscribe_key,
                             Plan::Free,
                             config.quota_disk_free,
+                            None,
+                            None,
                         )
                         .save(&db)
                         .await?;
@@ -517,13 +530,22 @@ impl<'r> FromRequest<'r> for User {
             _ => return Outcome::Failure((Status::Unauthorized, Error(Status::Unauthorized))),
         };
 
-        let user = match User::get_from_session(cookie.value(), &db).await {
+        let mut user = match User::get_from_session(cookie.value(), &db).await {
             Ok(Some(user)) => user,
             _ => return Outcome::Failure((Status::Unauthorized, Error(Status::Unauthorized))),
         };
 
         if !user.activated {
             return Outcome::Failure((Status::Unauthorized, Error(Status::Unauthorized)));
+        }
+
+        user.last_visited = Some(Utc::now().naive_utc());
+
+        if user.save(&db).await.is_err() {
+            return Outcome::Failure((
+                Status::InternalServerError,
+                Error(Status::InternalServerError),
+            ));
         }
 
         Outcome::Success(user)
@@ -534,6 +556,7 @@ impl<'r> FromRequest<'r> for User {
 ///
 /// This is just a wrapper for a user that has admin rights.
 pub struct Admin(pub User);
+
 #[rocket::async_trait]
 impl<'r> FromRequest<'r> for Admin {
     type Error = Error;

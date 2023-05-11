@@ -25,6 +25,7 @@ use crate::config::Config;
 use crate::db::capsule::{
     Capsule, Fade, Gos, Privacy, Record, Role, Slide, SoundTrack, WebcamSettings,
 };
+use crate::db::stats::{TaskStat, TaskStatType};
 use crate::db::task_status::TaskStatus;
 use crate::db::user::{Plan, User};
 use crate::websockets::WebSockets;
@@ -779,6 +780,8 @@ pub async fn produce(
         return Err(Error(Status::Conflict));
     }
 
+    let mut stat = TaskStat::new(TaskStatType::Production, &db).await?;
+
     let socks = socks.inner().clone();
     let sem = sem.inner().clone();
 
@@ -790,6 +793,8 @@ pub async fn produce(
         } else {
             "null".to_string()
         };
+
+        stat.start(&db).await.unwrap();
         let child = Command::new("../scripts/psh")
             .arg("on-produce")
             .arg(format!("{}", capsule.id))
@@ -844,6 +849,8 @@ pub async fn produce(
         } else {
             false
         };
+
+        stat.end(&db).await.unwrap();
 
         capsule.produced = if succeed {
             TaskStatus::Done
@@ -1062,6 +1069,8 @@ pub async fn publish(
         return Err(Error(Status::Conflict));
     }
 
+    let mut stat = TaskStat::new(TaskStatType::Publication, &db).await?;
+
     let input = config.data_path.join(format!("{}", *id)).join("output.mp4");
     let output = config.data_path.join(format!("{}", *id)).join("output");
 
@@ -1091,6 +1100,7 @@ pub async fn publish(
                 capsule.save(&db).await.ok();
 
                 if let Ok(_) = sem.acquire().await {
+                    stat.start(&db).await.unwrap();
                     let res = child.wait().await;
                     res.map(|x| x.success()).unwrap_or_else(|_| false)
                 } else {
@@ -1102,6 +1112,8 @@ pub async fn publish(
         } else {
             false
         };
+
+        stat.end(&db).await.unwrap();
 
         capsule.published = if succeed {
             TaskStatus::Done

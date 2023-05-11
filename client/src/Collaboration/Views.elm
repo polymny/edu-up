@@ -9,7 +9,7 @@ import Collaboration.Types as Collaboration
 import Config exposing (Config)
 import Data.Capsule as Data
 import Data.Types as Data
-import Data.User exposing (User)
+import Data.User as Data exposing (User)
 import Element exposing (Element)
 import Element.Background as Background
 import Element.Border as Border
@@ -76,7 +76,7 @@ view config user model =
             Element.row attr
                 [ logo
                 , Element.text u.username
-                , if switchAllowed then
+                , if switchAllowed && model.capsule.role == Data.Owner then
                     Ui.link [ Font.italic, Ui.ar ]
                         { label = role
                         , action = Ui.Msg <| App.CollaborationMsg <| Collaboration.SwitchRole u
@@ -84,7 +84,7 @@ view config user model =
 
                   else
                     Element.el [ Font.italic, Ui.ar ] <| Element.text role
-                , if u.role /= Data.Owner then
+                , if u.role /= Data.Owner && model.capsule.role == Data.Owner then
                     Ui.primaryIcon []
                         { icon = Material.Icons.clear
                         , action = Ui.Msg <| App.CollaborationMsg <| Collaboration.RemoveCollaborator u
@@ -104,25 +104,29 @@ view config user model =
         -- New collaborator form
         addCollaboratorForm : Element App.Msg
         addCollaboratorForm =
-            Element.row [ Ui.s 10, Ui.wf ]
-                [ Input.text [ Ui.wf ]
-                    { label = Input.labelHidden <| Strings.loginUsernameOrEmail lang
-                    , onChange =
-                        \x ->
-                            case model.newCollaboratorForm of
-                                RemoteData.Loading _ ->
-                                    App.Noop
+            if Data.isPremium user && model.capsule.role == Data.Owner then
+                Element.row [ Ui.s 10, Ui.wf ]
+                    [ Input.text [ Ui.wf ]
+                        { label = Input.labelHidden <| Strings.loginUsernameOrEmail lang
+                        , onChange =
+                            \x ->
+                                case model.newCollaboratorForm of
+                                    RemoteData.Loading _ ->
+                                        App.Noop
 
-                                _ ->
-                                    App.CollaborationMsg <| Collaboration.NewCollaboratorChanged x
-                    , placeholder = Just <| Input.placeholder [] <| Element.text <| Strings.loginUsernameOrEmail lang
-                    , text = model.newCollaborator
-                    }
-                , Ui.primary []
-                    { action = Ui.Msg <| App.CollaborationMsg <| Collaboration.NewCollaboratorFormSubmitted
-                    , label = Element.text <| Strings.stepsCollaborationAddCollaborator lang
-                    }
-                ]
+                                    _ ->
+                                        App.CollaborationMsg <| Collaboration.NewCollaboratorChanged x
+                        , placeholder = Just <| Input.placeholder [] <| Element.text <| Strings.loginUsernameOrEmail lang
+                        , text = model.newCollaborator
+                        }
+                    , Ui.primary []
+                        { action = Ui.Msg <| App.CollaborationMsg <| Collaboration.NewCollaboratorFormSubmitted
+                        , label = Element.text <| Strings.stepsCollaborationAddCollaborator lang
+                        }
+                    ]
+
+            else
+                Element.none
 
         -- Error message if collaborator addition failed
         collaboratorError : Element App.Msg
