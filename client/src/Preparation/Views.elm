@@ -269,6 +269,7 @@ slideView config _ model ghost default s =
                                     :: Ui.b 1
                                     :: Border.color Colors.greyBorder
                                     :: Element.inFront inFrontLabel
+                                    :: Element.inFront inFrontPrompt
                                     :: slideStyle model.slideModel slide.totalSlideId Drag
                                     ++ slideStyle model.slideModel slide.totalSlideId Drop
                                     ++ Utils.tern ghost (slideStyle model.slideModel slide.totalSlideId Ghost) []
@@ -293,6 +294,7 @@ slideView config _ model ghost default s =
                                     :: Ui.b 1
                                     :: Border.color Colors.greyBorder
                                     :: Element.inFront inFrontLabel
+                                    :: Element.inFront inFrontPrompt
                                     :: slideStyle model.slideModel slide.totalSlideId Drag
                                     ++ slideStyle model.slideModel slide.totalSlideId Drop
                                     ++ Utils.tern ghost (slideStyle model.slideModel slide.totalSlideId Ghost) []
@@ -306,7 +308,6 @@ slideView config _ model ghost default s =
                 , Ui.pl 20
                 , Ui.id ("slide-" ++ String.fromInt slide.totalSlideId)
                 , Element.inFront inFrontButtons
-                , Element.inFront inFrontPrompt
                 ]
                 slideElement
 
