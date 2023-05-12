@@ -11,7 +11,7 @@ import Config exposing (Config)
 import Data.Capsule as Data exposing (Capsule)
 import Data.User exposing (User)
 import DnDList.Groups
-import Element exposing (Element, modular)
+import Element exposing (Element)
 import Element.Background as Background
 import Element.Border as Border
 import Element.Font as Font
@@ -357,7 +357,7 @@ deleteSlideConfirmPopup lang model s =
                 }
             ]
         ]
-        |> Ui.popup 1 (Strings.actionsDeleteSlide lang)
+        |> Ui.popup (Strings.actionsDeleteSlide lang)
 
 
 {-| Popup to confirm the extra deletion.
@@ -378,7 +378,7 @@ deleteExtraConfirmPopup lang _ s =
                 }
             ]
         ]
-        |> Ui.popup 1 (Strings.actionsDeleteExtra lang)
+        |> Ui.popup (Strings.actionsDeleteExtra lang)
 
 
 {-| Popup to input prompt texts.
@@ -456,7 +456,7 @@ promptPopup lang model slide =
                 ]
             ]
         ]
-        |> Ui.popup 5 (Strings.actionsEditPrompt lang)
+        |> Ui.popup (Strings.actionsEditPrompt lang)
 
 
 {-| Popup to confirm drag n drop that will destroy records.
@@ -476,7 +476,7 @@ confirmUpdateCapsulePopup lang =
                 }
             ]
         ]
-        |> Ui.popup 1 (Strings.uiWarning lang)
+        |> Ui.popup (Strings.uiWarning lang)
 
 
 {-| Popup to confirm add slide that will destroy records.
@@ -496,7 +496,7 @@ confirmAddSlidePopup lang gos =
                 }
             ]
         ]
-        |> Ui.popup 1 (Strings.uiWarning lang)
+        |> Ui.popup (Strings.uiWarning lang)
 
 
 {-| Popup to select the page number when uploading a slide.
@@ -575,7 +575,7 @@ selectPageNumberPopup lang model f =
         , errorMsg
         , buttonBar
         ]
-        |> Ui.popup 1 (title lang)
+        |> Ui.popup (title lang)
 
 
 {-| Finds whether a slide is being dragged.

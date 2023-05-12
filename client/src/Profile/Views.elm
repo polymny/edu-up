@@ -928,7 +928,7 @@ deleteAccount config _ _ m =
         -- Account deletion confirm popup
         popup =
             if m.showPopup then
-                Ui.popup 1 (Strings.uiWarning lang) <|
+                Ui.popup (Strings.uiWarning lang) <|
                     Element.column [ Ui.wf, Ui.hf ]
                         [ Ui.paragraph [ Ui.cy ] <| Strings.loginConfirmDeleteAccount lang ++ "."
                         , Element.row [ Ui.s 10, Ui.ab, Ui.ar ]

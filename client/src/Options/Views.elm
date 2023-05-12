@@ -568,7 +568,7 @@ deleteTrackConfirmPopup lang _ s =
                 }
             ]
         ]
-        |> Ui.popup 1 (Strings.actionsDeleteTrack lang)
+        |> Ui.popup (Strings.actionsDeleteTrack lang)
 
 
 {-| Easily creates the Ui.Msg for options msg.

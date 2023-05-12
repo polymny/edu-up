@@ -305,18 +305,17 @@ spinningSpinner attr size =
 
 {-| A popup.
 -}
-popup : Int -> String -> Element msg -> Element msg
-popup size titleText content =
-    Element.row [ Ui.zIndex 1, Ui.wf, Ui.hf, Background.color (Element.rgba255 0 0 0 0.5), Element.scrollbars ]
-        [ Element.el [ Ui.wfp 1 ] Element.none
-        , Element.column [ Ui.hf, Ui.wfp size, Element.scrollbars ]
-            [ Element.el [ Ui.hfp 1 ] Element.none
-            , Element.column
-                [ Ui.wf
-                , Ui.hfp size
-                , Background.color Colors.green2
+popup : String -> Element msg -> Element msg
+popup titleText content =
+    let
+        popupElement : Element msg
+        popupElement =
+            Element.column
+                [ Background.color Colors.green2
                 , Ui.r 10
                 , Ui.b 1
+                , Ui.cy
+                , Ui.cx
                 , Border.color <| Colors.alphaColor 0.8 Colors.greyFont
                 , Border.shadow
                     { offset = ( 0.0, 0.0 )
@@ -328,12 +327,9 @@ popup size titleText content =
                 ]
                 [ Element.el [ Ui.p 10, Ui.cx, Font.color Colors.white, Font.bold ] (Element.text titleText)
                 , Element.el
-                    [ Ui.wf
-                    , Ui.hf
-                    , Background.color Colors.greyBackground
+                    [ Background.color Colors.greyBackground
                     , Ui.p 10
                     , Ui.r 10
-                    , Element.scrollbars
                     , Border.shadow
                         { offset = ( 0.0, 0.0 )
                         , size = 3.0
@@ -343,10 +339,58 @@ popup size titleText content =
                     ]
                     content
                 ]
-            , Element.el [ Ui.hfp 1 ] Element.none
-            ]
-        , Element.el [ Ui.wfp 1 ] Element.none
+    in
+    Element.el
+        [ Ui.zIndex 1
+        , Ui.wf
+        , Ui.hf
+        , Background.color (Element.rgba255 0 0 0 0.5)
+        , Element.inFront popupElement
         ]
+        Element.none
+
+
+
+-- Element.row [ Ui.zIndex 1, Ui.wf, Ui.hf, Background.color (Element.rgba255 0 0 0 0.5), Element.scrollbars ]
+--     [ Element.el [ Ui.wf ] Element.none
+--     , Element.column [ Ui.hf, Ui.wfp size, Element.scrollbars ]
+--         [ Element.el [ Ui.hf ] Element.none
+--         , Element.column
+--             [ Ui.wf
+--             , Ui.hf
+--             , Background.color Colors.green2
+--             , Ui.r 10
+--             , Ui.b 1
+--             , Border.color <| Colors.alphaColor 0.8 Colors.greyFont
+--             , Border.shadow
+--                 { offset = ( 0.0, 0.0 )
+--                 , size = 3.0
+--                 , blur = 3.0
+--                 , color = Colors.alpha 0.1
+--                 }
+--             , Element.scrollbars
+--             ]
+--             [ Element.el [ Ui.p 10, Ui.cx, Font.color Colors.white, Font.bold ] (Element.text titleText)
+--             , Element.el
+--                 [ Ui.wf
+--                 , Ui.hf
+--                 , Background.color Colors.greyBackground
+--                 , Ui.p 10
+--                 , Ui.r 10
+--                 , Element.scrollbars
+--                 , Border.shadow
+--                     { offset = ( 0.0, 0.0 )
+--                     , size = 3.0
+--                     , blur = 3.0
+--                     , color = Colors.alpha 0.1
+--                     }
+--                 ]
+--                 content
+--             ]
+--         , Element.el [ Ui.hf ] Element.none
+--         ]
+--     , Element.el [ Ui.wf ] Element.none
+--     ]
 
 
 {-| Helper to create an error modal.

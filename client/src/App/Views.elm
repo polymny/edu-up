@@ -298,7 +298,7 @@ langPicker lang =
             Element.wrappedRow [ Ui.cx, Ui.cy, Ui.s 10 ] <|
                 List.map langChoice Lang.langs
     in
-    Ui.popup 1 (Strings.configLang lang) <|
+    Ui.popup (Strings.configLang lang) <|
         Element.column [ Ui.wf, Ui.hf, Ui.s 10 ]
             [ langChoices
             , confirmButton
@@ -323,6 +323,6 @@ webSocketInfo lang =
                 , label = Element.text <| Strings.uiConfirm lang
                 }
     in
-    Ui.popup 1 (Strings.uiInfo lang) <|
+    Ui.popup (Strings.uiInfo lang) <|
         Element.column [ Ui.wf, Ui.hf, Ui.s 10 ]
             [ info, confirmButton ]

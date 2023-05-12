@@ -11,6 +11,7 @@ import Data.Capsule as Data exposing (Capsule)
 import Data.Types as Data
 import Data.User as Data
 import Publication.Types as Publication
+import Utils
 
 
 update : Publication.Msg -> App.Model -> ( App.Model, Cmd App.Msg )
@@ -23,7 +24,28 @@ update msg model =
         ( App.Publication m, Just capsule ) ->
             case msg of
                 Publication.TogglePrivacyPopup ->
-                    ( { model | page = App.Publication { m | showPrivacyPopup = not m.showPrivacyPopup } }
+                    let
+                        newPopupType : Publication.PopupType
+                        newPopupType =
+                            Utils.tern
+                                (m.popupType == Publication.PrivacyPopup)
+                                Publication.NoPopup
+                                Publication.PrivacyPopup
+                    in
+                    ( { model | page = App.Publication { m | popupType = newPopupType } }
+                    , Cmd.none
+                    )
+
+                Publication.ToggleIntegrationPopup ->
+                    let
+                        newPopupType : Publication.PopupType
+                        newPopupType =
+                            Utils.tern
+                                (m.popupType == Publication.IntegrationPopup)
+                                Publication.NoPopup
+                                Publication.IntegrationPopup
+                    in
+                    ( { model | page = App.Publication { m | popupType = newPopupType } }
                     , Cmd.none
                     )
 

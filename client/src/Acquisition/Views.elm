@@ -181,7 +181,7 @@ view config user model =
                         }
                     ]
                 ]
-                |> Ui.popup 1 (Strings.actionsDeleteRecord lang)
+                |> Ui.popup (Strings.actionsDeleteRecord lang)
 
         -- Popup to warn the user that they're leaving and that they might lose their record
         warnLeavingPopup : Element App.Msg
@@ -200,7 +200,7 @@ view config user model =
                         }
                     ]
                 ]
-                |> Ui.popup 1 (Strings.uiWarning lang)
+                |> Ui.popup (Strings.uiWarning lang)
 
         -- Popup to show the help to the user
         helpPopup : Element App.Msg
@@ -215,7 +215,7 @@ view config user model =
                     , label = Element.text <| Strings.uiConfirm lang
                     }
                 ]
-                |> Ui.popup 2 (Strings.uiHelp lang)
+                |> Ui.popup (Strings.uiHelp lang)
 
         -- Column that contains the device feedback element, the info, and the list of records
         rightColumn : Element App.Msg
@@ -817,7 +817,7 @@ settingsPopup user config model =
             , action = Ui.Msg <| App.AcquisitionMsg <| Acquisition.ToggleSettings
             }
         ]
-        |> Ui.popup 5 (Strings.navigationSettings lang)
+        |> Ui.popup (Strings.navigationSettings lang)
 
 
 {-| Displays a button to select a specific video device.

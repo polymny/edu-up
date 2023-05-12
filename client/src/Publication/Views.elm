@@ -13,7 +13,7 @@ import Element.Background as Background
 import Element.Border as Border
 import Element.Font as Font
 import Element.Input as Input
-import Html exposing (canvas)
+import Html
 import Html.Attributes
 import Material.Icons as Icons
 import Publication.Types as Publication
@@ -70,10 +70,10 @@ view config _ model =
                         [ title <| Strings.stepsProductionCurrentProducedVideo lang
                         , Element.el [ Ui.wf ] <| videoElement p
                         , if model.capsule.published == Data.Done then
-                            Element.column [ Ui.s 10 ]
-                                [ publicationInformationTitle
-                                , iframeCode
-                                ]
+                            Ui.secondary []
+                                { action = Ui.Msg <| App.PublicationMsg <| Publication.ToggleIntegrationPopup
+                                , label = Element.text <| Strings.stepsPublicationIntegrationHtmlCode lang
+                                }
 
                           else
                             Element.none
@@ -144,7 +144,7 @@ view config _ model =
 
         -- The privacy selection popup
         privacyPopup =
-            Ui.popup 1
+            Ui.popup
                 (Strings.stepsPublicationPrivacyPrivacySettings lang)
                 (Element.column [ Ui.hf, Ui.wf, Ui.s 50, Ui.p 10 ]
                     [ Element.column
@@ -164,6 +164,22 @@ view config _ model =
                     , Ui.primary [ Ui.ab, Ui.ar ]
                         { label = Element.text <| Strings.uiConfirm lang
                         , action = Ui.Msg <| App.PublicationMsg <| Publication.TogglePrivacyPopup
+                        }
+                    ]
+                )
+
+        -- The integration popup
+        integrationPopup =
+            Ui.popup
+                (Strings.stepsPublicationIntegrationHtmlCode lang)
+                (Element.column [ Ui.wf, Ui.hf, Ui.s 50, Ui.p 10 ]
+                    [ Element.column [ Ui.s 10 ]
+                        [ publicationInformationTitle
+                        , iframeCode
+                        ]
+                    , Ui.primary [ Ui.ab, Ui.ar ]
+                        { label = Element.text <| Strings.uiConfirm lang
+                        , action = Ui.Msg <| App.PublicationMsg <| Publication.ToggleIntegrationPopup
                         }
                     ]
                 )
@@ -282,9 +298,13 @@ view config _ model =
     in
     ( Element.row [ Ui.wf, Ui.hf, Ui.p 10, Ui.s 10 ]
         [ video, menu ]
-    , if model.showPrivacyPopup then
-        privacyPopup
+    , case model.popupType of
+        Publication.PrivacyPopup ->
+            privacyPopup
 
-      else
-        Element.none
+        Publication.IntegrationPopup ->
+            integrationPopup
+
+        Publication.NoPopup ->
+            Element.none
     )

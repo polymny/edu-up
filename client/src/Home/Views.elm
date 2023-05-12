@@ -1079,7 +1079,7 @@ deleteCapsuleConfirmPopup lang capsule =
                 }
             ]
         ]
-        |> Ui.popup 1 (Strings.actionsDeleteCapsule lang)
+        |> Ui.popup (Strings.actionsDeleteCapsule lang)
 
 
 {-| Popup to confirm leaving a capsule.
@@ -1100,7 +1100,7 @@ leaveCapsuleConfirmPopup lang capsule =
                 }
             ]
         ]
-        |> Ui.popup 1 (Strings.actionsLeaveCapsule lang)
+        |> Ui.popup (Strings.actionsLeaveCapsule lang)
 
 
 {-| Popup to rename a capsule.
@@ -1130,7 +1130,7 @@ renameCapsulePopup lang capsule =
                 }
             ]
         ]
-        |> Ui.popup 1 (Strings.actionsRenameCapsule lang)
+        |> Ui.popup (Strings.actionsRenameCapsule lang)
 
 
 {-| Popup to confirm the project deletion.
@@ -1155,7 +1155,7 @@ deleteProjectConfirmPopup lang project =
                 }
             ]
         ]
-        |> Ui.popup 1 (Strings.actionsDeleteProject lang)
+        |> Ui.popup (Strings.actionsDeleteProject lang)
 
 
 {-| Renames a project.
@@ -1189,7 +1189,7 @@ renameProjectPopup lang project =
                 }
             ]
         ]
-        |> Ui.popup 1 (Strings.actionsRenameProject lang)
+        |> Ui.popup (Strings.actionsRenameProject lang)
 
 
 {-| Easily creates the Ui.Msg for options msg.
