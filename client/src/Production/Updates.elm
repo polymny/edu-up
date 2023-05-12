@@ -13,7 +13,7 @@ import Data.Types as Data
 import Data.User as Data
 import Json.Decode as Decode
 import Material.Icons exposing (anchor)
-import Production.Types as Production exposing (getWebcamSettings)
+import Production.Types as Production exposing (getHeight, getWebcamSettings)
 
 
 {-| Updates the model.
@@ -88,9 +88,8 @@ update msg model =
                                 ( Just _, Nothing ) ->
                                     Data.setWebcamSettingsSize Nothing (getWebcamSettings capsule gos)
 
-                                ( Just size, Just width ) ->
-                                    Production.setWidth width size
-                                        |> (\x -> Data.setWebcamSettingsSize (Just x) (getWebcamSettings capsule gos))
+                                ( Just _, Just width ) ->
+                                    Data.setWebcamSettingsSize (Just width) (getWebcamSettings capsule gos)
 
                                 _ ->
                                     getWebcamSettings capsule gos
@@ -257,11 +256,17 @@ subs model =
 
         Just ( _, oldPageX, oldPageY ) ->
             let
+                recordSize : ( Int, Int )
+                recordSize =
+                    model.gos.record
+                        |> Maybe.andThen .size
+                        |> Maybe.withDefault ( 0, 0 )
+
                 imageSize : ( Float, Float )
                 imageSize =
                     case getWebcamSettings model.capsule model.gos of
                         Data.Pip { size } ->
-                            Tuple.mapBoth toFloat toFloat size
+                            Tuple.mapBoth toFloat toFloat ( size, getHeight recordSize size )
 
                         _ ->
                             ( 0, 0 )

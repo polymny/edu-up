@@ -17,7 +17,7 @@ import Element.Input as Input
 import Html.Attributes
 import Html.Events
 import Json.Decode as Decode
-import Production.Types as Production exposing (getWebcamSettings)
+import Production.Types as Production exposing (getHeight, getWebcamSettings)
 import Simple.Animation as Animation exposing (Animation)
 import Simple.Animation.Animated as Animated
 import Simple.Animation.Property as P
@@ -62,7 +62,7 @@ leftColumn config model =
         width =
             case getWebcamSettings model.capsule model.gos of
                 Data.Pip { size } ->
-                    Just (Tuple.first size)
+                    Just size
 
                 _ ->
                     Nothing
@@ -207,8 +207,8 @@ leftColumn config model =
                 , selected =
                     case getWebcamSettings model.capsule model.gos of
                         Data.Pip { size } ->
-                            if List.member (Tuple.first size) [ 200, 400, 800 ] then
-                                Just <| Just <| Tuple.first size
+                            if List.member size [ 200, 400, 800 ] then
+                                Just <| Just <| size
 
                             else
                                 Just <| Just 533
@@ -316,7 +316,13 @@ rightColumn config user model =
                 ( Data.Pip s, Just r ) ->
                     let
                         ( ( marginX, marginY ), ( w, h ) ) =
-                            ( model.webcamPosition, Tuple.mapBoth toFloat toFloat s.size )
+                            ( model.webcamPosition
+                            , r.size
+                                |> Maybe.withDefault ( 0, 0 )
+                                |> (\i -> getHeight i s.size)
+                                |> (\i -> ( s.size, i ))
+                                |> Tuple.mapBoth toFloat toFloat
+                            )
 
                         ( x, y ) =
                             case s.anchor of

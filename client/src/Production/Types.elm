@@ -70,16 +70,16 @@ type Msg
 
 {-| Changes the height preserving aspect ratio.
 -}
-setHeight : Int -> ( Int, Int ) -> ( Int, Int )
+setHeight : Int -> ( Int, Int ) -> Int
 setHeight newHeight ( width, height ) =
-    ( width * newHeight // height, newHeight )
+    width * newHeight // height
 
 
-{-| Changes the width preserving aspect ratio.
+{-| Get the height preserving aspect ratio.
 -}
-setWidth : Int -> ( Int, Int ) -> ( Int, Int )
-setWidth newWidth ( width, height ) =
-    ( newWidth, height * newWidth // width )
+getHeight : ( Int, Int ) -> Int -> Int
+getHeight ( width, height ) size =
+    height * size // width
 
 
 {-| The ID of the miniature of the webcam.
@@ -94,20 +94,6 @@ miniatureId =
 getWebcamSettings : Data.Capsule -> Data.Gos -> Data.WebcamSettings
 getWebcamSettings capsule gos =
     let
-        -- Get record size
-        recordSize =
-            case gos.record of
-                Just r ->
-                    case r.size of
-                        Just s ->
-                            s
-
-                        Nothing ->
-                            ( 1, 1 )
-
-                Nothing ->
-                    ( 1, 1 )
-
         -- Get default size
         defaultSize =
             case capsule.defaultWebcamSettings of
@@ -115,27 +101,7 @@ getWebcamSettings capsule gos =
                     s.size
 
                 _ ->
-                    ( 1, 1 )
-
-        -- Reset size
-        resetSize =
-            let
-                recoardWidth =
-                    recordSize |> Tuple.first |> toFloat
-
-                recoardHeight =
-                    recordSize |> Tuple.second |> toFloat
-
-                ratio =
-                    recoardWidth / recoardHeight
-
-                defaultWidth =
-                    defaultSize |> Tuple.first |> toFloat
-
-                newHeight =
-                    defaultWidth / ratio
-            in
-            ( defaultWidth |> round, newHeight |> round )
+                    1
 
         -- Get webcam settings
         webcamSettings =
@@ -152,7 +118,7 @@ getWebcamSettings capsule gos =
                                 , keycolor = s.keycolor
                                 , opacity = s.opacity
                                 , position = s.position
-                                , size = resetSize
+                                , size = defaultSize
                                 }
 
                         _ ->

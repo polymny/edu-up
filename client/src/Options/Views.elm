@@ -83,7 +83,7 @@ defaultProd config model =
         width =
             case model.capsule.defaultWebcamSettings of
                 Data.Pip { size } ->
-                    Just (Tuple.first size)
+                    Just size
 
                 _ ->
                     Nothing
@@ -196,8 +196,8 @@ defaultProd config model =
                 , selected =
                     case model.capsule.defaultWebcamSettings of
                         Data.Pip { size } ->
-                            if List.member (Tuple.first size) [ 200, 400, 800 ] then
-                                Just <| Just <| Tuple.first size
+                            if List.member size [ 200, 400, 800 ] then
+                                Just <| Just <| size
 
                             else
                                 Just <| Just 533
@@ -435,7 +435,7 @@ generalOptions config model =
                         Options.DeleteTrack Utils.Request model.capsule.soundTrack
                             |> App.OptionsMsg
                             |> Ui.Msg
-                
+
                 icon : Material.Icons.Types.Icon msg
                 icon =
                     if uploading then
@@ -443,7 +443,7 @@ generalOptions config model =
 
                     else
                         Icons.delete
-                
+
                 tooltip : String
                 tooltip =
                     if uploading then

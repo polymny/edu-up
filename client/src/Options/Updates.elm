@@ -31,7 +31,7 @@ update msg model =
                         newWebcamSettings =
                             case capsule.defaultWebcamSettings of
                                 Data.Disabled ->
-                                    Data.defaultWebcamSettings ( 533, 0 )
+                                    Data.defaultWebcamSettings 533
 
                                 _ ->
                                     Data.Disabled
@@ -58,7 +58,7 @@ update msg model =
                                     Data.setWebcamSettingsSize Nothing capsule.defaultWebcamSettings
 
                                 Just width ->
-                                    Data.setWebcamSettingsSize (Just ( width, 0 )) capsule.defaultWebcamSettings
+                                    Data.setWebcamSettingsSize (Just width) capsule.defaultWebcamSettings
                     in
                     updateModelWebcamSettings capsule newWebcamSettings model m
 

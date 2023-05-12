@@ -2,7 +2,7 @@ module Data.Capsule exposing
     ( Capsule, emptyCapsule, assetPath, iframeHtml, Collaborator
     , Gos, gosFromSlides, WebcamSettings(..), defaultWebcamSettings, setWebcamSettingsSize, Fade, defaultFade, Anchor(..), Event, EventType(..), eventTypeToString, updateGos
     , Slide, slidePath, videoPath, recordPath, pointerPath, gosVideoPath, deleteSlide, deleteExtra, updateSlide, updateSlideInGos
-    , Record
+    , Record, emptyRecord
     , encodeCapsule, encodeGos, encodeWebcamSettings, encodeFade, encodeRecord, encodeEvent, encodeEventType, encodeAnchor
     , encodeSlide, encodePair
     , decodeCapsule, decodeGos, decodeWebcamSettings, decodePip, decodeFullscreen, decodeFade, decodeRecord, decodeEvent
@@ -30,7 +30,7 @@ module Data.Capsule exposing
 
 ## Records
 
-@docs Record
+@docs Record, emptyRecord
 
 
 # Encoders and decoders
@@ -109,7 +109,7 @@ emptyCapsule =
     , published = Data.Idle
     , privacy = Data.Private
     , structure = []
-    , defaultWebcamSettings = defaultWebcamSettings ( 0, 0 )
+    , defaultWebcamSettings = defaultWebcamSettings 0
     , lastModified = 0
     , promptSubtitles = False
     , diskUsage = 0
@@ -396,6 +396,16 @@ type alias Record =
     }
 
 
+{-| Empty record.
+-}
+emptyRecord : Record
+emptyRecord =
+    { uuid = ""
+    , pointerUuid = Nothing
+    , size = Nothing
+    }
+
+
 {-| JSON encoder for record.
 -}
 encodeRecord : Maybe Record -> Encode.Value
@@ -603,8 +613,17 @@ decodeAnchor =
 -}
 type WebcamSettings
     = Disabled
-    | Fullscreen { opacity : Float, keycolor : Maybe String }
-    | Pip { anchor : Anchor, opacity : Float, position : ( Int, Int ), size : ( Int, Int ), keycolor : Maybe String }
+    | Fullscreen
+        { opacity : Float
+        , keycolor : Maybe String
+        }
+    | Pip
+        { anchor : Anchor
+        , opacity : Float
+        , position : ( Int, Int )
+        , size : Int
+        , keycolor : Maybe String
+        }
 
 
 {-| Sets the size of the webcam settings.
@@ -612,11 +631,11 @@ type WebcamSettings
 Nothing means fullscreen.
 
 -}
-setWebcamSettingsSize : Maybe ( Int, Int ) -> WebcamSettings -> WebcamSettings
+setWebcamSettingsSize : Maybe Int -> WebcamSettings -> WebcamSettings
 setWebcamSettingsSize size settings =
     let
         default =
-            Maybe.map defaultPip size |> Maybe.withDefault (defaultPip ( 0, 0 ))
+            Maybe.map defaultPip size |> Maybe.withDefault (defaultPip 0)
     in
     case size of
         Just s ->
@@ -662,7 +681,7 @@ encodeWebcamSettings settings =
                 [ ( "type", Encode.string "pip" )
                 , ( "anchor", encodeAnchor anchor )
                 , ( "position", encodePair Encode.int position )
-                , ( "size", encodePair Encode.int size )
+                , ( "size", Encode.int size )
                 , ( "opacity", Encode.float opacity )
                 , ( "keycolor", Maybe.withDefault Encode.null (Maybe.map Encode.string keycolor) )
                 ]
@@ -670,26 +689,26 @@ encodeWebcamSettings settings =
 
 {-| JSON decoder for the Pip attributes of webcam settings.
 -}
-decodePip : Decoder { anchor : Anchor, opacity : Float, position : ( Int, Int ), size : ( Int, Int ), keycolor : Maybe String }
+decodePip : Decoder { anchor : Anchor, opacity : Float, position : ( Int, Int ), size : Int, keycolor : Maybe String }
 decodePip =
     Decode.map5 (\a o p s k -> { anchor = a, opacity = o, position = p, size = s, keycolor = k })
         (Decode.field "anchor" decodeAnchor)
         (Decode.field "opacity" Decode.float)
         (Decode.field "position" (decodePair Decode.int))
-        (Decode.field "size" (decodePair Decode.int))
+        (Decode.field "size" Decode.int)
         (Decode.maybe (Decode.field "keycolor" Decode.string))
 
 
 {-| Default pip settings.
 -}
 defaultPip :
-    ( Int, Int )
+    Int
     ->
         { anchor : Anchor
         , keycolor : Maybe a
         , opacity : Float
         , position : ( number, number1 )
-        , size : ( Int, Int )
+        , size : Int
         }
 defaultPip size =
     { anchor = BottomLeft
@@ -702,7 +721,7 @@ defaultPip size =
 
 {-| Default webcam settings.
 -}
-defaultWebcamSettings : ( Int, Int ) -> WebcamSettings
+defaultWebcamSettings : Int -> WebcamSettings
 defaultWebcamSettings size =
     Pip
         { anchor = BottomLeft
