@@ -297,38 +297,96 @@ taskPanel clientState =
                 name : String
                 name =
                     case taskStatus.task of
-                        Config.UploadRecord _ _ gosId _ ->
+                        Config.UploadRecord _ capsuleId gosId _ ->
                             Strings.tasksUploadRecord lang
-                                ++ " ("
+                                ++ "\n ("
+                                ++ Strings.dataCapsuleCapsule lang 1
+                                ++ ": "
+                                ++ capsuleId
+                                ++ ", "
+                                ++ Strings.dataCapsuleGrain lang 1
+                                ++ ": "
                                 ++ String.fromInt (gosId + 1)
                                 ++ ")"
 
-                        Config.UploadTrack _ _ ->
+                        Config.UploadTrack _ capsuleId ->
                             Strings.tasksUploadTrack lang
+                                ++ "\n ("
+                                ++ Strings.dataCapsuleCapsule lang 1
+                                ++ ": "
+                                ++ capsuleId
+                                ++ ")"
 
-                        Config.AddGos _ _ ->
+                        Config.AddGos _ capsuleId ->
                             Strings.tasksUploadExtra lang
+                                ++ "\n ("
+                                ++ Strings.dataCapsuleCapsule lang 1
+                                ++ ": "
+                                ++ capsuleId
+                                ++ ")"
 
-                        Config.AddSlide _ _ ->
+                        Config.AddSlide _ capsuleId gosId ->
                             Strings.tasksUploadExtra lang
+                                ++ "\n ("
+                                ++ Strings.dataCapsuleCapsule lang 1
+                                ++ ": "
+                                ++ capsuleId
+                                ++ ", "
+                                ++ Strings.dataCapsuleGrain lang 1
+                                ++ ": "
+                                ++ String.fromInt (gosId + 1)
+                                ++ ")"
 
-                        Config.ReplaceSlide _ _ ->
+                        Config.ReplaceSlide _ capsuleId gosId ->
                             Strings.tasksUploadExtra lang
+                                ++ "\n ("
+                                ++ Strings.dataCapsuleCapsule lang 1
+                                ++ ": "
+                                ++ capsuleId
+                                ++ ", "
+                                ++ Strings.dataCapsuleGrain lang 1
+                                ++ ": "
+                                ++ String.fromInt (gosId + 1)
+                                ++ ")"
 
-                        Config.ExportCapsule _ _ ->
+                        Config.ExportCapsule _ capsuleId ->
                             Strings.tasksExportCapsule lang
+                                ++ "\n ("
+                                ++ Strings.dataCapsuleCapsule lang 1
+                                ++ ": "
+                                ++ capsuleId
+                                ++ ")"
 
                         Config.ImportCapsule _ ->
                             Strings.tasksImportCapsule lang
 
-                        Config.Production _ _ ->
+                        Config.Production _ capsuleId ->
                             Strings.tasksProductionCapsule lang
+                                ++ "\n ("
+                                ++ Strings.dataCapsuleCapsule lang 1
+                                ++ ": "
+                                ++ capsuleId
+                                ++ ")"
 
-                        Config.Publication _ _ ->
+                        Config.Publication _ capsuleId ->
                             Strings.tasksPublicationCapsule lang
+                                ++ "\n ("
+                                ++ Strings.dataCapsuleCapsule lang 1
+                                ++ ": "
+                                ++ capsuleId
+                                ++ ")"
 
-                        Config.TranscodeExtra _ _ _ ->
+                        Config.TranscodeExtra _ slideId capsuleId ->
                             Strings.tasksTranscodeExtra lang
+                                ++ "\n ("
+                                ++ Strings.dataCapsuleCapsule lang 1
+                                ++ ": "
+                                ++ capsuleId
+                                ++ ", "
+                                ++ Strings.dataCapsuleSlide lang 1
+                                ++ ": "
+                                ++ slideId
+                                ++ ")"
 
                 -- _ ->
                 --     Strings.tasksUnknown lang

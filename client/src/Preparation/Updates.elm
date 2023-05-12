@@ -19,7 +19,6 @@ import Keyboard
 import List.Extra
 import Preparation.Types as Preparation
 import RemoteData
-import Svg.Attributes exposing (display)
 import Utils
 
 
@@ -380,13 +379,13 @@ updateExtra user msg model config =
                             { task =
                                 case changeSlide of
                                     Preparation.AddSlide _ ->
-                                        Config.AddSlide config.clientState.taskId capsule.id
+                                        Config.AddSlide config.clientState.taskId capsule.id p
 
                                     Preparation.AddGos _ ->
                                         Config.AddGos config.clientState.taskId capsule.id
 
                                     Preparation.ReplaceSlide _ ->
-                                        Config.ReplaceSlide config.clientState.taskId capsule.id
+                                        Config.ReplaceSlide config.clientState.taskId capsule.id p
                             , progress = Just 0.0
                             , finished = False
                             , aborted = False

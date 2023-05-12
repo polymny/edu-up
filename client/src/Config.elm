@@ -262,9 +262,9 @@ type alias TaskId =
 type Task
     = UploadRecord TaskId String Int Decode.Value
     | UploadTrack TaskId String
-    | AddSlide TaskId String
+    | AddSlide TaskId String Int
     | AddGos TaskId String
-    | ReplaceSlide TaskId String
+    | ReplaceSlide TaskId String Int
     | Production TaskId String
     | Publication TaskId String
     | ExportCapsule TaskId String
@@ -283,13 +283,13 @@ isClientTask task =
         UploadTrack _ _ ->
             True
 
-        AddSlide _ _ ->
+        AddSlide _ _ _ ->
             True
 
         AddGos _ _ ->
             True
 
-        ReplaceSlide _ _ ->
+        ReplaceSlide _ _ _ ->
             True
 
         ExportCapsule _ _ ->
@@ -337,9 +337,10 @@ decodeTask =
                             (Decode.field "capsuleId" Decode.string)
 
                     "AddSlide" ->
-                        Decode.map2 AddSlide
+                        Decode.map3 AddSlide
                             (Decode.field "taskId" decodeTaskId)
                             (Decode.field "capsuleId" Decode.string)
+                            (Decode.field "gos" Decode.int)
 
                     "AddGos" ->
                         Decode.map2 AddGos
@@ -347,9 +348,10 @@ decodeTask =
                             (Decode.field "capsuleId" Decode.string)
 
                     "ReplaceSlide" ->
-                        Decode.map2 ReplaceSlide
+                        Decode.map3 ReplaceSlide
                             (Decode.field "taskId" decodeTaskId)
                             (Decode.field "capsuleId" Decode.string)
+                            (Decode.field "gos" Decode.int)
 
                     "Production" ->
                         Decode.map2 Production
@@ -392,13 +394,13 @@ getId task =
         UploadTrack id _ ->
             id
 
-        AddSlide id _ ->
+        AddSlide id _ _ ->
             id
 
         AddGos id _ ->
             id
 
-        ReplaceSlide id _ ->
+        ReplaceSlide id _ _ ->
             id
 
         Production id _ ->
@@ -495,13 +497,13 @@ compareTasks t1 t2 =
             else
                 id1 == id2
 
-        ( AddSlide id1 _, AddSlide id2 _ ) ->
+        ( AddSlide id1 _ _, AddSlide id2 _ _ ) ->
             id1 == id2
 
         ( AddGos id1 _, AddGos id2 _ ) ->
             id1 == id2
 
-        ( ReplaceSlide id1 _, ReplaceSlide id2 _ ) ->
+        ( ReplaceSlide id1 _ _, ReplaceSlide id2 _ _ ) ->
             id1 == id2
 
         ( Production id1 capsuleId1, Production id2 capsuleId2 ) ->
@@ -850,13 +852,13 @@ update msg { serverConfig, clientConfig, clientState } =
                                     in
                                     "task-track-" ++ String.fromInt realTaskId
 
-                                AddSlide taskId _ ->
+                                AddSlide taskId _ _ ->
                                     "task-track-" ++ String.fromInt taskId
 
                                 AddGos taskId _ ->
                                     "task-track-" ++ String.fromInt taskId
 
-                                ReplaceSlide taskId _ ->
+                                ReplaceSlide taskId _ _ ->
                                     "task-track-" ++ String.fromInt taskId
 
                                 ExportCapsule taskId _ ->
@@ -877,13 +879,13 @@ update msg { serverConfig, clientConfig, clientState } =
                                 UploadTrack _ _ ->
                                     Http.cancel tracker
 
-                                AddSlide _ _ ->
+                                AddSlide _ _ _ ->
                                     Http.cancel tracker
 
                                 AddGos _ _ ->
                                     Http.cancel tracker
 
-                                ReplaceSlide _ _ ->
+                                ReplaceSlide _ _ _ ->
                                     Http.cancel tracker
 
                                 ExportCapsule _ _ ->
@@ -1034,13 +1036,13 @@ subs config =
                                 UploadTrack taskId _ ->
                                     Just ( taskId, x.task )
 
-                                AddSlide taskId _ ->
+                                AddSlide taskId _ _ ->
                                     Just ( taskId, x.task )
 
                                 AddGos taskId _ ->
                                     Just ( taskId, x.task )
 
-                                ReplaceSlide taskId _ ->
+                                ReplaceSlide taskId _ _ ->
                                     Just ( taskId, x.task )
 
                                 _ ->
