@@ -800,11 +800,6 @@ bottombar config page =
             |> Maybe.map .version
             |> Maybe.map (\x -> Element.text (Strings.configVersion lang ++ " " ++ x))
             |> Maybe.withDefault Element.none
-        , config
-            |> Maybe.map .serverConfig
-            |> Maybe.andThen .commit
-            |> Maybe.map (\x -> Element.text (Strings.configCommit lang ++ " " ++ x))
-            |> Maybe.withDefault Element.none
         ]
 
 
