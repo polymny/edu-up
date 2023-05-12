@@ -812,13 +812,14 @@ pub async fn produce(
 
             if let Some(stdin) = child.stdin.as_mut() {
                 // replace null webcamsteeings with default webcam settings
-                for gos in &mut capsule.structure.0 {
+                let mut capsule_clone = capsule.clone();
+                for gos in &mut capsule_clone.structure.0 {
                     if gos.webcam_settings.is_none() {
-                        gos.webcam_settings = Some(capsule.webcam_settings.0.clone());
+                        gos.webcam_settings = Some(capsule_clone.webcam_settings.0.clone());
                     }
                 }
                 stdin
-                    .write_all(json!(capsule.structure.0).to_string().as_bytes())
+                    .write_all(json!(capsule_clone.structure.0).to_string().as_bytes())
                     .await
                     .unwrap();
 

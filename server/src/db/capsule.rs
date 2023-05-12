@@ -268,7 +268,7 @@ impl Gos {
 }
 
 /// Privacy settings for a video.
-#[derive(PgEnum, Serialize, Deserialize, Debug, PartialEq, Eq)]
+#[derive(PgEnum, Clone, Serialize, Deserialize, Debug, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum Privacy {
     /// Public video.
@@ -283,6 +283,7 @@ pub enum Privacy {
 
 /// A video capsule.
 #[ergol]
+#[derive(Clone)]
 pub struct Capsule {
     /// The id of the capsule.
     #[id]
