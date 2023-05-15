@@ -17,6 +17,7 @@ import Element.Input as Input
 import Html.Attributes
 import Html.Events
 import Json.Decode as Decode
+import Material.Icons
 import Production.Types as Production exposing (getHeight, getWebcamSettings)
 import Simple.Animation as Animation exposing (Animation)
 import Simple.Animation.Animated as Animated
@@ -39,6 +40,7 @@ view config user model =
             model.capsule
             model.gos
             model.gos.webcamSettings
+            model.webcamSize
         , rightColumn config user model
         ]
     , Element.none
@@ -47,8 +49,8 @@ view config user model =
 
 {-| The column with the controls of the production settings.
 -}
-leftColumn : Config -> User -> Data.Capsule -> Data.Gos -> Maybe Data.WebcamSettings -> Element App.Msg
-leftColumn config user capsule gos webcamSettings =
+leftColumn : Config -> User -> Data.Capsule -> Data.Gos -> Maybe Data.WebcamSettings -> Maybe Int -> Element App.Msg
+leftColumn config user capsule gos webcamSettings webcamSize =
     let
         --- HELPERS ---
         -- Shortcut for lang
@@ -179,25 +181,39 @@ leftColumn config user capsule gos webcamSettings =
             Strings.stepsProductionWebcamSize lang
                 |> title webcamSizeDisabled
 
+        mkSetWidth disabled x =
+            if disabled then
+                Ui.None
+
+            else
+                Ui.Msg <| App.ProductionMsg <| Production.WebcamSettingsMsg <| Production.SetWidth x
+
         -- Element to control the webcam size
         webcamSizeText =
-            disableIf webcamSizeDisabled
-                Input.text
-                [ Element.htmlAttribute <| Html.Attributes.type_ "number"
-                , Element.htmlAttribute <| Html.Attributes.min "10"
-                ]
-                { label = Input.labelHidden <| Strings.stepsProductionCustom lang
-                , onChange =
-                    \x ->
-                        case String.toInt x of
-                            Just y ->
-                                App.ProductionMsg <| Production.WebcamSettingsMsg <| Production.SetWidth <| Just y
+            Element.row []
+                [ disableIf webcamSizeDisabled
+                    Input.text
+                    []
+                    { label = Input.labelHidden <| Strings.stepsProductionCustom lang
+                    , onChange =
+                        \x ->
+                            case ( x, String.toInt x ) of
+                                ( _, Just y ) ->
+                                    App.ProductionMsg <| Production.WebcamSettingsMsg <| Production.SetWidth <| Just y
 
-                            _ ->
-                                App.ProductionMsg <| Production.WebcamSettingsMsg <| Production.Noop
-                , placeholder = Nothing
-                , text = Maybe.map String.fromInt width |> Maybe.withDefault ""
-                }
+                                ( "", _ ) ->
+                                    App.ProductionMsg <| Production.WebcamSettingsMsg <| Production.SetWidth <| Nothing
+
+                                _ ->
+                                    App.ProductionMsg <| Production.WebcamSettingsMsg <| Production.Noop
+                    , placeholder = Nothing
+                    , text = Maybe.map String.fromInt webcamSize |> Maybe.withDefault ""
+                    }
+                , Element.column []
+                    [ Ui.navigationElement (mkSetWidth webcamSizeDisabled <| Maybe.map (\x -> x + 1) webcamSize) [] <| Ui.icon 25 Material.Icons.expand_less
+                    , Ui.navigationElement (mkSetWidth webcamSizeDisabled <| Maybe.map (\x -> x - 1) webcamSize) [] <| Ui.icon 25 Material.Icons.expand_more
+                    ]
+                ]
 
         -- Element to choose the webcam size among small, medium, large, fullscreen
         webcamSizeRadio =
@@ -205,7 +221,13 @@ leftColumn config user capsule gos webcamSettings =
                 Input.radio
                 [ Ui.s 10 ]
                 { label = Input.labelHidden <| Strings.stepsProductionWebcamSize lang
-                , onChange = \x -> App.ProductionMsg <| Production.WebcamSettingsMsg <| Production.SetWidth <| x
+                , onChange =
+                    \x ->
+                        if x == Nothing then
+                            App.ProductionMsg <| Production.WebcamSettingsMsg <| Production.SetFullscreen
+
+                        else
+                            App.ProductionMsg <| Production.WebcamSettingsMsg <| Production.SetWidth <| x
                 , options =
                     [ Input.option (Just 200) <| Element.text <| Strings.stepsProductionSmall lang
                     , Input.option (Just 400) <| Element.text <| Strings.stepsProductionMedium lang

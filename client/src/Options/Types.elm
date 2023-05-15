@@ -18,6 +18,7 @@ import Utils
 type alias Model a =
     { capsule : a
     , webcamPosition : ( Float, Float )
+    , webcamSize : Maybe Int
     , deleteTrack : Maybe Data.SoundTrack
     , capsuleUpdate : RemoteData.WebData Capsule
     , playPreview : Bool
@@ -30,6 +31,7 @@ withCapsule : Capsule -> Model String -> Model Capsule
 withCapsule capsule model =
     { capsule = capsule
     , webcamPosition = model.webcamPosition
+    , webcamSize = model.webcamSize
     , deleteTrack = model.deleteTrack
     , capsuleUpdate = model.capsuleUpdate
     , playPreview = model.playPreview
@@ -57,6 +59,16 @@ init : Capsule -> Model String
 init capsule =
     { capsule = capsule.id
     , webcamPosition = ( 0, 0 )
+    , webcamSize =
+        case capsule.defaultWebcamSettings of
+            Data.Pip { size } ->
+                Just size
+
+            Data.Fullscreen _ ->
+                Nothing
+
+            _ ->
+                Nothing
     , deleteTrack = Nothing
     , capsuleUpdate = RemoteData.NotAsked
     , playPreview = False

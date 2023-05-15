@@ -12,6 +12,7 @@ type alias Model a b =
     { capsule : a
     , gos : b
     , webcamPosition : ( Float, Float )
+    , webcamSize : Maybe Int -- Nothing means empty string means 1px
     , holdingImage : Maybe ( Int, Float, Float )
     }
 
@@ -23,6 +24,7 @@ withCapsuleAndGos capsule gos model =
     { capsule = capsule
     , gos = gos
     , webcamPosition = model.webcamPosition
+    , webcamSize = model.webcamSize
     , holdingImage = model.holdingImage
     }
 
@@ -34,18 +36,22 @@ init gos capsule =
     case List.drop gos capsule.structure of
         h :: _ ->
             let
-                webcamPosition =
-                    case h.webcamSettings of
-                        Just (Data.Pip { position }) ->
-                            Tuple.mapBoth toFloat toFloat position
+                ( webcamPosition, webcamSize ) =
+                    case ( h.webcamSettings, capsule.defaultWebcamSettings ) of
+                        ( Just (Data.Pip { position, size }), _ ) ->
+                            ( Tuple.mapBoth toFloat toFloat position, Just size )
+
+                        ( Nothing, Data.Pip { position, size } ) ->
+                            ( Tuple.mapBoth toFloat toFloat position, Just size )
 
                         _ ->
-                            ( 0.0, 0.0 )
+                            ( ( 0.0, 0.0 ), Nothing )
             in
             Just
                 ( { capsule = capsule.id
                   , gos = gos
                   , webcamPosition = webcamPosition
+                  , webcamSize = webcamSize
                   , holdingImage = Nothing
                   }
                 , Cmd.none
@@ -70,7 +76,8 @@ type Msg
 type WebcamSettingsMsg
     = Noop
     | ToggleVideo
-    | SetWidth (Maybe Int) -- Nothing means fullscreen
+    | SetFullscreen
+    | SetWidth (Maybe Int) -- Nothing empty string means 1px
     | SetAnchor Data.Anchor
     | SetOpacity Float
 

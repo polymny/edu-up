@@ -55,17 +55,19 @@ update msg model =
                     in
                     updateModelWebcamSettings capsule newWebcamSettings model m
 
+                Options.WebcamSettingsMsg Production.SetFullscreen ->
+                    let
+                        newWebcamSettings =
+                            Data.setWebcamSettingsSize Nothing capsule.defaultWebcamSettings
+                    in
+                    updateModelWebcamSettings capsule newWebcamSettings model { m | webcamSize = Nothing }
+
                 Options.WebcamSettingsMsg (Production.SetWidth newWidth) ->
                     let
                         newWebcamSettings =
-                            case newWidth of
-                                Nothing ->
-                                    Data.setWebcamSettingsSize Nothing capsule.defaultWebcamSettings
-
-                                Just width ->
-                                    Data.setWebcamSettingsSize (Just width) capsule.defaultWebcamSettings
+                            Data.setWebcamSettingsSize (Just (newWidth |> Maybe.withDefault 1)) capsule.defaultWebcamSettings
                     in
-                    updateModelWebcamSettings capsule newWebcamSettings model m
+                    updateModelWebcamSettings capsule newWebcamSettings model { m | webcamSize = newWidth }
 
                 Options.WebcamSettingsMsg (Production.SetAnchor anchor) ->
                     let
@@ -231,7 +233,7 @@ update msg model =
 {-| Changes the current webcamsettings in the model.
 -}
 updateModelWebcamSettings : Data.Capsule -> Data.WebcamSettings -> App.Model -> Options.Model String -> ( App.Model, Cmd App.Msg )
-updateModelWebcamSettings capsule ws model _ =
+updateModelWebcamSettings capsule ws model m =
     let
         newCapsule =
             { capsule | defaultWebcamSettings = ws }
@@ -239,7 +241,7 @@ updateModelWebcamSettings capsule ws model _ =
         newUser =
             Data.updateUser newCapsule model.user
     in
-    ( { model | user = newUser }
+    ( { model | user = newUser, page = App.Options m }
     , Api.updateCapsule newCapsule (\_ -> App.Noop)
     )
 

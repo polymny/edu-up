@@ -34,16 +34,15 @@ update msg model =
             case msg of
                 Production.ResetOptions ->
                     let
-                        newPosition : ( Float, Float )
-                        newPosition =
+                        ( newPosition, newSize ) =
                             case capsule.defaultWebcamSettings of
-                                Data.Pip { position } ->
-                                    Tuple.mapBoth toFloat toFloat position
+                                Data.Pip { position, size } ->
+                                    ( Tuple.mapBoth toFloat toFloat position, Just size )
 
                                 _ ->
-                                    ( 0.0, 0.0 )
+                                    ( ( 0.0, 0.0 ), Nothing )
                     in
-                    updateModel capsule (resetOptions capsule gos) model { m | webcamPosition = newPosition }
+                    updateModel capsule (resetOptions capsule gos) model { m | webcamPosition = newPosition, webcamSize = newSize }
 
                 Production.HoldingImageChanged Nothing ->
                     -- User released mouse, update capsule
@@ -167,20 +166,29 @@ update msg model =
                     in
                     updateModel capsule { gos | webcamSettings = Just newWebcamSettings } model m
 
+                Production.WebcamSettingsMsg Production.SetFullscreen ->
+                    let
+                        newWebcamSettings =
+                            case recordSize of
+                                Just _ ->
+                                    Just <| Data.setWebcamSettingsSize Nothing (getWebcamSettings capsule gos)
+
+                                _ ->
+                                    gos.webcamSettings
+                    in
+                    updateModel capsule { gos | webcamSettings = newWebcamSettings } model { m | webcamSize = Nothing }
+
                 Production.WebcamSettingsMsg (Production.SetWidth newWidth) ->
                     let
                         newWebcamSettings =
-                            case ( recordSize, newWidth ) of
-                                ( Just _, Nothing ) ->
-                                    Data.setWebcamSettingsSize Nothing (getWebcamSettings capsule gos)
-
-                                ( Just _, Just width ) ->
-                                    Data.setWebcamSettingsSize (Just width) (getWebcamSettings capsule gos)
+                            case recordSize of
+                                Just _ ->
+                                    Just <| Data.setWebcamSettingsSize (Just (newWidth |> Maybe.withDefault 1)) (getWebcamSettings capsule gos)
 
                                 _ ->
-                                    getWebcamSettings capsule gos
+                                    gos.webcamSettings
                     in
-                    updateModel capsule { gos | webcamSettings = Just newWebcamSettings } model m
+                    updateModel capsule { gos | webcamSettings = newWebcamSettings } model { m | webcamSize = newWidth }
 
         _ ->
             ( model, Cmd.none )

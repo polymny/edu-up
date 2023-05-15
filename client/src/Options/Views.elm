@@ -161,25 +161,39 @@ defaultProd config user model =
             Strings.stepsProductionWebcamSize lang
                 |> title webcamSizeDisabled
 
+        mkSetWidth disabled x =
+            if disabled then
+                Ui.None
+
+            else
+                Ui.Msg <| App.OptionsMsg <| Options.WebcamSettingsMsg <| Production.SetWidth x
+
         -- Element to control the webcam size
         webcamSizeText =
-            disableIf webcamSizeDisabled
-                Input.text
-                [ Element.htmlAttribute <| Html.Attributes.type_ "number"
-                , Element.htmlAttribute <| Html.Attributes.min "10"
-                ]
-                { label = Input.labelHidden <| Strings.stepsProductionCustom lang
-                , onChange =
-                    \x ->
-                        case String.toInt x of
-                            Just y ->
-                                App.OptionsMsg <| Options.WebcamSettingsMsg <| Production.SetWidth <| Just y
+            Element.row []
+                [ disableIf webcamSizeDisabled
+                    Input.text
+                    []
+                    { label = Input.labelHidden <| Strings.stepsProductionCustom lang
+                    , onChange =
+                        \x ->
+                            case ( x, String.toInt x ) of
+                                ( _, Just y ) ->
+                                    App.OptionsMsg <| Options.WebcamSettingsMsg <| Production.SetWidth <| Just y
 
-                            _ ->
-                                App.Noop
-                , placeholder = Nothing
-                , text = Maybe.map String.fromInt width |> Maybe.withDefault ""
-                }
+                                ( "", _ ) ->
+                                    App.OptionsMsg <| Options.WebcamSettingsMsg <| Production.SetWidth <| Nothing
+
+                                _ ->
+                                    App.Noop
+                    , placeholder = Nothing
+                    , text = Maybe.map String.fromInt model.webcamSize |> Maybe.withDefault ""
+                    }
+                , Element.column []
+                    [ Ui.navigationElement (mkSetWidth webcamSizeDisabled <| Maybe.map (\x -> x + 1) model.webcamSize) [] <| Ui.icon 25 Icons.expand_less
+                    , Ui.navigationElement (mkSetWidth webcamSizeDisabled <| Maybe.map (\x -> x - 1) model.webcamSize) [] <| Ui.icon 25 Icons.expand_more
+                    ]
+                ]
 
         -- Element to choose the webcam size among small, medium, large, fullscreen
         webcamSizeRadio =
@@ -187,7 +201,13 @@ defaultProd config user model =
                 Input.radio
                 [ Ui.s 10 ]
                 { label = Input.labelHidden <| Strings.stepsProductionWebcamSize lang
-                , onChange = \x -> App.OptionsMsg <| Options.WebcamSettingsMsg <| Production.SetWidth x
+                , onChange =
+                    \x ->
+                        if x == Nothing then
+                            App.OptionsMsg <| Options.WebcamSettingsMsg <| Production.SetFullscreen
+
+                        else
+                            App.OptionsMsg <| Options.WebcamSettingsMsg <| Production.SetWidth x
                 , options =
                     [ Input.option (Just 200) <| Element.text <| Strings.stepsProductionSmall lang
                     , Input.option (Just 400) <| Element.text <| Strings.stepsProductionMedium lang
