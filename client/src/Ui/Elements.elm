@@ -316,6 +316,10 @@ popup titleText content =
                 , Ui.b 1
                 , Ui.cy
                 , Ui.cx
+                , Element.htmlAttribute <| Html.Attributes.style "max-width" "80%"
+                , Element.htmlAttribute <| Html.Attributes.style "max-height" "80%"
+                , Element.htmlAttribute <| Html.Attributes.style "min-width" "40%"
+                , Element.htmlAttribute <| Html.Attributes.style "min-height" "40%"
                 , Border.color <| Colors.alphaColor 0.8 Colors.greyFont
                 , Border.shadow
                     { offset = ( 0.0, 0.0 )
@@ -330,6 +334,8 @@ popup titleText content =
                     [ Background.color Colors.greyBackground
                     , Ui.p 10
                     , Ui.r 10
+                    , Ui.wf
+                    , Ui.hf
                     , Border.shadow
                         { offset = ( 0.0, 0.0 )
                         , size = 3.0
@@ -345,9 +351,8 @@ popup titleText content =
         , Ui.wf
         , Ui.hf
         , Background.color (Element.rgba255 0 0 0 0.5)
-        , Element.inFront popupElement
         ]
-        Element.none
+        popupElement
 
 
 
