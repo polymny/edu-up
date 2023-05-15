@@ -1,13 +1,13 @@
 module Ui.Elements exposing
     ( primary, primaryGeneric, primaryIcon, secondary, secondaryGeneric, secondaryIcon, link, Action(..), navigationElement, icon, title, animatedEl, spin
-    , spinner, spinningSpinner, popup
+    , spinner, spinningSpinner, popup, fixedPopup
     , addLinkAttr, errorModal, longText, successModal
     )
 
 {-| This module contains helpers to easily make buttons.
 
 @docs primary, primaryGeneric, primaryIcon, secondary, secondaryGeneric, secondaryIcon, link, Action, navigationElement, icon, title, animatedEl, spin
-@docs spinner, spinningSpinner, popup
+@docs spinner, spinningSpinner, popup, fixedPopup
 @docs errorModaln successModal
 
 -}
@@ -355,47 +355,50 @@ popup titleText content =
         popupElement
 
 
-
--- Element.row [ Ui.zIndex 1, Ui.wf, Ui.hf, Background.color (Element.rgba255 0 0 0 0.5), Element.scrollbars ]
---     [ Element.el [ Ui.wf ] Element.none
---     , Element.column [ Ui.hf, Ui.wfp size, Element.scrollbars ]
---         [ Element.el [ Ui.hf ] Element.none
---         , Element.column
---             [ Ui.wf
---             , Ui.hf
---             , Background.color Colors.green2
---             , Ui.r 10
---             , Ui.b 1
---             , Border.color <| Colors.alphaColor 0.8 Colors.greyFont
---             , Border.shadow
---                 { offset = ( 0.0, 0.0 )
---                 , size = 3.0
---                 , blur = 3.0
---                 , color = Colors.alpha 0.1
---                 }
---             , Element.scrollbars
---             ]
---             [ Element.el [ Ui.p 10, Ui.cx, Font.color Colors.white, Font.bold ] (Element.text titleText)
---             , Element.el
---                 [ Ui.wf
---                 , Ui.hf
---                 , Background.color Colors.greyBackground
---                 , Ui.p 10
---                 , Ui.r 10
---                 , Element.scrollbars
---                 , Border.shadow
---                     { offset = ( 0.0, 0.0 )
---                     , size = 3.0
---                     , blur = 3.0
---                     , color = Colors.alpha 0.1
---                     }
---                 ]
---                 content
---             ]
---         , Element.el [ Ui.hf ] Element.none
---         ]
---     , Element.el [ Ui.wf ] Element.none
---     ]
+{-| A popup with fixed size.
+-}
+fixedPopup : Int -> String -> Element msg -> Element msg
+fixedPopup size titleText content =
+    Element.row [ Ui.zIndex 1, Ui.wf, Ui.hf, Background.color (Element.rgba255 0 0 0 0.5), Element.scrollbars ]
+        [ Element.el [ Ui.wfp 1 ] Element.none
+        , Element.column [ Ui.hf, Ui.wfp size, Element.scrollbars ]
+            [ Element.el [ Ui.hfp 1 ] Element.none
+            , Element.column
+                [ Ui.wf
+                , Ui.hfp size
+                , Background.color Colors.green2
+                , Ui.r 10
+                , Ui.b 1
+                , Border.color <| Colors.alphaColor 0.8 Colors.greyFont
+                , Border.shadow
+                    { offset = ( 0.0, 0.0 )
+                    , size = 3.0
+                    , blur = 3.0
+                    , color = Colors.alpha 0.1
+                    }
+                , Element.scrollbars
+                ]
+                [ Element.el [ Ui.p 10, Ui.cx, Font.color Colors.white, Font.bold ] (Element.text titleText)
+                , Element.el
+                    [ Ui.wf
+                    , Ui.hf
+                    , Background.color Colors.greyBackground
+                    , Ui.p 10
+                    , Ui.r 10
+                    , Element.scrollbars
+                    , Border.shadow
+                        { offset = ( 0.0, 0.0 )
+                        , size = 3.0
+                        , blur = 3.0
+                        , color = Colors.alpha 0.1
+                        }
+                    ]
+                    content
+                ]
+            , Element.el [ Ui.hfp 1 ] Element.none
+            ]
+        , Element.el [ Ui.wfp 1 ] Element.none
+        ]
 
 
 {-| Helper to create an error modal.
