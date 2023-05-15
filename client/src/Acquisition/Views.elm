@@ -817,7 +817,7 @@ settingsPopup user config model =
             , action = Ui.Msg <| App.AcquisitionMsg <| Acquisition.ToggleSettings
             }
         ]
-        |> Ui.popup (Strings.navigationSettings lang)
+        |> Ui.fixedPopup 5 (Strings.navigationSettings lang)
 
 
 {-| Displays a button to select a specific video device.
