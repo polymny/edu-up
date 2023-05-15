@@ -176,11 +176,12 @@ leftColumn config user capsule gos webcamSettings webcamSize =
         webcamSizeDisabled =
             gos.record == Nothing || audioOnly || webcamSettings == Just Data.Disabled
 
-        --  Title to introduce webcam size settings
+        -- Title to introduce webcam size settings.
         webcamSizeTitle =
             Strings.stepsProductionWebcamSize lang
                 |> title webcamSizeDisabled
 
+        -- Helper to set the width of the webcam.
         mkSetWidth disabled x =
             if disabled then
                 Ui.None
@@ -188,7 +189,25 @@ leftColumn config user capsule gos webcamSettings webcamSize =
             else
                 Ui.Msg <| App.ProductionMsg <| Production.WebcamSettingsMsg <| Production.SetWidth x
 
-        -- Element to control the webcam size
+        -- Helper to increment the width of the webcam.
+        incrementWidth : Int -> Int
+        incrementWidth step =
+            let
+                maxWidth =
+                    gos.record
+                        |> Maybe.andThen .size
+                        |> Maybe.withDefault ( 1, 1 )
+                        |> Tuple.mapBoth toFloat toFloat
+                        |> (\( w, h ) -> round <| (w / h) * 1920 / (16 / 9))
+            in
+            case webcamSize of
+                Just x ->
+                    x + step
+
+                Nothing ->
+                    maxWidth + step
+
+        -- Element to control the webcam size.
         webcamSizeText =
             Element.row []
                 [ disableIf webcamSizeDisabled
@@ -210,8 +229,14 @@ leftColumn config user capsule gos webcamSettings webcamSize =
                     , text = Maybe.map String.fromInt webcamSize |> Maybe.withDefault ""
                     }
                 , Element.column []
-                    [ Ui.navigationElement (mkSetWidth webcamSizeDisabled <| Maybe.map (\x -> x + 1) webcamSize) [] <| Ui.icon 25 Material.Icons.expand_less
-                    , Ui.navigationElement (mkSetWidth webcamSizeDisabled <| Maybe.map (\x -> x - 1) webcamSize) [] <| Ui.icon 25 Material.Icons.expand_more
+                    [ Ui.navigationElement
+                        (mkSetWidth webcamSizeDisabled <| Just <| incrementWidth 1)
+                        []
+                        (Ui.icon 25 Material.Icons.expand_less)
+                    , Ui.navigationElement
+                        (mkSetWidth webcamSizeDisabled <| Just <| incrementWidth -1)
+                        []
+                        (Ui.icon 25 Material.Icons.expand_more)
                     ]
                 ]
 

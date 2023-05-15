@@ -168,6 +168,13 @@ update msg model =
 
                 Production.WebcamSettingsMsg Production.SetFullscreen ->
                     let
+                        maxWidth =
+                            gos.record
+                                |> Maybe.andThen .size
+                                |> Maybe.withDefault ( 1, 1 )
+                                |> Tuple.mapBoth toFloat toFloat
+                                |> (\( w, h ) -> round <| (w / h) * 1920 / (16 / 9))
+
                         newWebcamSettings =
                             case recordSize of
                                 Just _ ->
@@ -176,7 +183,7 @@ update msg model =
                                 _ ->
                                     gos.webcamSettings
                     in
-                    updateModel capsule { gos | webcamSettings = newWebcamSettings } model { m | webcamSize = Nothing }
+                    updateModel capsule { gos | webcamSettings = newWebcamSettings } model { m | webcamSize = Just maxWidth }
 
                 Production.WebcamSettingsMsg (Production.SetWidth newWidth) ->
                     let

@@ -34,10 +34,17 @@ withCapsuleAndGos capsule gos model =
 init : Int -> Capsule -> Maybe ( Model String Int, Cmd Msg )
 init gos capsule =
     case List.drop gos capsule.structure of
-        h :: _ ->
+        head :: _ ->
             let
+                maxWidth =
+                    head.record
+                        |> Maybe.andThen .size
+                        |> Maybe.withDefault ( 1, 1 )
+                        |> Tuple.mapBoth toFloat toFloat
+                        |> (\( w, h ) -> round <| (w / h) * 1920 / (16 / 9))
+
                 ( webcamPosition, webcamSize ) =
-                    case ( h.webcamSettings, capsule.defaultWebcamSettings ) of
+                    case ( head.webcamSettings, capsule.defaultWebcamSettings ) of
                         ( Just (Data.Pip { position, size }), _ ) ->
                             ( Tuple.mapBoth toFloat toFloat position, Just size )
 
@@ -45,7 +52,7 @@ init gos capsule =
                             ( Tuple.mapBoth toFloat toFloat position, Just size )
 
                         _ ->
-                            ( ( 0.0, 0.0 ), Nothing )
+                            ( ( 0.0, 0.0 ), Just maxWidth )
             in
             Just
                 ( { capsule = capsule.id

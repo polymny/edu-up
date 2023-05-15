@@ -168,6 +168,16 @@ defaultProd config user model =
             else
                 Ui.Msg <| App.OptionsMsg <| Options.WebcamSettingsMsg <| Production.SetWidth x
 
+        -- Helper to increment the width of the webcam.
+        incrementWidth : Int -> Int
+        incrementWidth step =
+            case width of
+                Just x ->
+                    x + step
+
+                Nothing ->
+                    400 + step
+
         -- Element to control the webcam size
         webcamSizeText =
             Element.row []
@@ -190,8 +200,14 @@ defaultProd config user model =
                     , text = Maybe.map String.fromInt model.webcamSize |> Maybe.withDefault ""
                     }
                 , Element.column []
-                    [ Ui.navigationElement (mkSetWidth webcamSizeDisabled <| Maybe.map (\x -> x + 1) model.webcamSize) [] <| Ui.icon 25 Icons.expand_less
-                    , Ui.navigationElement (mkSetWidth webcamSizeDisabled <| Maybe.map (\x -> x - 1) model.webcamSize) [] <| Ui.icon 25 Icons.expand_more
+                    [ Ui.navigationElement
+                        (mkSetWidth webcamSizeDisabled <| Just <| incrementWidth 1)
+                        []
+                        (Ui.icon 25 Icons.expand_less)
+                    , Ui.navigationElement
+                        (mkSetWidth webcamSizeDisabled <| Just <| incrementWidth -1)
+                        []
+                        (Ui.icon 25 Icons.expand_more)
                     ]
                 ]
 
