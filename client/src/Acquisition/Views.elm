@@ -330,26 +330,37 @@ view config user model =
         slideElement =
             case currentSlide of
                 Just s ->
-                    Element.el
-                        [ Ui.wf
-                        , Ui.hfp 2
-                        , Background.uncropped (Data.slidePath model.capsule s)
-                        , Element.html (Html.canvas [ Html.Attributes.id Acquisition.pointerCanvasId ] [])
-                            |> Element.el [ Ui.wf, Ui.cy ]
-                            |> Element.inFront
-                        ]
-                        Element.none
+                    Element.image [ Ui.wf, Ui.hf ] { src = Data.slidePath model.capsule s, description = "" }
+                        |> Element.el
+                            [ Element.htmlAttribute <| Html.Attributes.style "aspect-ratio" "16 / 9"
+                            , Element.htmlAttribute <| Html.Attributes.style "max-width" "100%"
+                            , Element.htmlAttribute <| Html.Attributes.style "max-height" "100%"
+                            , Ui.cx
+                            , Ui.cy
+                            , Html.canvas
+                                [ Html.Attributes.id Acquisition.pointerCanvasId
+                                , Html.Attributes.width 1920
+                                , Html.Attributes.height 1080
+                                , Html.Attributes.style "width" "100%"
+                                , Html.Attributes.style "height" "100%"
+                                ]
+                                []
+                                |> Element.html
+                                |> Element.el [ Ui.wf, Ui.hf ]
+                                |> Element.inFront
+                            ]
+                        |> Element.el [ Ui.wf, Ui.hf ]
 
                 _ ->
                     Element.none
 
         -- Full content of the page
         content =
-            Element.column [ Ui.wf, Ui.hf ]
+            Element.column [ Ui.wf, Ui.hf, Element.clip ]
                 [ promptElement config model
                 , statusElement
                 , Element.row
-                    [ Ui.wf, Ui.hf ]
+                    [ Ui.wf, Ui.hf, Element.clip ]
                     [ pointerControl model
                     , slideElement
                     ]

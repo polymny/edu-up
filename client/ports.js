@@ -1020,8 +1020,6 @@ function init(node, flags) {
         await new Promise(requestAnimationFrame);
 
         let canvas = document.getElementById(canvasId);
-        canvas.width = 1920;
-        canvas.height = 1080;
 
         let ctx = canvas.getContext('2d');
 
