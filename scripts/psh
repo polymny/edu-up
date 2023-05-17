@@ -263,7 +263,7 @@ get_webcam_size()
 {
     webcam_settings=$1
 
-    echo $(printf "%s:-1" $(echo $webcam_settings | jq -cr ".size") )
+    echo $(printf "%s:-1" $(echo $webcam_settings | jq -cr ".size[0]") )
 }
 
 get_alpha()
@@ -401,7 +401,7 @@ params_pip_slide_record() {
     case $composition_type in
          "pip" )
             webcam_alpha=$(get_alpha "$webcam_settings")
-            size=$(echo "$webcam_settings" | jq -cr ".size")
+            size=$(echo "$webcam_settings" | jq -cr ".size[0]")
             webcam_size=$(get_webcam_size "$webcam_settings")
             webcam_overlay=$(get_overlay "$webcam_settings")
             scale_record="scale=${webcam_size},format=argb,colorchannelmixer=aa=${webcam_alpha}"

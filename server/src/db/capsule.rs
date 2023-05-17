@@ -117,7 +117,7 @@ pub enum WebcamSettings {
         position: (i32, i32),
 
         /// The size of the webcam.
-        size: i32,
+        size: (i32, i32),
 
         /// Keying color
         keycolor: Option<String>,
@@ -128,7 +128,7 @@ impl Default for WebcamSettings {
     fn default() -> WebcamSettings {
         WebcamSettings::Pip {
             anchor: Anchor::default(),
-            size: 533,
+            size: (533, 400),
             position: (4, 4),
             opacity: 1.0,
             keycolor: None,

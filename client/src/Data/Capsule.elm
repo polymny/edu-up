@@ -681,7 +681,7 @@ encodeWebcamSettings settings =
                 [ ( "type", Encode.string "pip" )
                 , ( "anchor", encodeAnchor anchor )
                 , ( "position", encodePair Encode.int position )
-                , ( "size", Encode.int size )
+                , ( "size", Encode.list Encode.int [ size, 9 * size // 16 ] )
                 , ( "opacity", Encode.float opacity )
                 , ( "keycolor", Maybe.withDefault Encode.null (Maybe.map Encode.string keycolor) )
                 ]
@@ -695,7 +695,7 @@ decodePip =
         (Decode.field "anchor" decodeAnchor)
         (Decode.field "opacity" Decode.float)
         (Decode.field "position" (decodePair Decode.int))
-        (Decode.field "size" Decode.int)
+        (Decode.field "size" (Decode.map Tuple.first (decodePair Decode.int)))
         (Decode.maybe (Decode.field "keycolor" Decode.string))
 
 
@@ -707,7 +707,7 @@ defaultPip :
         { anchor : Anchor
         , keycolor : Maybe a
         , opacity : Float
-        , position : ( number, number1 )
+        , position : ( Int, Int )
         , size : Int
         }
 defaultPip size =
