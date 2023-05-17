@@ -46,15 +46,15 @@ view config user model =
                 _ ->
                     Element.none
     in
-    ( Element.row []
-        [ Element.column [ Ui.s 10, Ui.p 100 ]
+    ( Element.row [ Ui.wf, Ui.p 10, Ui.s 10 ]
+        [ Element.column [ Ui.s 10, Ui.wf, Ui.at ]
             [ Strings.stepsOptionsOptionsExplanation config.clientState.lang
                 |> title
             , Element.column [ Ui.s 10, Ui.pt 20, Ui.wf ]
                 [ defaultProd config user model
                 ]
             ]
-        , Element.column [ Ui.s 10, Ui.p 100 ]
+        , Element.column [ Ui.s 10, Ui.wf, Ui.at ]
             [ Strings.stepsOptionsGeneralOptions config.clientState.lang
                 |> title
             , Element.column [ Ui.s 10, Ui.pt 20, Ui.wf ]
