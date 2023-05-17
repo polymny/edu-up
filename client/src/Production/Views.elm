@@ -32,17 +32,15 @@ import Utils
 
 {-| The full view of the page.
 -}
-view : Config -> User -> Production.Model Data.Capsule Data.Gos -> ( Element App.Msg, Element App.Msg )
+view : Config -> User -> Production.Model Data.Capsule Data.Gos -> ( Element App.Msg, Element App.Msg, Element App.Msg )
 view config user model =
-    ( Element.row [ Ui.wf, Ui.hf, Ui.s 10, Ui.p 10 ]
-        [ leftColumn config
-            user
-            model.capsule
-            model.gos
-            model.gos.webcamSettings
-            model.webcamSize
-        , rightColumn config user model
-        ]
+    ( leftColumn config
+        user
+        model.capsule
+        model.gos
+        model.gos.webcamSettings
+        model.webcamSize
+    , rightColumn config user model
     , Element.none
     )
 
@@ -336,7 +334,7 @@ leftColumn config user capsule gos webcamSettings webcamSize =
                     |> Element.el (Ui.wfp 1 :: Ui.ab :: disableAttrIf opacityDisabled)
                 ]
     in
-    Element.column [ Ui.wfp 1, Ui.s 30, Ui.at ]
+    Element.column [ Ui.wf, Ui.s 30, Ui.at, Element.scrollbarY, Ui.p 10 ]
         [ resetButton
         , Element.column [ Ui.s 10 ]
             [ useVideo
@@ -594,7 +592,7 @@ rightColumn config user model =
                 _ ->
                     Element.none
     in
-    Element.column [ Ui.at, Ui.wfp 3, Ui.s 10 ]
+    Element.column [ Ui.at, Ui.wf, Element.scrollbarY, Ui.s 10, Ui.p 10 ]
         [ Element.el [ Ui.wf, Ui.cy, Element.inFront overlay, Element.clip ] slide
         , Element.row [ Ui.ar, Ui.s 10 ] [ videoLink, produceButton ]
         , progressBar

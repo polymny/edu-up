@@ -237,9 +237,26 @@ viewSuccess model =
                 |> Ui.addLeftAndRightColumn model.config.clientState.lang model.page capsule (Just m.gos)
 
         ( App.Production m, Just capsule, Just gos ) ->
-            Production.view model.config model.user (Production.withCapsuleAndGos capsule gos m)
-                |> Ui.addLeftColumn model.config.clientState.lang model.page capsule (Just m.gos)
+            let
+                ( c1, c2, p ) =
+                    Production.view model.config model.user (Production.withCapsuleAndGos capsule gos m)
 
+                finalView =
+                    Element.row [ Ui.wf, Ui.hf, Element.scrollbars ]
+                        [ Element.el [ Ui.wfp 2, Ui.hf, Element.scrollbarY ]
+                            (Ui.leftColumn
+                                model.config.clientState.lang
+                                (App.Production m)
+                                capsule
+                                (Just m.gos)
+                            )
+                        , Element.el [ Ui.wfp 5, Ui.hf, Element.scrollbarY ] c1
+                        , Element.el [ Ui.wfp 5, Ui.hf, Element.scrollbarY ] c2
+                        ]
+            in
+            ( finalView, p )
+
+        -- |> Ui.addLeftColumn model.config.clientState.lang model.page capsule (Just m.gos)
         ( App.Publication m, Just capsule, _ ) ->
             Publication.view model.config model.user (Publication.withCapsule capsule m)
                 |> Ui.addLeftColumn model.config.clientState.lang model.page capsule Nothing
