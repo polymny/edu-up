@@ -109,15 +109,13 @@ update msg model =
                                 Config.update (Config.UpdateTaskStatus task) model.config
                         in
                         ( { model | page = newPage, config = Config.incrementTaskId newConfig }
-                        , Cmd.batch
-                            [ Api.uploadTrack
-                                { capsule = capsule
-                                , fileValue = fileValue
-                                , file = file
-                                , toMsg = \x -> App.OptionsMsg (Options.TrackUpload x)
-                                , taskId = model.config.clientState.taskId
-                                }
-                            ]
+                        , Api.uploadTrack
+                            { capsule = capsule
+                            , fileValue = fileValue
+                            , file = file
+                            , toMsg = (\x -> App.OptionsMsg (Options.TrackUpload x)) |> App.orError
+                            , taskId = model.config.clientState.taskId
+                            }
                         )
 
                     else
@@ -149,10 +147,12 @@ update msg model =
 
                         ( sync, newConfig ) =
                             ( Api.updateCapsule newCapsule
-                                (\_ ->
+                                ((\_ ->
                                     RemoteData.Success newCapsule
                                         |> Options.CapsuleUpdate model.config.clientState.lastRequest
                                         |> App.OptionsMsg
+                                 )
+                                    |> App.orError
                                 )
                             , Config.incrementRequest model.config
                             )
@@ -242,7 +242,7 @@ updateModelWebcamSettings capsule ws model m =
             Data.updateUser newCapsule model.user
     in
     ( { model | user = newUser, page = App.Options m }
-    , Api.updateCapsule newCapsule (\_ -> App.Noop)
+    , Api.updateCapsule newCapsule ((\_ -> App.Noop) |> App.orError)
     )
 
 
@@ -259,7 +259,7 @@ updateModelSoundTrack capsule soundTrack model _ =
     in
     ( { model | user = newUser }
     , Cmd.batch
-        [ Api.updateCapsule newCapsule (\_ -> App.Noop)
+        [ Api.updateCapsule newCapsule ((\_ -> App.Noop) |> App.orError)
         , volumeChangedPort (Maybe.withDefault 1.0 (Maybe.map .volume soundTrack))
         ]
     )

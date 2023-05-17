@@ -330,7 +330,7 @@ update msg model =
                                 }
                         , user = Data.updateUser newCapsule model.user
                       }
-                    , Api.deleteRecord capsule m.gos (\_ -> App.Noop)
+                    , Api.deleteRecord capsule m.gos ((\_ -> App.Noop) |> App.orError)
                     )
 
                 Acquisition.EscapePressed ->
@@ -435,7 +435,7 @@ update msg model =
                         | user = Data.updateUser newCapsule model.user
                         , page = App.Acquisition { m | currentReplacementPrompt = Nothing }
                       }
-                    , Api.updateCapsule newCapsule (\_ -> App.Noop)
+                    , Api.updateCapsule newCapsule ((\_ -> App.Noop) |> App.orError)
                     )
 
                 Acquisition.StartEditingSecondPrompt ->
@@ -517,7 +517,7 @@ update msg model =
                         | user = Data.updateUser newCapsule model.user
                         , page = App.Acquisition { m | nextReplacementPrompt = Nothing }
                       }
-                    , Api.updateCapsule newCapsule (\_ -> App.Noop)
+                    , Api.updateCapsule newCapsule ((\_ -> App.Noop) |> App.orError)
                     )
 
                 Acquisition.ToggleHelp ->

@@ -1200,6 +1200,18 @@ msgstr ""
 msgid "Ui.webSocketWaitRefreshContactAdmin"
 msgstr ""
 
+#. Fatal error occured.
+msgid "Ui.fatalError"
+msgstr ""
+
+#. Connection to Polymny Studio has been interrupted.
+msgid "Ui.connectionInterrupted"
+msgstr ""
+
+#. Try refreshing the page, or contacting us if the problem persists.
+msgid "Ui.refreshOrContactAdmin"
+msgstr ""
+
 #. Go back to the old client.
 msgid "Ui.goBackToOldClient"
 msgstr ""

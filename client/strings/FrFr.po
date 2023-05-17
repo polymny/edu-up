@@ -1255,6 +1255,18 @@ msgstr "Si la connexion au websocket ne fonctionne pas, l'application ne fonctio
 msgid "Ui.webSocketWaitRefreshContactAdmin"
 msgstr "Vous pouvez patienter ou raffraîchir la page, ou contacter l'administrateur si le problème persiste"
 
+#. Fatal error occured.
+msgid "Ui.fatalError"
+msgstr "Une erreur fatale est survenue"
+
+#. Connection to Polymny Studio has been interrupted.
+msgid "Ui.connectionInterrupted"
+msgstr "La connexion a Polymny Studio a été interrompue"
+
+#. Try refreshing the page, or contacting us if the problem persists.
+msgid "Ui.refreshOrContactAdmin"
+msgstr "Vous pouvez essayer de raffraîchir la page, ou de nous contacter si le problème persiste"
+
 #. Go back to the old client.
 msgid "Ui.goBackToOldClient"
 msgstr "Retourner à l'ancienne version"

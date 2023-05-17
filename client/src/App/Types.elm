@@ -1,6 +1,6 @@
 module App.Types exposing
     ( Model, Page(..), Msg(..), onUrlRequest
-    , Error(..), errorToString
+    , Error(..), errorToString, orError
     , MaybeModel(..), MaybeMsg(..), WebSocketMsg(..), toMaybe
     )
 
@@ -14,7 +14,7 @@ module App.Types exposing
 
 # Error management
 
-@docs Error, errorToString, unwrapRemoteData, unwrapResult
+@docs Error, errorToString, unwrapRemoteData, unwrapResult, orError
 
 -}
 
@@ -32,6 +32,7 @@ import Preparation.Types as Preparation
 import Production.Types as Production
 import Profile.Types as Profile
 import Publication.Types as Publication
+import RemoteData exposing (RemoteData)
 import Unlogged.Types as Unlogged
 import Url
 
@@ -122,6 +123,18 @@ type Msg
     | CopyString String
     | Logout
     | LoggedOut
+
+
+{-| Returns ErrorOccured if an error occured or just calls the function passed as paramter.
+-}
+orError : (RemoteData a b -> Msg) -> RemoteData a b -> Msg
+orError toMsg result =
+    case result of
+        RemoteData.Failure _ ->
+            ConfigMsg Config.HasError
+
+        _ ->
+            toMsg result
 
 
 {-| This type contains the different types of web socket messages that can be received from server.

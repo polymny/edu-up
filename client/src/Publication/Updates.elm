@@ -78,12 +78,12 @@ update msg model =
                         | user = Data.updateUser { capsule | published = Data.Running Nothing } model.user
                         , config = Config.incrementTaskId newConfig
                       }
-                    , Api.publishCapsule capsule (\_ -> App.Noop)
+                    , Api.publishCapsule capsule ((\_ -> App.Noop) |> App.orError)
                     )
 
                 Publication.UnpublishVideo ->
                     ( { model | user = Data.updateUser { capsule | published = Data.Idle } model.user }
-                    , Api.unpublishCapsule capsule (\_ -> App.Noop)
+                    , Api.unpublishCapsule capsule ((\_ -> App.Noop) |> App.orError)
                     )
 
         _ ->
@@ -99,5 +99,5 @@ updateModel newCapsule model _ =
             Data.updateUser newCapsule model.user
     in
     ( { model | user = newUser }
-    , Api.updateCapsule newCapsule (\_ -> App.Noop)
+    , Api.updateCapsule newCapsule ((\_ -> App.Noop) |> App.orError)
     )

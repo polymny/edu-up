@@ -66,7 +66,9 @@ update msg model =
 
                         ( sync, newConfig ) =
                             ( Api.updateCapsule newCapsule
-                                (\x -> App.PreparationMsg (Preparation.CapsuleUpdate model.config.clientState.lastRequest x))
+                                ((\x -> App.PreparationMsg (Preparation.CapsuleUpdate model.config.clientState.lastRequest x))
+                                    |> App.orError
+                                )
                             , Config.incrementRequest model.config
                             )
                     in
@@ -100,7 +102,9 @@ update msg model =
 
                         ( sync, newConfig ) =
                             ( Api.updateCapsule newCapsule
-                                (\x -> App.PreparationMsg (Preparation.CapsuleUpdate model.config.clientState.lastRequest x))
+                                ((\x -> App.PreparationMsg (Preparation.CapsuleUpdate model.config.clientState.lastRequest x))
+                                    |> App.orError
+                                )
                             , Config.incrementRequest model.config
                             )
                     in
@@ -153,7 +157,9 @@ update msg model =
 
                         sync =
                             Api.updateCapsule newCapsule
-                                (\x -> App.PreparationMsg (Preparation.CapsuleUpdate model.config.clientState.lastRequest x))
+                                ((\x -> App.PreparationMsg (Preparation.CapsuleUpdate model.config.clientState.lastRequest x))
+                                    |> App.orError
+                                )
                     in
                     ( { model
                         | user = Data.updateUser newCapsule model.user
@@ -170,7 +176,9 @@ update msg model =
 
                         sync =
                             Api.updateCapsule newCapsule
-                                (\x -> App.PreparationMsg (Preparation.CapsuleUpdate model.config.clientState.lastRequest x))
+                                ((\x -> App.PreparationMsg (Preparation.CapsuleUpdate model.config.clientState.lastRequest x))
+                                    |> App.orError
+                                )
 
                         previousSlide =
                             capsule.structure
@@ -202,7 +210,9 @@ update msg model =
 
                         sync =
                             Api.updateCapsule newCapsule
-                                (\x -> App.PreparationMsg (Preparation.CapsuleUpdate model.config.clientState.lastRequest x))
+                                ((\x -> App.PreparationMsg (Preparation.CapsuleUpdate model.config.clientState.lastRequest x))
+                                    |> App.orError
+                                )
 
                         nextSlide =
                             capsule.structure
@@ -296,7 +306,9 @@ update msg model =
                             Preparation.ConfirmUpdateCapsulePopup c ->
                                 ( { model | page = App.Preparation <| Preparation.init c, config = Config.incrementRequest model.config }
                                 , Api.updateCapsule c
-                                    (\x -> App.PreparationMsg (Preparation.CapsuleUpdate model.config.clientState.lastRequest x))
+                                    ((\x -> App.PreparationMsg (Preparation.CapsuleUpdate model.config.clientState.lastRequest x))
+                                        |> App.orError
+                                    )
                                 )
 
                             _ ->
@@ -398,19 +410,19 @@ updateExtra user msg model config =
                     case changeSlide of
                         Preparation.AddSlide gos ->
                             ( { model | changeSlide = RemoteData.Loading Nothing }
-                            , Api.addSlide capsule gos p file config.clientState.taskId mkMsg
+                            , Api.addSlide capsule gos p file config.clientState.taskId (App.orError mkMsg)
                             , Config.incrementTaskId newConfig
                             )
 
                         Preparation.AddGos gos ->
                             ( { model | changeSlide = RemoteData.Loading Nothing }
-                            , Api.addGos capsule gos p file config.clientState.taskId mkMsg
+                            , Api.addGos capsule gos p file config.clientState.taskId (App.orError mkMsg)
                             , Config.incrementTaskId newConfig
                             )
 
                         Preparation.ReplaceSlide slide ->
                             ( { model | changeSlide = RemoteData.Loading Nothing }
-                            , Api.replaceSlide capsule slide p file config.clientState.taskId mkMsg
+                            , Api.replaceSlide capsule slide p file config.clientState.taskId (App.orError mkMsg)
                             , Config.incrementTaskId newConfig
                             )
 
@@ -441,7 +453,9 @@ updateExtra user msg model config =
                 cmd : Cmd App.Msg
                 cmd =
                     Api.updateCapsule c
-                        (\x -> App.PreparationMsg (Preparation.CapsuleUpdate config.clientState.lastRequest x))
+                        ((\x -> App.PreparationMsg (Preparation.CapsuleUpdate config.clientState.lastRequest x))
+                            |> App.orError
+                        )
             in
             ( Preparation.init c, cmd, Config.incrementRequest config )
 
@@ -493,7 +507,9 @@ updateDnD user msg model config =
                     if dropped && capsule.structure /= newStructure && not broken then
                         ( Api.updateCapsule
                             { capsule | structure = newStructure }
-                            (\x -> App.PreparationMsg (Preparation.CapsuleUpdate config.clientState.lastRequest x))
+                            ((\x -> App.PreparationMsg (Preparation.CapsuleUpdate config.clientState.lastRequest x))
+                                |> App.orError
+                            )
                         , Config.incrementRequest config
                         )
 

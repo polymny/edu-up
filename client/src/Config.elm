@@ -242,6 +242,7 @@ type alias ClientState =
     , taskId : TaskId
     , webSocketStatus : Bool
     , popupType : PopupType
+    , hasError : Bool
     }
 
 
@@ -249,6 +250,7 @@ type PopupType
     = NoPopup
     | LangPicker
     | WebSocketInfo
+    | ErrorInfo
 
 
 {-| Task id
@@ -445,6 +447,7 @@ initClientState key lang =
     , showTaskPanel = False
     , taskId = 0
     , webSocketStatus = False
+    , hasError = False
     }
 
 
@@ -554,6 +557,7 @@ type Msg
     | UpdateTaskStatus TaskStatus
     | ToggleLangPicker
     | ToggleWebSocketInfo
+    | ToggleErrorInfo
     | ToggleTaskPanel
     | FocusResult (Result Dom.Error ())
     | DisableTaskPanel
@@ -562,6 +566,7 @@ type Msg
     | ScrollToGos Float String
     | WebSocketStatus Bool
     | UploadRecordFailed TaskId
+    | HasError
 
 
 {-| This functions updates the config.
@@ -755,6 +760,19 @@ update msg { serverConfig, clientConfig, clientState } =
                             { clientState
                                 | popupType =
                                     Utils.tern (clientState.popupType == LangPicker) NoPopup LangPicker
+                            }
+                      }
+                    , False
+                    , []
+                    )
+
+                ToggleErrorInfo ->
+                    ( { serverConfig = serverConfig
+                      , clientConfig = clientConfig
+                      , clientState =
+                            { clientState
+                                | popupType =
+                                    Utils.tern (clientState.popupType == ErrorInfo) NoPopup ErrorInfo
                             }
                       }
                     , False
@@ -971,6 +989,15 @@ update msg { serverConfig, clientConfig, clientState } =
                     ( { serverConfig = serverConfig
                       , clientConfig = clientConfig
                       , clientState = { clientState | tasks = List.map taskMapper clientState.tasks }
+                      }
+                    , False
+                    , []
+                    )
+
+                HasError ->
+                    ( { serverConfig = serverConfig
+                      , clientConfig = clientConfig
+                      , clientState = { clientState | hasError = True, popupType = ErrorInfo }
                       }
                     , False
                     , []

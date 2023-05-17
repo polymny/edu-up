@@ -173,6 +173,9 @@ viewContent fullModel =
 
                 Config.WebSocketInfo ->
                     webSocketInfo clientState.lang
+
+                Config.ErrorInfo ->
+                    errorInfo clientState.lang
     in
     Element.column
         [ Ui.wf
@@ -341,5 +344,27 @@ webSocketInfo lang =
                 }
     in
     Ui.popup (Strings.uiInfo lang) <|
+        Element.column [ Ui.wf, Ui.hf, Ui.s 10 ]
+            [ info, confirmButton ]
+
+
+{-| The popup that gives some info about the server error.
+-}
+errorInfo : Lang -> Element App.MaybeMsg
+errorInfo lang =
+    let
+        info =
+            Element.column [ Font.center, Ui.cx, Ui.cy, Ui.s 50 ]
+                [ Ui.paragraph [] <| Strings.uiConnectionInterrupted lang ++ "."
+                , Ui.paragraph [] <| Strings.uiRefreshOrContactAdmin lang ++ "."
+                ]
+
+        confirmButton =
+            Ui.primary [ Ui.ab, Ui.ar ]
+                { action = Ui.Msg <| App.LoggedMsg <| App.ConfigMsg <| Config.ToggleErrorInfo
+                , label = Element.text <| Strings.uiConfirm lang
+                }
+    in
+    Ui.popup (Strings.uiFatalError lang) <|
         Element.column [ Ui.wf, Ui.hf, Ui.s 10 ]
             [ info, confirmButton ]

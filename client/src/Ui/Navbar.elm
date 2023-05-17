@@ -84,15 +84,24 @@ navbar config page user =
                     Ui.logo
 
         errorMsg =
-            case page of
-                Just (App.Preparation m) ->
-                    case m.capsuleUpdate of
-                        RemoteData.Loading _ ->
-                            Ui.spinningSpinner [] 25
+            let
+                hasError =
+                    Maybe.map .clientState config
+                        |> Maybe.map .hasError
+                        |> Maybe.withDefault False
 
+                errorIcon =
+                    Ui.icon 25 Icons.error
+                        |> Element.el [ Font.color Colors.red ]
+            in
+            case ( hasError, page ) of
+                ( True, _ ) ->
+                    errorIcon
+
+                ( _, Just (App.Preparation m) ) ->
+                    case m.capsuleUpdate of
                         RemoteData.Failure _ ->
-                            Ui.icon 25 Icons.error
-                                |> Element.el [ Font.color Colors.red ]
+                            errorIcon
 
                         _ ->
                             Element.none

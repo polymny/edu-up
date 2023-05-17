@@ -66,7 +66,7 @@ update msg model =
                             Data.updateUser newCapsule model.user
                     in
                     ( { model | user = newUser }
-                    , Api.removeCollaborator capsule u.username (\_ -> App.Noop)
+                    , Api.removeCollaborator capsule u.username ((\_ -> App.Noop) |> App.orError)
                     )
 
                 Collaboration.SwitchRole u ->
@@ -92,7 +92,7 @@ update msg model =
                             Data.updateUser newCapsule model.user
                     in
                     ( { model | user = newUser }
-                    , Api.changeCollaboratorRole capsule u.username newRole (\_ -> App.Noop)
+                    , Api.changeCollaboratorRole capsule u.username newRole ((\_ -> App.Noop) |> App.orError)
                     )
 
         _ ->
