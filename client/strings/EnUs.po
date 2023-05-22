@@ -32,6 +32,10 @@ msgstr "Login failed"
 msgid "Login.termsOfService"
 msgstr "Terms of service"
 
+#. The shorthand for termis of service.
+msgid "Login.termsOfServiceShort"
+msgstr "ToS"
+
 #. Begning of the sentence that the user pronounces when accepting the terms of service.
 msgid "Login.acceptTermsOfServiceBegining"
 msgstr "I read and accept the"
@@ -1311,3 +1315,23 @@ msgstr "Sorry, but we're experiencing some technical difficulties"
 #. Please try refreshing the page by clicking here.
 msgid "Error.ServerError.tryRefreshingByClickingHere"
 msgstr "Please try refreshing the page by clicking here"
+
+#. Welcome to the new version.
+msgid "NewClient.welcome"
+msgstr "Welcome to the new Polymny Studio version"
+
+#. New UI, improvements and bug fixes
+msgid "NewClient.updates"
+msgstr "The UI is way more beautiful, and many features have been improved"
+
+#. Click here to check the release note for more information.
+msgid "NewClient.checkReleaseNote"
+msgstr "For more information, click here to check the release note"
+
+#. You can go back to the previous version by clicking the link in the bottom bar.
+msgid "NewClient.youCanGoBack"
+msgstr "You can go back to the previous version by clicking the link in the bottom bar"
+
+#. Don't hesitate to send us feedback at ... .
+msgid "NewClient.pleaseSendFeedback"
+msgstr "Don't hesitate to send us feedback at"

@@ -18,6 +18,10 @@ msgstr ""
 msgid "Login.termsOfService"
 msgstr ""
 
+#. The shorthand for termis of service.
+msgid "Login.termsOfServiceShort"
+msgstr ""
+
 #. Begning of the sentence that the user pronounces when accepting the terms of service.
 msgid "Login.acceptTermsOfServiceBegining"
 msgstr ""
@@ -1262,4 +1266,24 @@ msgstr ""
 
 #. Please try refreshing the page by clicking here.
 msgid "Error.ServerError.tryRefreshingByClickingHere"
+msgstr ""
+
+#. Welcome to the new version.
+msgid "NewClient.welcome"
+msgstr ""
+
+#. New UI, improvements and bug fixes
+msgid "NewClient.updates"
+msgstr ""
+
+#. Click here to check the release note for more information.
+msgid "NewClient.checkReleaseNote"
+msgstr ""
+
+#. You can go back to the previous version by clicking the link in the bottom bar.
+msgid "NewClient.youCanGoBack"
+msgstr ""
+
+#. Don't hesitate to send us feed back at ... .
+msgid "NewClient.pleaseSendFeedback"
 msgstr ""

@@ -45,7 +45,10 @@ init flags url key =
             Decode.decodeValue (Decode.field "global" (Decode.field "clientConfig" Config.decodeClientConfig)) flags
 
         clientState =
-            Config.initClientState (Just key) (clientConfig |> Result.toMaybe |> Maybe.andThen .lang)
+            Config.initClientState
+                (Just key)
+                (clientConfig |> Result.toMaybe |> Maybe.andThen .lang)
+                (clientConfig |> Result.toMaybe |> Maybe.map .awareOfNewClient |> Maybe.withDefault False)
 
         sortBy =
             clientConfig |> Result.map .sortBy |> Result.withDefault Config.defaultClientConfig.sortBy

@@ -1,7 +1,7 @@
 module Lang exposing
     ( Lang(..), langs, fromString, toString, toLocal, flag
-    , default, question, dots
-    , warning
+    , default, question, exclamation, dots
+    , hurray, warning
     )
 
 {-| This module holds the lang type and the different strings represented in the different languages.
@@ -14,7 +14,7 @@ module Lang exposing
 
 # Utils functions
 
-@docs default, other, question, dots
+@docs default, other, question, exclamation, dots
 
 -}
 
@@ -113,6 +113,18 @@ question string lang =
             string lang ++ "?"
 
 
+{-| Adds an exclamating mark to a string.
+-}
+exclamation : (Lang -> String) -> Lang -> String
+exclamation string lang =
+    case lang of
+        FrFr ->
+            string lang ++ " !"
+
+        _ ->
+            string lang ++ "!"
+
+
 {-| Adds three dots at the end of a string.
 -}
 dots : (Lang -> String) -> Lang -> String
@@ -127,3 +139,10 @@ dots string lang =
 warning : (Lang -> String) -> Lang -> String
 warning string lang =
     "⚠️ " ++ string lang ++ " ⚠️"
+
+
+{-| Adds hurray emojis at the beginning and end of a string.
+-}
+hurray : (Lang -> String) -> Lang -> String
+hurray string lang =
+    "🎉 " ++ string lang ++ " 🥳"

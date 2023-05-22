@@ -36,6 +36,7 @@ import Production.Views as Production
 import Profile.Views as Profile
 import Publication.Types as Publication
 import Publication.Views as Publication
+import Route
 import Strings
 import Ui.Colors as Colors
 import Ui.Elements as Ui
@@ -160,13 +161,13 @@ viewContent fullModel =
                 App.Failure error ->
                     ( viewError error |> Element.map App.LoggedMsg, Element.none )
 
-        clientState =
+        ( clientState, home ) =
             case fullModel of
                 App.Logged { config } ->
-                    config.clientState
+                    ( config.clientState, config.serverConfig.home )
 
                 _ ->
-                    Config.initClientState Nothing Nothing
+                    ( Config.initClientState Nothing Nothing False, Nothing )
 
         realPopup =
             case clientState.popupType of
@@ -178,6 +179,9 @@ viewContent fullModel =
 
                 Config.WebSocketInfo ->
                     webSocketInfo clientState.lang
+
+                Config.NewClientInfo ->
+                    newClientInfo clientState.lang home
     in
     Element.column
         [ Ui.wf
@@ -351,5 +355,47 @@ webSocketInfo lang =
                 }
     in
     Ui.popup (Strings.uiInfo lang) <|
+        Element.column [ Ui.wf, Ui.hf, Ui.s 10 ]
+            [ info, confirmButton ]
+
+
+{-| A popup that shows up the first time a user arrives on the new client.
+-}
+newClientInfo : Lang -> Maybe String -> Element App.MaybeMsg
+newClientInfo lang home =
+    let
+        info =
+            Element.column [ Font.center, Ui.cx, Ui.cy, Ui.s 30 ]
+                [ Ui.paragraph [] <| Lang.hurray Strings.newClientWelcome lang
+                , Ui.paragraph [] <| Lang.exclamation Strings.newClientUpdates lang
+                , case home of
+                    Just h ->
+                        Element.paragraph [] <|
+                            [ Ui.link [ Font.bold ]
+                                { action = Ui.Route <| Route.Custom <| h ++ "/notes-de-versions/2-0-0/"
+                                , label = Strings.newClientCheckReleaseNote lang ++ "."
+                                }
+                            ]
+
+                    _ ->
+                        Ui.paragraph [] <| Strings.newClientCheckReleaseNote lang ++ "."
+                , Ui.paragraph [ Font.italic ] <| Strings.newClientYouCanGoBack lang ++ "."
+                , Element.paragraph [] <|
+                    [ Element.text <| Strings.newClientPleaseSendFeedback lang ++ " "
+                    , Ui.link [ Font.bold ]
+                        { action = Ui.Route <| Route.Custom <| "mailto:contacter@polymny.studio"
+                        , label = "contacter@polymny.studio"
+                        }
+                    , Element.text <| Lang.exclamation (\_ -> "") lang
+                    ]
+                ]
+
+        confirmButton =
+            Ui.primary [ Ui.ab, Ui.ar ]
+                { action = Ui.Msg <| App.LoggedMsg <| App.ConfigMsg <| Config.CloseNewClientInfo
+                , label = Element.text <| Strings.uiConfirm lang
+                }
+    in
+    Ui.popup (Lang.hurray Strings.newClientWelcome lang) <|
         Element.column [ Ui.wf, Ui.hf, Ui.s 10 ]
             [ info, confirmButton ]

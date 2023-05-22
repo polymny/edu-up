@@ -161,6 +161,7 @@ type alias ClientConfig =
     , sortBy : Data.SortBy
     , devices : Device.Devices
     , preferredDevice : Maybe Device.Device
+    , awareOfNewClient : Bool
     }
 
 
@@ -174,6 +175,7 @@ defaultClientConfig =
     , sortBy = { key = Data.LastModified, ascending = False }
     , devices = { audio = [], video = [] }
     , preferredDevice = Nothing
+    , awareOfNewClient = False
     }
 
 
@@ -188,6 +190,7 @@ encodeClientConfig config =
         , ( "sortBy", Data.encodeSortBy config.sortBy )
         , ( "devices", Device.encodeDevices config.devices )
         , ( "preferredDevice", Maybe.map Device.encodeDevice config.preferredDevice |> Maybe.withDefault Encode.null )
+        , ( "awareOfNewClient", Encode.bool config.awareOfNewClient )
         ]
 
 
@@ -202,13 +205,14 @@ makeDefault default arg =
 -}
 decodeClientConfig : Decoder ClientConfig
 decodeClientConfig =
-    Decode.map6 ClientConfig
+    Decode.map7 ClientConfig
         (Decode.field "lang" Decode.string |> Decode.map Lang.fromString |> makeDefault defaultClientConfig.lang)
         (Decode.field "zoomLevel" Decode.int |> makeDefault defaultClientConfig.zoomLevel)
         (Decode.field "promptSize" Decode.int |> makeDefault defaultClientConfig.promptSize)
         (Decode.field "sortBy" Data.decodeSortBy |> makeDefault defaultClientConfig.sortBy)
         (Decode.field "devices" Device.decodeDevices |> makeDefault defaultClientConfig.devices)
         (Decode.maybe (Decode.field "preferredDevice" Device.decodeDevice))
+        (Decode.field "awareOfNewClient" Decode.bool |> makeDefault defaultClientConfig.awareOfNewClient)
 
 
 {-| This type holds the client global state.
@@ -250,6 +254,7 @@ type PopupType
     = NoPopup
     | LangPicker
     | WebSocketInfo
+    | NewClientInfo
 
 
 {-| Task id
@@ -434,15 +439,15 @@ decodeTaskStatus =
 
 {-| Initializes a client state.
 -}
-initClientState : Maybe Browser.Navigation.Key -> Maybe Lang -> ClientState
-initClientState key lang =
+initClientState : Maybe Browser.Navigation.Key -> Maybe Lang -> Bool -> ClientState
+initClientState key lang awareOfNewClient =
     { key = key
     , zone = Time.utc
     , time = Time.millisToPosix 0
     , lang = Maybe.withDefault Lang.default lang
     , lastRequest = 0
     , tasks = []
-    , popupType = NoPopup
+    , popupType = Utils.tern awareOfNewClient NoPopup NewClientInfo
     , showTaskPanel = False
     , taskId = 0
     , webSocketStatus = False
@@ -565,6 +570,7 @@ type Msg
     | WebSocketStatus Bool
     | UploadRecordFailed TaskId
     | HasError
+    | CloseNewClientInfo
 
 
 {-| This functions updates the config.
@@ -985,6 +991,15 @@ update msg { serverConfig, clientConfig, clientState } =
                       , clientState = { clientState | hasError = True }
                       }
                     , False
+                    , []
+                    )
+
+                CloseNewClientInfo ->
+                    ( { serverConfig = serverConfig
+                      , clientConfig = { clientConfig | awareOfNewClient = True }
+                      , clientState = { clientState | popupType = NoPopup }
+                      }
+                    , True
                     , []
                     )
 

@@ -32,6 +32,10 @@ msgstr "Connexion echouée"
 msgid "Login.termsOfService"
 msgstr "Conditions générales d'utilisation"
 
+#. The shorthand for termis of service.
+msgid "Login.termsOfServiceShort"
+msgstr "CGU"
+
 #. Begning of the sentence that the user pronounces when accepting the terms of service.
 msgid "Login.acceptTermsOfServiceBegining"
 msgstr "J'ai lu et j'accepte les"
@@ -1322,3 +1326,23 @@ msgstr "Désolé, mais nous rencontrons actuellement des difficultés techniques
 #. Please try refreshing the page by clicking here.
 msgid "Error.ServerError.tryRefreshingByClickingHere"
 msgstr "Veuillez essayer de rafraîchir la page en cliquant ici"
+
+#. Welcome to the new version.
+msgid "NewClient.welcome"
+msgstr "Bienvenue sur la nouvelle version de Polymny Studio"
+
+#. New UI, improvements and bug fixes
+msgid "NewClient.updates"
+msgstr "L'interface est bien plus jolie, et de nombreuses fonctionnalités ont été améliorées"
+
+#. Click here to check the release note for more information.
+msgid "NewClient.checkReleaseNote"
+msgstr "Pour plus d'information, cliquez ici pour consulter la note de version"
+
+#. You can go back to the previous version by clicking the link in the bottom bar.
+msgid "NewClient.youCanGoBack"
+msgstr "Vous pouvez retourner à l'ancienne version en cliquant sur le lien dans la barre du bas"
+
+#. Don't hesitate to send us feed back at ... .
+msgid "NewClient.pleaseSendFeedback"
+msgstr "N'hésitez pas à nous envoyer vos retours à"
