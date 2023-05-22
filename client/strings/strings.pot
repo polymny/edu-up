@@ -953,6 +953,10 @@ msgstr ""
 msgid "Config.license"
 msgstr ""
 
+#. The shorthand for the license of the code.
+msgid "Config.licenseShort"
+msgstr ""
+
 #. Welcome on Polymny.
 msgid "Intro.welcomeOnPolymny"
 msgstr ""

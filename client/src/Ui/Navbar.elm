@@ -788,20 +788,32 @@ bottombar config page =
             )
             serverUrl
             |> Maybe.withDefault Element.none
-        , Ui.link [ Ui.ar, Element.mouseOver [ Font.color Colors.greyBackground ] ]
-            { label = Strings.configLicense lang
+        , Ui.link
+            [ Ui.ar
+            , Element.mouseOver [ Font.color Colors.greyBackground ]
+            , Ui.tooltip <| Strings.configLicense lang
+            ]
+            { label = Strings.configLicenseShort lang
             , action = Ui.NewTab "https://github.com/polymny/polymny/blob/master/LICENSE"
             }
-        , Ui.link [ Ui.ar, Element.mouseOver [ Font.color Colors.greyBackground ] ]
-            { label = Strings.loginTermsOfService lang
+        , Ui.link
+            [ Ui.ar
+            , Element.mouseOver [ Font.color Colors.greyBackground ]
+            , Ui.tooltip <| Strings.loginTermsOfService lang
+            ]
+            { label = Strings.loginTermsOfServiceShort lang
             , action = Ui.NewTab "https://polymny.studio/cgu/"
             }
         , Ui.link [ Ui.ar, Element.mouseOver [ Font.color Colors.greyBackground ] ]
             { label = Strings.configSource lang
             , action = Ui.NewTab "https://github.com/polymny/polymny"
             }
-        , Ui.link [ Ui.ar, Element.mouseOver [ Font.color Colors.greyBackground ] ]
-            { label = Strings.configLang lang ++ " " ++ Lang.flag lang
+        , Ui.link
+            [ Ui.ar
+            , Element.mouseOver [ Font.color Colors.greyBackground ]
+            , Ui.tooltip <| Strings.configLang lang
+            ]
+            { label = Lang.flag lang
             , action = Ui.Msg <| App.LoggedMsg <| App.ConfigMsg <| Config.ToggleLangPicker
             }
         , config

@@ -984,6 +984,10 @@ msgstr "Lang"
 msgid "Config.license"
 msgstr "License GNU Affero V3"
 
+#. The shorthand for the license of the code.
+msgid "Config.licenseShort"
+msgstr "AGPLv3"
+
 #. Welcome on Polymny.
 msgid "Intro.welcomeOnPolymny"
 msgstr "Welcome on Polymny Studio"
