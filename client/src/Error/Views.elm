@@ -36,11 +36,13 @@ view config user model =
 
                 Error.ServerError ->
                     Element.column [ Ui.s 20 ]
-                        [ Element.el [ Font.size 40, Font.bold ] <| Element.text <| Strings.errorServerErrorTechnicalDifficulties lang ++ "."
-                        , Ui.link [ Font.bold ]
-                            { action = Ui.Msg <| App.ExternalUrl ""
-                            , label = Strings.errorServerErrorTryRefreshingByClickingHere lang ++ "."
-                            }
+                        [ Ui.paragraph [ Font.size 40, Font.bold ] <| Strings.errorServerErrorTechnicalDifficulties lang ++ "."
+                        , Element.paragraph [] <|
+                            [ Ui.link [ Font.bold ]
+                                { action = Ui.Msg <| App.ExternalUrl ""
+                                , label = Strings.errorServerErrorTryRefreshingByClickingHere lang ++ "."
+                                }
+                            ]
                         , Element.paragraph []
                             [ Element.text <| Strings.errorServerErrorProblemPersists lang ++ " "
                             , Ui.link [ Font.bold ]
@@ -55,6 +57,6 @@ view config user model =
                     Element.none
 
         content =
-            Element.el [ Ui.cx, Ui.py 50 ] errorElement
+            Element.el [ Ui.cx, Ui.p 50 ] errorElement
     in
     ( content, Element.none )
