@@ -1310,3 +1310,15 @@ msgstr "Transcodage de resources externes"
 #. Unknown task.
 msgid "Tasks.unknown"
 msgstr "Tâche inconnue"
+
+#. This page does not exist.
+msgid "Error.NotFound.pageNotFound"
+msgstr "La page à laquelle vous essayez d'accéder n'a pas été trouvée"
+
+#. Sorry, but we're experiencing some technical difficulties.
+msgid "Error.ServerError.technicalDifficulties"
+msgstr "Désolé, mais nous rencontrons actuellement des difficultés techniques"
+
+#. Please try refreshing the page by clicking here.
+msgid "Error.ServerError.tryRefreshingByClickingHere"
+msgstr "Veuillez essayer de rafraîchir la page en cliquant ici"

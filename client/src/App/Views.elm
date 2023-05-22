@@ -19,6 +19,8 @@ import Element exposing (Element)
 import Element.Background as Background
 import Element.Border as Border
 import Element.Font as Font
+import Error.Types as Error
+import Error.Views as Error
 import Home.Views as Home
 import Html
 import Html.Attributes
@@ -126,6 +128,9 @@ title model =
                         App.Profile _ ->
                             [ Strings.uiProfile lang ]
 
+                        App.Error _ ->
+                            []
+
                 _ ->
                     []
     in
@@ -152,7 +157,7 @@ viewContent fullModel =
                     , Element.none
                     )
 
-                App.Error error ->
+                App.Failure error ->
                     ( viewError error |> Element.map App.LoggedMsg, Element.none )
 
         clientState =
@@ -173,9 +178,6 @@ viewContent fullModel =
 
                 Config.WebSocketInfo ->
                     webSocketInfo clientState.lang
-
-                Config.ErrorInfo ->
-                    errorInfo clientState.lang
     in
     Element.column
         [ Ui.wf
@@ -224,22 +226,25 @@ viewSuccess model =
         ( maybeCapsule, maybeGos ) =
             App.capsuleAndGos model.user model.page
     in
-    case ( model.page, maybeCapsule, maybeGos ) of
-        ( App.Home m, _, _ ) ->
+    case ( ( model.page, model.config.clientState.hasError ), ( maybeCapsule, maybeGos ) ) of
+        ( ( _, True ), _ ) ->
+            Error.view model.config model.user (Error.init Error.ServerError)
+
+        ( ( App.Home m, _ ), _ ) ->
             Home.view model.config model.user m
 
-        ( App.NewCapsule m, _, _ ) ->
+        ( ( App.NewCapsule m, _ ), _ ) ->
             NewCapsule.view model.config model.user m
 
-        ( App.Preparation m, Just capsule, _ ) ->
+        ( ( App.Preparation m, _ ), ( Just capsule, _ ) ) ->
             Preparation.view model.config model.user (Preparation.withCapsule capsule m)
                 |> Ui.addLeftColumn model.config.clientState.lang model.page capsule Nothing
 
-        ( App.Acquisition m, Just capsule, Just gos ) ->
+        ( ( App.Acquisition m, _ ), ( Just capsule, Just gos ) ) ->
             Acquisition.view model.config model.user (Acquisition.withCapsuleAndGos capsule gos m)
                 |> Ui.addLeftAndRightColumn model.config.clientState.lang model.page capsule (Just m.gos)
 
-        ( App.Production m, Just capsule, Just gos ) ->
+        ( ( App.Production m, _ ), ( Just capsule, Just gos ) ) ->
             let
                 ( c1, c2, p ) =
                     Production.view model.config model.user (Production.withCapsuleAndGos capsule gos m)
@@ -259,21 +264,23 @@ viewSuccess model =
             in
             ( finalView, p )
 
-        -- |> Ui.addLeftColumn model.config.clientState.lang model.page capsule (Just m.gos)
-        ( App.Publication m, Just capsule, _ ) ->
+        ( ( App.Publication m, _ ), ( Just capsule, _ ) ) ->
             Publication.view model.config model.user (Publication.withCapsule capsule m)
                 |> Ui.addLeftColumn model.config.clientState.lang model.page capsule Nothing
 
-        ( App.Options m, Just capsule, _ ) ->
+        ( ( App.Options m, _ ), ( Just capsule, _ ) ) ->
             Options.view model.config model.user (Options.withCapsule capsule m)
                 |> Ui.addLeftColumn model.config.clientState.lang model.page capsule Nothing
 
-        ( App.Collaboration m, Just capsule, _ ) ->
+        ( ( App.Collaboration m, _ ), ( Just capsule, _ ) ) ->
             Collaboration.view model.config model.user (Collaboration.withCapsule capsule m)
                 |> Ui.addLeftColumn model.config.clientState.lang model.page capsule Nothing
 
-        ( App.Profile m, _, _ ) ->
+        ( ( App.Profile m, _ ), _ ) ->
             Profile.view model.config model.user m
+
+        ( ( App.Error m, _ ), _ ) ->
+            Error.view model.config model.user m
 
         _ ->
             ( Element.none, Element.none )
@@ -281,9 +288,9 @@ viewSuccess model =
 
 {-| Returns the view if the model is in error.
 -}
-viewError : App.Error -> Element App.Msg
+viewError : App.Failure -> Element App.Msg
 viewError error =
-    Element.text (App.errorToString error)
+    Element.text (App.failureToString error)
 
 
 {-| The popup for the lang picker.
@@ -344,27 +351,5 @@ webSocketInfo lang =
                 }
     in
     Ui.popup (Strings.uiInfo lang) <|
-        Element.column [ Ui.wf, Ui.hf, Ui.s 10 ]
-            [ info, confirmButton ]
-
-
-{-| The popup that gives some info about the server error.
--}
-errorInfo : Lang -> Element App.MaybeMsg
-errorInfo lang =
-    let
-        info =
-            Element.column [ Font.center, Ui.cx, Ui.cy, Ui.s 50 ]
-                [ Ui.paragraph [] <| Strings.uiConnectionInterrupted lang ++ "."
-                , Ui.paragraph [] <| Strings.uiRefreshOrContactAdmin lang ++ "."
-                ]
-
-        confirmButton =
-            Ui.primary [ Ui.ab, Ui.ar ]
-                { action = Ui.Msg <| App.LoggedMsg <| App.ConfigMsg <| Config.ToggleErrorInfo
-                , label = Element.text <| Strings.uiConfirm lang
-                }
-    in
-    Ui.popup (Strings.uiFatalError lang) <|
         Element.column [ Ui.wf, Ui.hf, Ui.s 10 ]
             [ info, confirmButton ]

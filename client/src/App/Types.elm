@@ -1,6 +1,6 @@
 module App.Types exposing
     ( Model, Page(..), Msg(..), onUrlRequest
-    , Error(..), errorToString, orError
+    , Failure(..), failureToString, orError
     , MaybeModel(..), MaybeMsg(..), WebSocketMsg(..), toMaybe
     )
 
@@ -14,7 +14,7 @@ module App.Types exposing
 
 # Error management
 
-@docs Error, errorToString, unwrapRemoteData, unwrapResult, orError
+@docs Failure, failureToString, unwrapRemoteData, unwrapResult, orError
 
 -}
 
@@ -24,6 +24,7 @@ import Collaboration.Types as Collaboration
 import Config exposing (Config)
 import Data.Capsule as Data
 import Data.User as Data exposing (User)
+import Error.Types as Error
 import Home.Types as Home
 import Json.Decode as Decode
 import NewCapsule.Types as NewCapsule
@@ -40,7 +41,7 @@ import Url
 {-| This type helps us deal with errors at the startup of the application.
 -}
 type MaybeModel
-    = Error Error
+    = Failure Failure
     | Unlogged Unlogged.Model
     | Logged Model
 
@@ -85,20 +86,21 @@ type Page
     | Options (Options.Model String)
     | Collaboration (Collaboration.Model String)
     | Profile Profile.Model
+    | Error Error.Model
 
 
 {-| This type represents the errors that can occur when the page starts.
 -}
-type Error
-    = DecodeError Decode.Error
+type Failure
+    = DecodeFailure Decode.Error
 
 
-{-| Convers the error to a string.
+{-| Convers the efailure to a string.
 -}
-errorToString : Error -> String
-errorToString error =
+failureToString : Failure -> String
+failureToString error =
     case error of
-        DecodeError e ->
+        DecodeFailure e ->
             "Error decoding JSON: " ++ Decode.errorToString e
 
 

@@ -250,7 +250,6 @@ type PopupType
     = NoPopup
     | LangPicker
     | WebSocketInfo
-    | ErrorInfo
 
 
 {-| Task id
@@ -557,7 +556,6 @@ type Msg
     | UpdateTaskStatus TaskStatus
     | ToggleLangPicker
     | ToggleWebSocketInfo
-    | ToggleErrorInfo
     | ToggleTaskPanel
     | FocusResult (Result Dom.Error ())
     | DisableTaskPanel
@@ -760,19 +758,6 @@ update msg { serverConfig, clientConfig, clientState } =
                             { clientState
                                 | popupType =
                                     Utils.tern (clientState.popupType == LangPicker) NoPopup LangPicker
-                            }
-                      }
-                    , False
-                    , []
-                    )
-
-                ToggleErrorInfo ->
-                    ( { serverConfig = serverConfig
-                      , clientConfig = clientConfig
-                      , clientState =
-                            { clientState
-                                | popupType =
-                                    Utils.tern (clientState.popupType == ErrorInfo) NoPopup ErrorInfo
                             }
                       }
                     , False
@@ -997,7 +982,7 @@ update msg { serverConfig, clientConfig, clientState } =
                 HasError ->
                     ( { serverConfig = serverConfig
                       , clientConfig = clientConfig
-                      , clientState = { clientState | hasError = True, popupType = ErrorInfo }
+                      , clientState = { clientState | hasError = True }
                       }
                     , False
                     , []

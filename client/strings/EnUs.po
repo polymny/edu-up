@@ -1299,3 +1299,15 @@ msgstr "Transcode extra"
 #. Unknown task.
 msgid "Tasks.unknown"
 msgstr "Unknown task"
+
+#. This page does not exist.
+msgid "Error.NotFound.pageNotFound"
+msgstr "The webpage you are trying to access could not be found"
+
+#. Sorry, but we're experiencing some technical difficulties.
+msgid "Error.ServerError.technicalDifficulties"
+msgstr "Sorry, but we're experiencing some technical difficulties"
+
+#. Please try refreshing the page by clicking here.
+msgid "Error.ServerError.tryRefreshingByClickingHere"
+msgstr "Please try refreshing the page by clicking here"

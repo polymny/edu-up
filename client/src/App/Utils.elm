@@ -18,6 +18,7 @@ import Config exposing (Config)
 import Data.Capsule as Data
 import Data.Types as Data
 import Data.User as Data exposing (User)
+import Error.Types as Error
 import Home.Types as Home
 import Json.Decode as Decode
 import Options.Types as Options
@@ -119,13 +120,13 @@ init flags url key =
                     )
 
                 ( Err s, _, _ ) ->
-                    ( App.Error (App.DecodeError s), Cmd.none )
+                    ( App.Failure (App.DecodeFailure s), Cmd.none )
 
                 ( _, Err c, _ ) ->
-                    ( App.Error (App.DecodeError c), Cmd.none )
+                    ( App.Failure (App.DecodeFailure c), Cmd.none )
 
                 ( _, _, Err u ) ->
-                    ( App.Error (App.DecodeError u), Cmd.none )
+                    ( App.Failure (App.DecodeFailure u), Cmd.none )
     in
     ( model, cmd )
 
@@ -206,7 +207,7 @@ pageFromRoute _ user route =
             ( Data.getCapsuleById id user
                 |> Maybe.map Preparation.init
                 |> Maybe.map App.Preparation
-                |> Maybe.withDefault (App.Home Home.init)
+                |> (Maybe.withDefault <| App.Error <| Error.init Error.NotFound)
             , Cmd.none
             )
 
@@ -214,19 +215,19 @@ pageFromRoute _ user route =
             Data.getCapsuleById id user
                 |> Maybe.andThen (Acquisition.init gos)
                 |> Maybe.map (\( a, b ) -> ( App.Acquisition a, Cmd.map App.AcquisitionMsg b ))
-                |> Maybe.withDefault ( App.Home Home.init, Cmd.none )
+                |> Maybe.withDefault ( App.Error <| Error.init Error.NotFound, Cmd.none )
 
         Route.Production id gos ->
             Data.getCapsuleById id user
                 |> Maybe.andThen (Production.init gos)
                 |> Maybe.map (\( a, b ) -> ( App.Production a, Cmd.map App.ProductionMsg b ))
-                |> Maybe.withDefault ( App.Home Home.init, Cmd.none )
+                |> Maybe.withDefault ( App.Error <| Error.init Error.NotFound, Cmd.none )
 
         Route.Publication id ->
             ( Data.getCapsuleById id user
                 |> Maybe.map Publication.init
                 |> Maybe.map App.Publication
-                |> Maybe.withDefault (App.Home Home.init)
+                |> (Maybe.withDefault <| App.Error <| Error.init Error.NotFound)
             , Cmd.none
             )
 
@@ -234,7 +235,7 @@ pageFromRoute _ user route =
             ( Data.getCapsuleById id user
                 |> Maybe.map Options.init
                 |> Maybe.map App.Options
-                |> Maybe.withDefault (App.Home Home.init)
+                |> (Maybe.withDefault <| App.Error <| Error.init Error.NotFound)
             , Cmd.none
             )
 
@@ -242,12 +243,15 @@ pageFromRoute _ user route =
             ( Data.getCapsuleById id user
                 |> Maybe.map Collaboration.init
                 |> Maybe.map App.Collaboration
-                |> Maybe.withDefault (App.Home Home.init)
+                |> (Maybe.withDefault <| App.Error <| Error.init Error.NotFound)
             , Cmd.none
             )
 
         Route.Profile ->
             ( App.Profile Profile.init, Cmd.none )
+
+        Route.NotFound ->
+            ( App.Error <| Error.init <| Error.fromCode 404, Cmd.none )
 
         _ ->
             ( App.Home Home.init, Cmd.none )
@@ -284,3 +288,6 @@ routeFromPage page =
 
         App.Profile _ ->
             Route.Profile
+
+        App.Error _ ->
+            Route.NotFound
