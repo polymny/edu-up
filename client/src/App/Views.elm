@@ -167,7 +167,7 @@ viewContent fullModel =
                     ( config.clientState, config.serverConfig.home )
 
                 _ ->
-                    ( Config.initClientState Nothing Nothing False, Nothing )
+                    ( Config.initClientState Nothing Nothing True, Nothing )
 
         realPopup =
             case clientState.popupType of

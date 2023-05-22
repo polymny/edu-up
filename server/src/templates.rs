@@ -288,7 +288,7 @@ const INDEX_HTML_AFTER_FLAGS: &str = r#";
                 head.appendChild(portsScript);
 
                 function startApp() {
-                    if (!testElm("Main')) {
+                    if (!testElm("Main")) {
                         setTimeout(startApp, 100);
                         return;
                     }

@@ -48,7 +48,7 @@ init flags url key =
             Config.initClientState
                 (Just key)
                 (clientConfig |> Result.toMaybe |> Maybe.andThen .lang)
-                (clientConfig |> Result.toMaybe |> Maybe.map .awareOfNewClient |> Maybe.withDefault False)
+                (clientConfig |> Result.toMaybe |> Maybe.map .awareOfNewClient |> Maybe.withDefault True)
 
         sortBy =
             clientConfig |> Result.map .sortBy |> Result.withDefault Config.defaultClientConfig.sortBy
