@@ -37,10 +37,18 @@ view config user model =
                 Error.ServerError ->
                     Element.column [ Ui.s 20 ]
                         [ Element.el [ Font.size 40, Font.bold ] <| Element.text <| Strings.errorServerErrorTechnicalDifficulties lang ++ "."
-                        , Ui.link []
+                        , Ui.link [ Font.bold ]
                             { action = Ui.Msg <| App.ExternalUrl ""
                             , label = Strings.errorServerErrorTryRefreshingByClickingHere lang ++ "."
                             }
+                        , Element.paragraph []
+                            [ Element.text <| Strings.errorServerErrorProblemPersists lang ++ " "
+                            , Ui.link [ Font.bold ]
+                                { label = "contacter@polymny.studio"
+                                , action = Ui.Route <| Route.Custom "mailto:contacter@polymny.studio"
+                                }
+                            , Element.text "."
+                            ]
                         ]
 
                 _ ->

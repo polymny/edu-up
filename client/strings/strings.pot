@@ -1272,6 +1272,10 @@ msgstr ""
 msgid "Error.ServerError.tryRefreshingByClickingHere"
 msgstr ""
 
+#. If the problem persists, feel free to contact us at.
+msgid "Error.ServerError.problemPersists"
+msgstr ""
+
 #. Welcome to the new version.
 msgid "NewClient.welcome"
 msgstr ""

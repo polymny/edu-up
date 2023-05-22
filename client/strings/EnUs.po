@@ -1320,6 +1320,10 @@ msgstr "Sorry, but we're experiencing some technical difficulties"
 msgid "Error.ServerError.tryRefreshingByClickingHere"
 msgstr "Please try refreshing the page by clicking here"
 
+#. If the problem persists, feel free to contact us at.
+msgid "Error.ServerError.problemPersists"
+msgstr "If the problem persists, feel free to contact us at"
+
 #. Welcome to the new version.
 msgid "NewClient.welcome"
 msgstr "Welcome to the new Polymny Studio version"
