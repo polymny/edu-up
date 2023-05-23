@@ -633,6 +633,18 @@ msgstr ""
 msgid "Steps.Production.downloadVideo"
 msgstr ""
 
+#. This grain uses the default production options.
+msgid "Steps.Production.grainUsesDefaultProductionOptions"
+msgstr ""
+
+#. Change options below to change options for this particular grain.
+msgid "Steps.Production.changeOptionsBelow"
+msgstr ""
+
+#. Go to options tab to change options for all grains.
+msgid "Steps.Production.changeOptionsInOptionsTab"
+msgstr ""
+
 #. Step of video publication.
 msgid "Steps.Publication.publication"
 msgstr ""

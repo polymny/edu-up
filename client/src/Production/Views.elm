@@ -147,6 +147,22 @@ leftColumn config user capsule gos webcamSettings webcamSize =
                             Ui.None
                 }
 
+        -- Info to show if the grain uses default options.
+        resetElement =
+            case ( webcamSettings, Maybe.andThen .size gos.record ) of
+                ( Just _, _ ) ->
+                    Element.none
+
+                ( _, Nothing ) ->
+                    Element.none
+
+                _ ->
+                    Element.column [ Ui.s 10 ]
+                        [ Ui.paragraph [] <| Strings.stepsProductionGrainUsesDefaultProductionOptions lang ++ "."
+                        , Ui.paragraph [] <| Strings.stepsProductionChangeOptionsBelow lang ++ "."
+                        , Ui.paragraph [] <| Strings.stepsProductionChangeOptionsInOptionsTab lang ++ "."
+                        ]
+
         -- Whether the user wants to include the video inside the slides or not
         useVideo =
             (disableIf <| gos.record == Nothing || audioOnly)
@@ -335,7 +351,10 @@ leftColumn config user capsule gos webcamSettings webcamSize =
                 ]
     in
     Element.column [ Ui.wf, Ui.s 30, Ui.at, Element.scrollbarY, Ui.p 10 ]
-        [ resetButton
+        [ Element.column [ Ui.s 10 ]
+            [ resetButton
+            , resetElement
+            ]
         , Element.column [ Ui.s 10 ]
             [ useVideo
             , useVideoInfo

@@ -667,6 +667,18 @@ msgstr "La vidéo n'a pas encore été produite"
 msgid "Steps.Production.downloadVideo"
 msgstr "Télécharger la vidéo"
 
+#. This grain uses the default production options.
+msgid "Steps.Production.grainUsesDefaultProductionOptions"
+msgstr "Ce grain utilise les options de production par défaut de la capsule"
+
+#. Change options below to change options for this particular grain.
+msgid "Steps.Production.changeOptionsBelow"
+msgstr "Changez les options ci-dessous pour changer les options pour grain en particulier"
+
+#. Go to options tab to change options for all grains.
+msgid "Steps.Production.changeOptionsInOptionsTab"
+msgstr "Allez dans l'onglet options pour changer les options pour tous les grains de la capsule"
+
 #. Step of video publication.
 msgid "Steps.Publication.publication"
 msgstr "Publication"
@@ -1027,7 +1039,7 @@ msgstr "Options de production par défaut"
 
 #. Sentence to reset the options to the default values.
 msgid "Steps.Production.resetOptions"
-msgstr "Réinitialiser les options"
+msgstr "Utiliser les options par défaut de la capsule"
 
 #. General options.
 msgid "Steps.Options.generalOptions"
