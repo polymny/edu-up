@@ -2,7 +2,7 @@ module Data.Types exposing
     ( SortBy, encodeSortBy, decodeSortBy, SortKey(..), encodeSortKey, decodeSortKey
     , Plan(..), decodePlan
     , Role(..), encodeRole, roleFromString, decodeRole
-    , TaskStatus(..), decodeTaskStatus
+    , TaskStatus(..), isRunning, decodeTaskStatus
     , Privacy(..), encodePrivacy, decodePrivacy
     )
 
@@ -26,7 +26,7 @@ module Data.Types exposing
 
 # Task status
 
-@docs TaskStatus, decodeTaskStatus
+@docs TaskStatus, isRunning, decodeTaskStatus
 
 
 # Capsules privacy
@@ -220,6 +220,18 @@ decodeTaskStatus =
                     x ->
                         Decode.fail <| "Unknown task status: " ++ x
             )
+
+
+{-| Checks if a task status is running.
+-}
+isRunning : TaskStatus -> Bool
+isRunning status =
+    case status of
+        Running _ ->
+            True
+
+        _ ->
+            False
 
 
 {-| The different privacy types for a published capsule.
