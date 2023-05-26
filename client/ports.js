@@ -1023,42 +1023,45 @@ function init(node, flags) {
 
         let ctx = canvas.getContext('2d');
 
-        pointerStream = canvas.captureStream(30);
+        if (isPremium) {
 
-        canvas.addEventListener('pointerdown', function (event) {
-            pointer.down = true;
-            pointer.position.x = event.offsetX * canvas.width / canvas.parentNode.clientWidth;
-            pointer.position.y = event.offsetY * canvas.width / canvas.parentNode.clientWidth;
-            refresh(canvas, ctx);
-            canvas.setPointerCapture(event.pointerId);
-        });
+            pointerStream = canvas.captureStream(30);
 
-        canvas.addEventListener('pointerup', function (event) {
-            pointer.down = false;
-            refresh(canvas, ctx);
-            canvas.releasePointerCapture(event.pointerId);
-        });
+            canvas.addEventListener('pointerdown', function (event) {
+                pointer.down = true;
+                pointer.position.x = event.offsetX * canvas.width / canvas.parentNode.clientWidth;
+                pointer.position.y = event.offsetY * canvas.width / canvas.parentNode.clientWidth;
+                refresh(canvas, ctx);
+                canvas.setPointerCapture(event.pointerId);
+            });
 
-        canvas.addEventListener('pointermove', function (event) {
-            pointer.position.x = event.offsetX * canvas.width / canvas.parentNode.clientWidth;
-            pointer.position.y = event.offsetY * canvas.width / canvas.parentNode.clientWidth;
-            refresh(canvas, ctx);
-        });
+            canvas.addEventListener('pointerup', function (event) {
+                pointer.down = false;
+                refresh(canvas, ctx);
+                canvas.releasePointerCapture(event.pointerId);
+            });
 
-        let pointerOptions = {
-            videoBitsPerSecond: 2500000,
-            mimeType: 'video/webm;codecs=vp8'
-        };
+            canvas.addEventListener('pointermove', function (event) {
+                pointer.position.x = event.offsetX * canvas.width / canvas.parentNode.clientWidth;
+                pointer.position.y = event.offsetY * canvas.width / canvas.parentNode.clientWidth;
+                refresh(canvas, ctx);
+            });
 
-        pointerRecorder = new MediaRecorder(pointerStream, pointerOptions);
-        pointerRecorder.ondataavailable = (data) => {
-            pointerArrived = data.data;
-            sendRecordToElmIfReady();
-        };
+            let pointerOptions = {
+                videoBitsPerSecond: 2500000,
+                mimeType: 'video/webm;codecs=vp8'
+            };
 
-        pointerRecorder.onerror = (err) => {
-            console.log(err);
-        };
+            pointerRecorder = new MediaRecorder(pointerStream, pointerOptions);
+            pointerRecorder.ondataavailable = (data) => {
+                pointerArrived = data.data;
+                sendRecordToElmIfReady();
+            };
+
+            pointerRecorder.onerror = (err) => {
+                console.log(err);
+            };
+        }
     }
 
     // Fully refreshes the canvas.

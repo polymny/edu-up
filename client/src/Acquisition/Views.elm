@@ -11,7 +11,7 @@ import App.Types as App
 import Config exposing (Config)
 import Data.Capsule as Data
 import Data.Types exposing (Plan(..))
-import Data.User exposing (User)
+import Data.User as Data exposing (User)
 import Device
 import Element exposing (Element)
 import Element.Background as Background
@@ -361,7 +361,11 @@ view config user model =
                 , statusElement
                 , Element.row
                     [ Ui.wf, Ui.hf, Element.clip ]
-                    [ pointerControl model
+                    [ if Data.isPremium user then
+                        pointerControl model
+
+                      else
+                        Element.none
                     , slideElement
                     ]
                 ]
