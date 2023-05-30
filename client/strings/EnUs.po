@@ -32,6 +32,10 @@ msgstr "Login failed"
 msgid "Login.termsOfService"
 msgstr "Terms of service"
 
+#. The shorthand for termis of service.
+msgid "Login.termsOfServiceShort"
+msgstr "ToS"
+
 #. Begning of the sentence that the user pronounces when accepting the terms of service.
 msgid "Login.acceptTermsOfServiceBegining"
 msgstr "I read and accept the"
@@ -338,6 +342,14 @@ msgstr "Organize slides"
 msgid "Steps.Preparation.dndWillBreak"
 msgstr "This change will destroy some of your records"
 
+#. A sentence that explains that adding a slide will destroy the record.
+msgid "Steps.Preparation.addSlideWillBreak"
+msgstr "Adding a slide to this grain will destroy the associated record"
+
+#. A sentence that explains that deleting a slide will destroy the record.
+msgid "Steps.Preparation.deleteSlideWillBreak"
+msgstr "Deleting this slide will destroy the record associated to the grain"
+
 #. Select a pdf file.
 msgid "Steps.Preparation.selectPdf"
 msgstr "Select PDF"
@@ -410,6 +422,18 @@ msgstr "Acquisition"
 #. Action to start the recording.
 msgid "Steps.Acquisition.startRecording"
 msgstr "Start recording"
+
+#. Action to stop the recording.
+msgid "Steps.Acquisition.stopRecording"
+msgstr "Stop recording"
+
+#. Action to go to the next line during recording.
+msgid "Steps.Acquisition.recordingNextLine"
+msgstr "Go to the next line"
+
+#. Action to go to the next slide during recording.
+msgid "Steps.Acquisition.recordingNextSlide"
+msgstr "Go to the next slide"
 
 #. Action to record a video.
 msgid "Steps.Acquisition.record"
@@ -512,6 +536,10 @@ msgstr "If you have multiple slides in the grain, the right arrow will go throug
 #. Fourth line of help.
 msgid "Steps.Acquisition.Help.fourth"
 msgstr "You can then use the right arrow to end your recording"
+
+#. Reinitialize all devices.
+msgid "Steps.Acquisition.reinitializeDevices"
+msgstr "Reinitialize all devices"
 
 #. Step of video production.
 msgid "Steps.Production.production"
@@ -637,6 +665,18 @@ msgstr "Video has not been produced yet"
 msgid "Steps.Production.downloadVideo"
 msgstr "Download video"
 
+#. This grain uses the default production options.
+msgid "Steps.Production.grainUsesDefaultProductionOptions"
+msgstr "This grain uses the capsule's default production options"
+
+#. Change options below to change options for this particular grain.
+msgid "Steps.Production.changeOptionsBelow"
+msgstr "Change the options below to change options for this particular grain"
+
+#. Go to options tab to change options for all grains.
+msgid "Steps.Production.changeOptionsInOptionsTab"
+msgstr "Go to the options tab to change options for all grains of the capsule"
+
 #. Step of video publication.
 msgid "Steps.Publication.publication"
 msgstr "Publication"
@@ -711,6 +751,10 @@ msgstr "Copy video URL"
 #. Not produced yet.
 msgid "Steps.Publication.notProducedYet"
 msgstr "Video has not been produced yet. You will be able to publish it once it is produced."
+
+#. Show integration HTML code.
+msgid "Steps.Publication.integrationHtmlCode"
+msgstr "HTML integration code"
 
 #. Share capsule with someone.
 msgid "Steps.Config.share"
@@ -952,6 +996,10 @@ msgstr "Lang"
 msgid "Config.license"
 msgstr "License GNU Affero V3"
 
+#. The shorthand for the license of the code.
+msgid "Config.licenseShort"
+msgstr "AGPLv3"
+
 #. Welcome on Polymny.
 msgid "Intro.welcomeOnPolymny"
 msgstr "Welcome on Polymny Studio"
@@ -984,7 +1032,7 @@ msgstr "Default production options"
 
 #. Sentence to reset the options to the default values.
 msgid "Steps.Production.resetOptions"
-msgstr "Reset options"
+msgstr "Use the capsule's default production options"
 
 #. General options.
 msgid "Steps.Options.generalOptions"
@@ -1029,6 +1077,32 @@ msgstr "Play sound track preview"
 #. Stop sound track preview.
 msgid "Steps.Options.stopPreview"
 msgstr "Stop sound track preview"
+
+#. Collaboration.
+msgid "Steps.Collaboration.collaboration"
+msgstr "Collaboration"
+
+#. Collaborators.
+msgid "Steps.Collaboration.collaborator"
+msgid_plural ""
+msgstr[0] "Collaborator"
+msgstr[1] "Collaborators"
+
+#. Add a collaborator.
+msgid "Steps.Collaboration.addCollaborator"
+msgstr "Add collaborator"
+
+#. Addition of a collaborator failed.
+msgid "Steps.Collaboration.addCollaboratorFailed"
+msgstr "Couldn't add collaborator"
+
+#. Is the username or email correct.
+msgid "Steps.Collaboration.addCollaboratorFailed2"
+msgstr "Is the username or email correct"
+
+#. Remove a collaborator.
+msgid "Steps.Collaboration.removeCollaborator"
+msgstr "Remove collaborator"
 
 #. Delete project.
 msgid "Actions.deleteProject"
@@ -1194,6 +1268,26 @@ msgstr "If the websocket is not working, Polymny Studio won't work correctly"
 msgid "Ui.webSocketWaitRefreshContactAdmin"
 msgstr "You can wait or try to refresh the page, or contact the administrator if the problem persists"
 
+#. Fatal error occured.
+msgid "Ui.fatalError"
+msgstr "A fatal error occured"
+
+#. Connection to Polymny Studio has been interrupted.
+msgid "Ui.connectionInterrupted"
+msgstr "The connection to Polymny Studio has been interrupted"
+
+#. Try refreshing the page, or contacting us if the problem persists.
+msgid "Ui.refreshOrContactAdmin"
+msgstr "Try refreshing the page, or contacting us if the problem persists"
+
+#. Go back to the old client.
+msgid "Ui.goBackToOldClient"
+msgstr "Go back to the old version"
+
+#. Open Polymny.
+msgid "Ui.openPolymny"
+msgstr "Open Polymny"
+
 #. Upload record task.
 msgid "Tasks.uploadRecord"
 msgstr "Upload record"
@@ -1225,3 +1319,39 @@ msgstr "Transcode extra"
 #. Unknown task.
 msgid "Tasks.unknown"
 msgstr "Unknown task"
+
+#. This page does not exist.
+msgid "Error.NotFound.pageNotFound"
+msgstr "The webpage you are trying to access could not be found"
+
+#. Sorry, but we're experiencing some technical difficulties.
+msgid "Error.ServerError.technicalDifficulties"
+msgstr "Sorry, but we're experiencing some technical difficulties"
+
+#. Please try refreshing the page by clicking here.
+msgid "Error.ServerError.tryRefreshingByClickingHere"
+msgstr "Please try refreshing the page by clicking here"
+
+#. If the problem persists, feel free to contact us at.
+msgid "Error.ServerError.problemPersists"
+msgstr "If the problem persists, feel free to contact us at"
+
+#. Welcome to the new version.
+msgid "NewClient.welcome"
+msgstr "Welcome to the new Polymny Studio version"
+
+#. New UI, improvements and bug fixes
+msgid "NewClient.updates"
+msgstr "The UI is way more beautiful, and many features have been improved"
+
+#. Click here to check the release note for more information.
+msgid "NewClient.checkReleaseNote"
+msgstr "For more information, click here to check the release note"
+
+#. You can go back to the previous version by clicking the link in the bottom bar.
+msgid "NewClient.youCanGoBack"
+msgstr "You can go back to the previous version by clicking the link in the bottom bar"
+
+#. Don't hesitate to send us feedback at ... .
+msgid "NewClient.pleaseSendFeedback"
+msgstr "Don't hesitate to send us feedback at"

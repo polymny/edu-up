@@ -11,6 +11,7 @@ import Data.Capsule as Data exposing (Capsule)
 import Data.Types as Data
 import Data.User as Data
 import Publication.Types as Publication
+import Utils
 
 
 update : Publication.Msg -> App.Model -> ( App.Model, Cmd App.Msg )
@@ -23,7 +24,28 @@ update msg model =
         ( App.Publication m, Just capsule ) ->
             case msg of
                 Publication.TogglePrivacyPopup ->
-                    ( { model | page = App.Publication { m | showPrivacyPopup = not m.showPrivacyPopup } }
+                    let
+                        newPopupType : Publication.PopupType
+                        newPopupType =
+                            Utils.tern
+                                (m.popupType == Publication.PrivacyPopup)
+                                Publication.NoPopup
+                                Publication.PrivacyPopup
+                    in
+                    ( { model | page = App.Publication { m | popupType = newPopupType } }
+                    , Cmd.none
+                    )
+
+                Publication.ToggleIntegrationPopup ->
+                    let
+                        newPopupType : Publication.PopupType
+                        newPopupType =
+                            Utils.tern
+                                (m.popupType == Publication.IntegrationPopup)
+                                Publication.NoPopup
+                                Publication.IntegrationPopup
+                    in
+                    ( { model | page = App.Publication { m | popupType = newPopupType } }
                     , Cmd.none
                     )
 
@@ -56,12 +78,12 @@ update msg model =
                         | user = Data.updateUser { capsule | published = Data.Running Nothing } model.user
                         , config = Config.incrementTaskId newConfig
                       }
-                    , Api.publishCapsule capsule (\_ -> App.Noop)
+                    , Api.publishCapsule capsule ((\_ -> App.Noop) |> App.orError)
                     )
 
                 Publication.UnpublishVideo ->
                     ( { model | user = Data.updateUser { capsule | published = Data.Idle } model.user }
-                    , Api.unpublishCapsule capsule (\_ -> App.Noop)
+                    , Api.unpublishCapsule capsule ((\_ -> App.Noop) |> App.orError)
                     )
 
         _ ->
@@ -77,5 +99,5 @@ updateModel newCapsule model _ =
             Data.updateUser newCapsule model.user
     in
     ( { model | user = newUser }
-    , Api.updateCapsule newCapsule (\_ -> App.Noop)
+    , Api.updateCapsule newCapsule ((\_ -> App.Noop) |> App.orError)
     )

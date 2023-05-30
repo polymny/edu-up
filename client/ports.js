@@ -309,18 +309,25 @@ function init(node, flags) {
     // correctly if not.
     async function getUserMedia(args) {
         let response = await navigator.mediaDevices.getUserMedia(args);
-        navigator.mediaDevices.ondevicechange = detectDevices;
+        navigator.mediaDevices.ondevicechange = () => detectDevices();
         return response;
     }
 
     // Detect the devices
-    async function detectDevices(elmAskedToDetectDevices = false, cameraDeviceId = null) {
+    async function detectDevices(elmAskedToDetectDevices = false, cameraDeviceId = null, clearCache = false) {
+
         if (detectingDevices === true) {
             shouldRedetectDevices = true;
             return;
         }
 
         let clientConfig = JSON.parse(localStorage.getItem('clientConfig'));
+
+        if (clearCache) {
+            clientConfig.devices = { audio: [], video: [] };
+            clientConfig.preferredDevice = undefined;
+        }
+
         let oldDevices = clientConfig.devices || { audio: [], video: [] };
 
         console.log("Detect devices");
@@ -522,17 +529,17 @@ function init(node, flags) {
 
         await new Promise(requestAnimationFrame);
 
-        let element = document.getElementById(videoId);
+        let video = document.getElementById(videoId);
 
-        if (element == null) {
+        if (video == null) {
             return;
         }
 
-        element.focus();
-        element.srcObject = stream;
-        element.src = null;
-        element.muted = muted;
-        await element.play();
+        video.focus();
+        video.srcObject = stream;
+        video.src = null;
+        video.muted = muted;
+        await video.play();
     }
 
     // Starts the recording.
@@ -896,7 +903,7 @@ function init(node, flags) {
                         // app.ports.capsuleUpdated.send(capsule);
                     } catch (e) {
                         console.log(e)
-                        app.ports.uploadRecordFailed.send(null);
+                        app.ports.uploadRecordFailed.send(taskId);
                     }
                 }
 
@@ -987,7 +994,7 @@ function init(node, flags) {
                 // app.ports.capsuleUpdated.send(capsule);
             } catch (e) {
                 console.log(e)
-                app.ports.uploadRecordFailed.send(null);
+                app.ports.uploadRecordFailed.send(taskId);
             }
 
         }
@@ -1013,47 +1020,48 @@ function init(node, flags) {
         await new Promise(requestAnimationFrame);
 
         let canvas = document.getElementById(canvasId);
-        canvas.width = 1920;
-        canvas.height = 1080;
 
         let ctx = canvas.getContext('2d');
 
-        pointerStream = canvas.captureStream(30);
+        if (isPremium) {
 
-        canvas.addEventListener('pointerdown', function (event) {
-            pointer.down = true;
-            pointer.position.x = event.offsetX * canvas.width / canvas.parentNode.clientWidth;
-            pointer.position.y = event.offsetY * canvas.width / canvas.parentNode.clientWidth;
-            refresh(canvas, ctx);
-            canvas.setPointerCapture(event.pointerId);
-        });
+            pointerStream = canvas.captureStream(30);
 
-        canvas.addEventListener('pointerup', function (event) {
-            pointer.down = false;
-            refresh(canvas, ctx);
-            canvas.releasePointerCapture(event.pointerId);
-        });
+            canvas.addEventListener('pointerdown', function (event) {
+                pointer.down = true;
+                pointer.position.x = event.offsetX * canvas.width / canvas.parentNode.clientWidth;
+                pointer.position.y = event.offsetY * canvas.width / canvas.parentNode.clientWidth;
+                refresh(canvas, ctx);
+                canvas.setPointerCapture(event.pointerId);
+            });
 
-        canvas.addEventListener('pointermove', function (event) {
-            pointer.position.x = event.offsetX * canvas.width / canvas.parentNode.clientWidth;
-            pointer.position.y = event.offsetY * canvas.width / canvas.parentNode.clientWidth;
-            refresh(canvas, ctx);
-        });
+            canvas.addEventListener('pointerup', function (event) {
+                pointer.down = false;
+                refresh(canvas, ctx);
+                canvas.releasePointerCapture(event.pointerId);
+            });
 
-        let pointerOptions = {
-            videoBitsPerSecond: 2500000,
-            mimeType: 'video/webm;codecs=vp8'
-        };
+            canvas.addEventListener('pointermove', function (event) {
+                pointer.position.x = event.offsetX * canvas.width / canvas.parentNode.clientWidth;
+                pointer.position.y = event.offsetY * canvas.width / canvas.parentNode.clientWidth;
+                refresh(canvas, ctx);
+            });
 
-        pointerRecorder = new MediaRecorder(pointerStream, pointerOptions);
-        pointerRecorder.ondataavailable = (data) => {
-            pointerArrived = data.data;
-            sendRecordToElmIfReady();
-        };
+            let pointerOptions = {
+                videoBitsPerSecond: 2500000,
+                mimeType: 'video/webm;codecs=vp8'
+            };
 
-        pointerRecorder.onerror = (err) => {
-            console.log(err);
-        };
+            pointerRecorder = new MediaRecorder(pointerStream, pointerOptions);
+            pointerRecorder.ondataavailable = (data) => {
+                pointerArrived = data.data;
+                sendRecordToElmIfReady();
+            };
+
+            pointerRecorder.onerror = (err) => {
+                console.log(err);
+            };
+        }
     }
 
     // Fully refreshes the canvas.
@@ -1318,12 +1326,13 @@ function init(node, flags) {
                 let gos = this.capsule.structure[gosIndex];
 
                 for (let slideIndex = 0; slideIndex < gos.slides.length; slideIndex++) {
+                    let gosOrMinusOne = slideIndex !== 0 ? gosIndex : -1;
                     let slide = gos.slides[slideIndex];
                     let image = await this.capsuleContent.file(slide.uuid).async("blob");
                     image = image.slice(0, image.size, "image/png")
 
                     // Upload the slide.
-                    resp = await fetch("/api/add-slide/" + this.newCapsule.id + "/-1/-1", { method: "POST", body: image });
+                    resp = await fetch("/api/add-slide/" + this.newCapsule.id + "/" + gosOrMinusOne + "/-1", { method: "POST", body: image });
                     this.newCapsule = await resp.json();
 
                     // Find uuid of the slide we added.
@@ -1529,7 +1538,7 @@ function init(node, flags) {
     });
 
     // Copies the string to the clipboard.
-    makePort("copyString", async function(args) {
+    makePort("copyString", async function (args) {
         await navigator.clipboard.writeText(args);
     });
 
@@ -1657,7 +1666,7 @@ function init(node, flags) {
         beforeUnloadValue = arg;
     });
 
-    makePort("detectDevices", (cameraDeviceId) => detectDevices(true, cameraDeviceId));
+    makePort("detectDevices", (args) => detectDevices(true, args[0], args[1]));
     makePort("bindDevice", bindDevice);
     makePort("unbindDevice", unbindDevice);
     makePort("registerEvent", registerEvent);

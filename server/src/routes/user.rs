@@ -4,6 +4,8 @@ use std::borrow::Cow;
 
 use time::Duration;
 
+use chrono::Utc;
+
 use serde::{Deserialize, Serialize};
 
 use tokio::fs::remove_dir_all;
@@ -125,6 +127,7 @@ pub async fn activate<'a>(
 
     user.activated = true;
     user.activation_key = None;
+    user.member_since = Some(Utc::now().naive_utc());
     user.save(&db).await?;
     let session = user.save_session(&db).await?;
     add_cookies(&session.secret, &config, cookies);
@@ -339,17 +342,17 @@ pub async fn reset_password<'a>(
     config: &S<Config>,
     key: String,
     lang: Lang,
-) -> Cors<Result<Html<String>>> {
+) -> Result<Html<String>> {
     let user = User::get_by_reset_password_key(Some(key), &db).await;
 
     match user {
         Ok(Some(_)) => (),
-        Ok(None) => return Cors::err(&config.home, Status::NotFound),
-        _ => return Cors::err(&config.home, Status::InternalServerError),
+        Ok(None) => return Err(Error(Status::NotFound)),
+        _ => return Err(Error(Status::InternalServerError)),
     }
 
     let body = index_html(json!({ "user": json!(null), "global": global_flags(&config, &lang) }));
-    Cors::ok(&config.home, Html(body))
+    Ok(Html(body))
 }
 
 /// The type to change a user's email address.
@@ -378,18 +381,10 @@ pub async fn request_change_email(
 
 /// Route to validate an email change.
 #[get("/validate-email/<key>")]
-pub async fn validate_email<'a>(
-    key: String,
-    config: &S<Config>,
-    db: Db,
-    lang: Lang,
-) -> Cors<Result<Html<String>>> {
+pub async fn validate_email<'a>(key: String, db: Db) -> Result<Redirect> {
     match User::validate_change_email(key, &db).await {
-        Ok(_) => {
-            let body = index_html(json!({"user": null, "global": global_flags(&config, &lang) }));
-            Cors::ok(&config.home, Html(body))
-        }
-        Err(Error(s)) => Cors::err(&config.home, s),
+        Ok(_) => Ok(Redirect::to("/profile/")),
+        Err(Error(s)) => Err(Error(s)),
     }
 }
 /// The form for deleting a user.

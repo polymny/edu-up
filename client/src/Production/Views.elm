@@ -5,7 +5,7 @@ module Production.Views exposing (..)
 
 import App.Types as App
 import App.Utils as App
-import Config exposing (Config, TaskStatus)
+import Config exposing (Config)
 import Data.Capsule as Data
 import Data.Types as Data
 import Data.User exposing (User)
@@ -17,7 +17,8 @@ import Element.Input as Input
 import Html.Attributes
 import Html.Events
 import Json.Decode as Decode
-import Production.Types as Production exposing (getWebcamSettings)
+import Material.Icons
+import Production.Types as Production exposing (getHeight, getWebcamSettings)
 import Simple.Animation as Animation exposing (Animation)
 import Simple.Animation.Animated as Animated
 import Simple.Animation.Property as P
@@ -31,20 +32,23 @@ import Utils
 
 {-| The full view of the page.
 -}
-view : Config -> User -> Production.Model Data.Capsule Data.Gos -> ( Element App.Msg, Element App.Msg )
+view : Config -> User -> Production.Model Data.Capsule Data.Gos -> ( Element App.Msg, Element App.Msg, Element App.Msg )
 view config user model =
-    ( Element.row [ Ui.wf, Ui.hf, Ui.s 10, Ui.p 10 ]
-        [ leftColumn config model
-        , rightColumn config user model
-        ]
+    ( leftColumn config
+        user
+        model.capsule
+        model.gos
+        model.gos.webcamSettings
+        model.webcamSize
+    , rightColumn config user model
     , Element.none
     )
 
 
 {-| The column with the controls of the production settings.
 -}
-leftColumn : Config -> Production.Model Data.Capsule Data.Gos -> Element App.Msg
-leftColumn config model =
+leftColumn : Config -> User -> Data.Capsule -> Data.Gos -> Maybe Data.WebcamSettings -> Maybe Int -> Element App.Msg
+leftColumn config user capsule gos webcamSettings webcamSize =
     let
         --- HELPERS ---
         -- Shortcut for lang
@@ -60,9 +64,9 @@ leftColumn config model =
         -- Video width if pip
         width : Maybe Int
         width =
-            case getWebcamSettings model.capsule model.gos of
+            case getWebcamSettings capsule gos of
                 Data.Pip { size } ->
-                    Just (Tuple.first size)
+                    Just size
 
                 _ ->
                     Nothing
@@ -70,7 +74,7 @@ leftColumn config model =
         -- Video opacity
         opacity : Float
         opacity =
-            case getWebcamSettings model.capsule model.gos of
+            case getWebcamSettings capsule gos of
                 Data.Pip pip ->
                     pip.opacity
 
@@ -83,12 +87,17 @@ leftColumn config model =
         -- True if the gos has a record that contains only audio
         audioOnly : Bool
         audioOnly =
-            Maybe.map .size model.gos.record == Just Nothing
+            Maybe.map .size gos.record == Just Nothing
+
+        -- Webcam settings of the gos (or default for capsule if nothing)
+        realWebcamSettings : Data.WebcamSettings
+        realWebcamSettings =
+            webcamSettings |> Maybe.withDefault capsule.defaultWebcamSettings
 
         -- Gives the anchor if the webcam settings is Pip
         anchor : Maybe Data.Anchor
         anchor =
-            case getWebcamSettings model.capsule model.gos of
+            case getWebcamSettings capsule gos of
                 Data.Pip p ->
                     Just p.anchor
 
@@ -130,7 +139,7 @@ leftColumn config model =
                 []
                 { label = Element.text <| Strings.stepsProductionResetOptions lang
                 , action =
-                    case model.gos.webcamSettings of
+                    case webcamSettings of
                         Just _ ->
                             Ui.Msg <| App.ProductionMsg Production.ResetOptions
 
@@ -138,20 +147,36 @@ leftColumn config model =
                             Ui.None
                 }
 
+        -- Info to show if the grain uses default options.
+        resetElement =
+            case ( webcamSettings, Maybe.andThen .size gos.record ) of
+                ( Just _, _ ) ->
+                    Element.none
+
+                ( _, Nothing ) ->
+                    Element.none
+
+                _ ->
+                    Element.column [ Ui.s 10 ]
+                        [ Ui.paragraph [] <| Strings.stepsProductionGrainUsesDefaultProductionOptions lang ++ "."
+                        , Ui.paragraph [] <| Strings.stepsProductionChangeOptionsBelow lang ++ "."
+                        , Ui.paragraph [] <| Strings.stepsProductionChangeOptionsInOptionsTab lang ++ "."
+                        ]
+
         -- Whether the user wants to include the video inside the slides or not
         useVideo =
-            (disableIf <| model.gos.record == Nothing || audioOnly)
+            (disableIf <| gos.record == Nothing || audioOnly)
                 Input.checkbox
                 []
-                { checked = model.gos.record /= Nothing && model.gos.webcamSettings /= Just Data.Disabled
+                { checked = gos.record /= Nothing && webcamSettings /= Just Data.Disabled
                 , icon = Input.defaultCheckbox
                 , label = Input.labelRight [] <| Element.text <| Strings.stepsProductionUseVideo lang
-                , onChange = \_ -> App.ProductionMsg Production.ToggleVideo
+                , onChange = \_ -> App.ProductionMsg <| Production.WebcamSettingsMsg <| Production.ToggleVideo
                 }
 
         -- Text that explains why the user can't use the video (if they can't)
         useVideoInfo =
-            case Maybe.map .size model.gos.record of
+            case Maybe.map .size gos.record of
                 Nothing ->
                     Ui.paragraph [] <| Strings.stepsProductionCantUseVideoBecauseNoRecord lang ++ "."
 
@@ -163,40 +188,85 @@ leftColumn config model =
 
         -- Whether the webcam size is disabled
         webcamSizeDisabled =
-            model.gos.record == Nothing || audioOnly || model.gos.webcamSettings == Just Data.Disabled
+            gos.record == Nothing || audioOnly || webcamSettings == Just Data.Disabled
 
-        --  Title to introduce webcam size settings
+        -- Title to introduce webcam size settings.
         webcamSizeTitle =
             Strings.stepsProductionWebcamSize lang
                 |> title webcamSizeDisabled
 
-        -- Element to control the webcam size
-        webcamSizeText =
-            disableIf webcamSizeDisabled
-                Input.text
-                [ Element.htmlAttribute <| Html.Attributes.type_ "number"
-                , Element.htmlAttribute <| Html.Attributes.min "10"
-                ]
-                { label = Input.labelHidden <| Strings.stepsProductionCustom lang
-                , onChange =
-                    \x ->
-                        case String.toInt x of
-                            Just y ->
-                                App.ProductionMsg <| Production.SetWidth <| Just y
+        -- Helper to set the width of the webcam.
+        mkSetWidth disabled x =
+            if disabled then
+                Ui.None
 
-                            _ ->
-                                App.Noop
-                , placeholder = Nothing
-                , text = Maybe.map String.fromInt width |> Maybe.withDefault ""
-                }
+            else
+                Ui.Msg <| App.ProductionMsg <| Production.WebcamSettingsMsg <| Production.SetWidth x
+
+        -- Helper to increment the width of the webcam.
+        incrementWidth : Int -> Int
+        incrementWidth step =
+            let
+                maxWidth =
+                    gos.record
+                        |> Maybe.andThen .size
+                        |> Maybe.withDefault ( 1, 1 )
+                        |> Tuple.mapBoth toFloat toFloat
+                        |> (\( w, h ) -> round <| (w / h) * 1920 / (16 / 9))
+            in
+            case webcamSize of
+                Just x ->
+                    x + step
+
+                Nothing ->
+                    maxWidth + step
+
+        -- Element to control the webcam size.
+        webcamSizeText =
+            Element.row []
+                [ disableIf webcamSizeDisabled
+                    Input.text
+                    []
+                    { label = Input.labelHidden <| Strings.stepsProductionCustom lang
+                    , onChange =
+                        \x ->
+                            case ( x, String.toInt x ) of
+                                ( _, Just y ) ->
+                                    App.ProductionMsg <| Production.WebcamSettingsMsg <| Production.SetWidth <| Just y
+
+                                ( "", _ ) ->
+                                    App.ProductionMsg <| Production.WebcamSettingsMsg <| Production.SetWidth <| Nothing
+
+                                _ ->
+                                    App.ProductionMsg <| Production.WebcamSettingsMsg <| Production.Noop
+                    , placeholder = Nothing
+                    , text = Maybe.map String.fromInt webcamSize |> Maybe.withDefault ""
+                    }
+                , Element.column []
+                    [ Ui.navigationElement
+                        (mkSetWidth webcamSizeDisabled <| Just <| incrementWidth 1)
+                        []
+                        (Ui.icon 25 Material.Icons.expand_less)
+                    , Ui.navigationElement
+                        (mkSetWidth webcamSizeDisabled <| Just <| incrementWidth -1)
+                        []
+                        (Ui.icon 25 Material.Icons.expand_more)
+                    ]
+                ]
 
         -- Element to choose the webcam size among small, medium, large, fullscreen
         webcamSizeRadio =
-            (disableIf <| model.gos.record == Nothing || audioOnly || model.gos.webcamSettings == Just Data.Disabled)
+            (disableIf <| gos.record == Nothing || audioOnly || webcamSettings == Just Data.Disabled)
                 Input.radio
                 [ Ui.s 10 ]
                 { label = Input.labelHidden <| Strings.stepsProductionWebcamSize lang
-                , onChange = \x -> App.ProductionMsg <| Production.SetWidth <| x
+                , onChange =
+                    \x ->
+                        if x == Nothing then
+                            App.ProductionMsg <| Production.WebcamSettingsMsg <| Production.SetFullscreen
+
+                        else
+                            App.ProductionMsg <| Production.WebcamSettingsMsg <| Production.SetWidth <| x
                 , options =
                     [ Input.option (Just 200) <| Element.text <| Strings.stepsProductionSmall lang
                     , Input.option (Just 400) <| Element.text <| Strings.stepsProductionMedium lang
@@ -205,10 +275,10 @@ leftColumn config model =
                     , Input.option (Just 533) <| Element.text <| Strings.stepsProductionCustom lang
                     ]
                 , selected =
-                    case getWebcamSettings model.capsule model.gos of
+                    case getWebcamSettings capsule gos of
                         Data.Pip { size } ->
-                            if List.member (Tuple.first size) [ 200, 400, 800 ] then
-                                Just <| Just <| Tuple.first size
+                            if List.member size [ 200, 400, 800 ] then
+                                Just <| Just <| size
 
                             else
                                 Just <| Just 533
@@ -222,7 +292,7 @@ leftColumn config model =
 
         -- Whether the webcam position is disabled
         webcamPositionDisabled =
-            model.gos.record == Nothing || audioOnly || model.gos.webcamSettings == Just Data.Disabled
+            gos.record == Nothing || audioOnly || webcamSettings == Just Data.Disabled
 
         -- Title to introduce webcam position settings
         webcamPositionTitle =
@@ -235,7 +305,7 @@ leftColumn config model =
                 Input.radio
                 [ Ui.s 10 ]
                 { label = Input.labelHidden <| Strings.stepsProductionWebcamPosition lang
-                , onChange = \x -> App.ProductionMsg <| Production.SetAnchor x
+                , onChange = \x -> App.ProductionMsg <| Production.WebcamSettingsMsg <| Production.SetAnchor x
                 , options =
                     [ Input.option Data.TopLeft <| Element.text <| Strings.stepsProductionTopLeft lang
                     , Input.option Data.TopRight <| Element.text <| Strings.stepsProductionTopRight lang
@@ -247,7 +317,7 @@ leftColumn config model =
 
         -- Whether the user can control the opacity
         opacityDisabled =
-            model.gos.record == Nothing || audioOnly || model.gos.webcamSettings == Just Data.Disabled
+            gos.record == Nothing || audioOnly || webcamSettings == Just Data.Disabled
 
         -- Title to introduce webcam opacity settings
         opacityTitle =
@@ -262,7 +332,7 @@ leftColumn config model =
                     Input.slider
                     [ Element.behindContent <| Element.el [ Ui.wf, Ui.hpx 2, Ui.cy, Background.color Colors.greyBorder ] Element.none
                     ]
-                    { onChange = \x -> App.ProductionMsg <| Production.SetOpacity x
+                    { onChange = \x -> App.ProductionMsg <| Production.WebcamSettingsMsg <| Production.SetOpacity x
                     , label = Input.labelHidden <| Strings.stepsProductionOpacity lang
                     , max = 1
                     , min = 0
@@ -280,8 +350,11 @@ leftColumn config model =
                     |> Element.el (Ui.wfp 1 :: Ui.ab :: disableAttrIf opacityDisabled)
                 ]
     in
-    Element.column [ Ui.wfp 1, Ui.s 30, Ui.at ]
-        [ resetButton
+    Element.column [ Ui.wf, Ui.s 30, Ui.at, Element.scrollbarY, Ui.p 10 ]
+        [ Element.column [ Ui.s 10 ]
+            [ resetButton
+            , resetElement
+            ]
         , Element.column [ Ui.s 10 ]
             [ useVideo
             , useVideoInfo
@@ -316,7 +389,13 @@ rightColumn config user model =
                 ( Data.Pip s, Just r ) ->
                     let
                         ( ( marginX, marginY ), ( w, h ) ) =
-                            ( model.webcamPosition, Tuple.mapBoth toFloat toFloat s.size )
+                            ( model.webcamPosition
+                            , r.size
+                                |> Maybe.withDefault ( 0, 0 )
+                                |> (\i -> getHeight i s.size)
+                                |> (\i -> ( s.size, i ))
+                                |> Tuple.mapBoth toFloat toFloat
+                            )
 
                         ( x, y ) =
                             case s.anchor of
@@ -532,7 +611,7 @@ rightColumn config user model =
                 _ ->
                     Element.none
     in
-    Element.column [ Ui.at, Ui.wfp 3, Ui.s 10 ]
+    Element.column [ Ui.at, Ui.wf, Element.scrollbarY, Ui.s 10, Ui.p 10 ]
         [ Element.el [ Ui.wf, Ui.cy, Element.inFront overlay, Element.clip ] slide
         , Element.row [ Ui.ar, Ui.s 10 ] [ videoLink, produceButton ]
         , progressBar

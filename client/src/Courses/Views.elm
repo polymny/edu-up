@@ -84,7 +84,7 @@ popup config user model =
             Element.none
 
         Courses.NewGroupPopup groupName ->
-            Ui.popup 1 "[Nouveau groupe]" <|
+            Ui.popup "[Nouveau groupe]" <|
                 Element.column [ Ui.wf, Ui.hf, Ui.p 20 ]
                     [ Input.text
                         [ Ui.wf ]
@@ -116,7 +116,7 @@ popup config user model =
                         Data.Teacher ->
                             "[Nouveau professeur]"
             in
-            Ui.popup 1 title <|
+            Ui.popup title <|
                 Element.column [ Ui.wf, Ui.hf, Ui.p 20 ]
                     [ Input.text
                         [ Ui.wf ]
@@ -138,7 +138,7 @@ popup config user model =
                     ]
 
         Courses.DeleteGroupPopup group ->
-            Ui.popup 1 "[Supprimer le groupe]" <|
+            Ui.popup "[Supprimer le groupe]" <|
                 Element.column [ Ui.wf, Ui.hf, Ui.p 20 ]
                     [ Element.text <| "[Êtes-vous sûr de vouloir supprimer le groupe " ++ group.name ++ " ?]"
                     , Element.row [ Ui.wf, Ui.ab ]
@@ -154,7 +154,7 @@ popup config user model =
                     ]
 
         Courses.SelfRemovePopup ->
-            Ui.popup 1 "[Quitter le groupe]" <|
+            Ui.popup "[Quitter le groupe]" <|
                 Element.column [ Ui.wf, Ui.hf, Ui.p 20 ]
                     [ Element.text <| "[Êtes-vous sûr de vouloir quitter le groupe ?]"
                     , Element.row [ Ui.wf, Ui.ab ]
@@ -170,7 +170,7 @@ popup config user model =
                     ]
 
         Courses.LastTeacherPopup ->
-            Ui.popup 1 "[Dernier enseignant]" <|
+            Ui.popup "[Dernier enseignant]" <|
                 Element.column [ Ui.wf, Ui.hf, Ui.p 20 ]
                     [ Element.text <| "[Vous êtes le dernier professeur du groupe.]"
                     , Element.text <| "[Vous ne pouvez pas quitter le groupe.]"
@@ -217,7 +217,7 @@ popup config user model =
                                 ]
                             ]
                    )
-                |> Ui.popup 5 "[Choisissez la capsule]"
+                |> Ui.popup "[Choisissez la capsule]"
 
 
 {-| Group button view.

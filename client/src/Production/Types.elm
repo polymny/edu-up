@@ -12,6 +12,7 @@ type alias Model a b =
     { capsule : a
     , gos : b
     , webcamPosition : ( Float, Float )
+    , webcamSize : Maybe Int -- Nothing means empty string means 1px
     , holdingImage : Maybe ( Int, Float, Float )
     }
 
@@ -23,6 +24,7 @@ withCapsuleAndGos capsule gos model =
     { capsule = capsule
     , gos = gos
     , webcamPosition = model.webcamPosition
+    , webcamSize = model.webcamSize
     , holdingImage = model.holdingImage
     }
 
@@ -32,20 +34,31 @@ withCapsuleAndGos capsule gos model =
 init : Int -> Capsule -> Maybe ( Model String Int, Cmd Msg )
 init gos capsule =
     case List.drop gos capsule.structure of
-        h :: _ ->
+        head :: _ ->
             let
-                webcamPosition =
-                    case h.webcamSettings of
-                        Just (Data.Pip { position }) ->
-                            Tuple.mapBoth toFloat toFloat position
+                maxWidth =
+                    head.record
+                        |> Maybe.andThen .size
+                        |> Maybe.withDefault ( 1, 1 )
+                        |> Tuple.mapBoth toFloat toFloat
+                        |> (\( w, h ) -> round <| (w / h) * 1920 / (16 / 9))
+
+                ( webcamPosition, webcamSize ) =
+                    case ( head.webcamSettings, capsule.defaultWebcamSettings ) of
+                        ( Just (Data.Pip { position, size }), _ ) ->
+                            ( Tuple.mapBoth toFloat toFloat position, Just size )
+
+                        ( Nothing, Data.Pip { position, size } ) ->
+                            ( Tuple.mapBoth toFloat toFloat position, Just size )
 
                         _ ->
-                            ( 0.0, 0.0 )
+                            ( ( 0.0, 0.0 ), Just maxWidth )
             in
             Just
                 ( { capsule = capsule.id
                   , gos = gos
                   , webcamPosition = webcamPosition
+                  , webcamSize = webcamSize
                   , holdingImage = Nothing
                   }
                 , Cmd.none
@@ -58,28 +71,36 @@ init gos capsule =
 {-| Message type of the app.
 -}
 type Msg
-    = ToggleVideo
-    | SetWidth (Maybe Int) -- Nothing means fullscreen
-    | SetAnchor Data.Anchor
-    | SetOpacity Float
-    | ImageMoved Float Float Float Float
+    = ImageMoved Float Float Float Float
     | HoldingImageChanged (Maybe ( Int, Float, Float ))
     | Produce
     | ResetOptions
+    | WebcamSettingsMsg WebcamSettingsMsg
+
+
+{-| All messages that change the webcam settings.
+-}
+type WebcamSettingsMsg
+    = Noop
+    | ToggleVideo
+    | SetFullscreen
+    | SetWidth (Maybe Int) -- Nothing empty string means 1px
+    | SetAnchor Data.Anchor
+    | SetOpacity Float
 
 
 {-| Changes the height preserving aspect ratio.
 -}
-setHeight : Int -> ( Int, Int ) -> ( Int, Int )
+setHeight : Int -> ( Int, Int ) -> Int
 setHeight newHeight ( width, height ) =
-    ( width * newHeight // height, newHeight )
+    width * newHeight // height
 
 
-{-| Changes the width preserving aspect ratio.
+{-| Get the height preserving aspect ratio.
 -}
-setWidth : Int -> ( Int, Int ) -> ( Int, Int )
-setWidth newWidth ( width, height ) =
-    ( newWidth, height * newWidth // width )
+getHeight : ( Int, Int ) -> Int -> Int
+getHeight ( width, height ) size =
+    height * size // width
 
 
 {-| The ID of the miniature of the webcam.
@@ -94,20 +115,6 @@ miniatureId =
 getWebcamSettings : Data.Capsule -> Data.Gos -> Data.WebcamSettings
 getWebcamSettings capsule gos =
     let
-        -- Get record size
-        recordSize =
-            case gos.record of
-                Just r ->
-                    case r.size of
-                        Just s ->
-                            s
-
-                        Nothing ->
-                            ( 1, 1 )
-
-                Nothing ->
-                    ( 1, 1 )
-
         -- Get default size
         defaultSize =
             case capsule.defaultWebcamSettings of
@@ -115,27 +122,7 @@ getWebcamSettings capsule gos =
                     s.size
 
                 _ ->
-                    ( 1, 1 )
-
-        -- Reset size
-        resetSize =
-            let
-                recoardWidth =
-                    recordSize |> Tuple.first |> toFloat
-
-                recoardHeight =
-                    recordSize |> Tuple.second |> toFloat
-
-                ratio =
-                    recoardWidth / recoardHeight
-
-                defaultWidth =
-                    defaultSize |> Tuple.first |> toFloat
-
-                newHeight =
-                    defaultWidth / ratio
-            in
-            ( defaultWidth |> round, newHeight |> round )
+                    1
 
         -- Get webcam settings
         webcamSettings =
@@ -152,7 +139,7 @@ getWebcamSettings capsule gos =
                                 , keycolor = s.keycolor
                                 , opacity = s.opacity
                                 , position = s.position
-                                , size = resetSize
+                                , size = defaultSize
                                 }
 
                         _ ->

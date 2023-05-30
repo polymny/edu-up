@@ -161,6 +161,7 @@ type alias ClientConfig =
     , sortBy : Data.SortBy
     , devices : Device.Devices
     , preferredDevice : Maybe Device.Device
+    , awareOfNewClient : Bool
     }
 
 
@@ -174,6 +175,7 @@ defaultClientConfig =
     , sortBy = { key = Data.LastModified, ascending = False }
     , devices = { audio = [], video = [] }
     , preferredDevice = Nothing
+    , awareOfNewClient = False
     }
 
 
@@ -188,6 +190,7 @@ encodeClientConfig config =
         , ( "sortBy", Data.encodeSortBy config.sortBy )
         , ( "devices", Device.encodeDevices config.devices )
         , ( "preferredDevice", Maybe.map Device.encodeDevice config.preferredDevice |> Maybe.withDefault Encode.null )
+        , ( "awareOfNewClient", Encode.bool config.awareOfNewClient )
         ]
 
 
@@ -202,13 +205,14 @@ makeDefault default arg =
 -}
 decodeClientConfig : Decoder ClientConfig
 decodeClientConfig =
-    Decode.map6 ClientConfig
+    Decode.map7 ClientConfig
         (Decode.field "lang" Decode.string |> Decode.map Lang.fromString |> makeDefault defaultClientConfig.lang)
         (Decode.field "zoomLevel" Decode.int |> makeDefault defaultClientConfig.zoomLevel)
         (Decode.field "promptSize" Decode.int |> makeDefault defaultClientConfig.promptSize)
         (Decode.field "sortBy" Data.decodeSortBy |> makeDefault defaultClientConfig.sortBy)
         (Decode.field "devices" Device.decodeDevices |> makeDefault defaultClientConfig.devices)
         (Decode.maybe (Decode.field "preferredDevice" Device.decodeDevice))
+        (Decode.field "awareOfNewClient" Decode.bool |> makeDefault defaultClientConfig.awareOfNewClient)
 
 
 {-| This type holds the client global state.
@@ -242,6 +246,7 @@ type alias ClientState =
     , taskId : TaskId
     , webSocketStatus : Bool
     , popupType : PopupType
+    , hasError : Bool
     }
 
 
@@ -249,6 +254,7 @@ type PopupType
     = NoPopup
     | LangPicker
     | WebSocketInfo
+    | NewClientInfo
 
 
 {-| Task id
@@ -262,9 +268,9 @@ type alias TaskId =
 type Task
     = UploadRecord TaskId String Int Decode.Value
     | UploadTrack TaskId String
-    | AddSlide TaskId String
+    | AddSlide TaskId String Int
     | AddGos TaskId String
-    | ReplaceSlide TaskId String
+    | ReplaceSlide TaskId String Int
     | Production TaskId String
     | Publication TaskId String
     | ExportCapsule TaskId String
@@ -283,13 +289,13 @@ isClientTask task =
         UploadTrack _ _ ->
             True
 
-        AddSlide _ _ ->
+        AddSlide _ _ _ ->
             True
 
         AddGos _ _ ->
             True
 
-        ReplaceSlide _ _ ->
+        ReplaceSlide _ _ _ ->
             True
 
         ExportCapsule _ _ ->
@@ -337,9 +343,10 @@ decodeTask =
                             (Decode.field "capsuleId" Decode.string)
 
                     "AddSlide" ->
-                        Decode.map2 AddSlide
+                        Decode.map3 AddSlide
                             (Decode.field "taskId" decodeTaskId)
                             (Decode.field "capsuleId" Decode.string)
+                            (Decode.field "gos" Decode.int)
 
                     "AddGos" ->
                         Decode.map2 AddGos
@@ -347,9 +354,10 @@ decodeTask =
                             (Decode.field "capsuleId" Decode.string)
 
                     "ReplaceSlide" ->
-                        Decode.map2 ReplaceSlide
+                        Decode.map3 ReplaceSlide
                             (Decode.field "taskId" decodeTaskId)
                             (Decode.field "capsuleId" Decode.string)
+                            (Decode.field "gos" Decode.int)
 
                     "Production" ->
                         Decode.map2 Production
@@ -381,6 +389,42 @@ type alias TaskStatus =
     }
 
 
+{-| Extracts the task id of a task.
+-}
+getId : Task -> TaskId
+getId task =
+    case task of
+        UploadRecord id _ _ _ ->
+            id
+
+        UploadTrack id _ ->
+            id
+
+        AddSlide id _ _ ->
+            id
+
+        AddGos id _ ->
+            id
+
+        ReplaceSlide id _ _ ->
+            id
+
+        Production id _ ->
+            id
+
+        Publication id _ ->
+            id
+
+        ExportCapsule id _ ->
+            id
+
+        ImportCapsule id ->
+            id
+
+        TranscodeExtra id _ _ ->
+            id
+
+
 {-| Decodes a task status.
 -}
 decodeTaskStatus : Decoder TaskStatus
@@ -395,18 +439,19 @@ decodeTaskStatus =
 
 {-| Initializes a client state.
 -}
-initClientState : Maybe Browser.Navigation.Key -> Maybe Lang -> ClientState
-initClientState key lang =
+initClientState : Maybe Browser.Navigation.Key -> Maybe Lang -> Bool -> ClientState
+initClientState key lang awareOfNewClient =
     { key = key
     , zone = Time.utc
     , time = Time.millisToPosix 0
     , lang = Maybe.withDefault Lang.default lang
     , lastRequest = 0
     , tasks = []
-    , popupType = NoPopup
+    , popupType = Utils.tern awareOfNewClient NoPopup NewClientInfo
     , showTaskPanel = False
     , taskId = 0
     , webSocketStatus = False
+    , hasError = False
     }
 
 
@@ -459,13 +504,13 @@ compareTasks t1 t2 =
             else
                 id1 == id2
 
-        ( AddSlide id1 _, AddSlide id2 _ ) ->
+        ( AddSlide id1 _ _, AddSlide id2 _ _ ) ->
             id1 == id2
 
         ( AddGos id1 _, AddGos id2 _ ) ->
             id1 == id2
 
-        ( ReplaceSlide id1 _, ReplaceSlide id2 _ ) ->
+        ( ReplaceSlide id1 _ _, ReplaceSlide id2 _ _ ) ->
             id1 == id2
 
         ( Production id1 capsuleId1, Production id2 capsuleId2 ) ->
@@ -512,6 +557,7 @@ type Msg
     | DetectDevicesResponse Device.Devices (Maybe Device.Device)
     | SetAudio Device.Audio
     | SetVideo (Maybe ( Device.Video, Device.Resolution ))
+    | ReinitializeDevices
     | UpdateTaskStatus TaskStatus
     | ToggleLangPicker
     | ToggleWebSocketInfo
@@ -522,6 +568,9 @@ type Msg
     | AbortTask Task
     | ScrollToGos Float String
     | WebSocketStatus Bool
+    | UploadRecordFailed TaskId
+    | HasError
+    | CloseNewClientInfo
 
 
 {-| This functions updates the config.
@@ -581,7 +630,7 @@ update msg { serverConfig, clientConfig, clientState } =
 
                 PromptSizeChanged promptSize ->
                     ( { serverConfig = serverConfig
-                      , clientConfig = { clientConfig | promptSize = promptSize }
+                      , clientConfig = { clientConfig | promptSize = promptSize |> max 10 |> min 150 }
                       , clientState = clientState
                       }
                     , True
@@ -658,6 +707,20 @@ update msg { serverConfig, clientConfig, clientState } =
                       }
                     , True
                     , []
+                    )
+
+                ReinitializeDevices ->
+                    ( { clientConfig =
+                            { clientConfig
+                                | devices = { audio = [], video = [] }
+                                , preferredDevice = Nothing
+                            }
+                      , serverConfig = serverConfig
+                      , clientState = clientState
+                      }
+                      -- The port will clear the cache itself
+                    , False
+                    , [ Device.detectDevices Nothing True ]
                     )
 
                 UpdateTaskStatus task ->
@@ -798,13 +861,13 @@ update msg { serverConfig, clientConfig, clientState } =
                                     in
                                     "task-track-" ++ String.fromInt realTaskId
 
-                                AddSlide taskId _ ->
+                                AddSlide taskId _ _ ->
                                     "task-track-" ++ String.fromInt taskId
 
                                 AddGos taskId _ ->
                                     "task-track-" ++ String.fromInt taskId
 
-                                ReplaceSlide taskId _ ->
+                                ReplaceSlide taskId _ _ ->
                                     "task-track-" ++ String.fromInt taskId
 
                                 ExportCapsule taskId _ ->
@@ -825,13 +888,13 @@ update msg { serverConfig, clientConfig, clientState } =
                                 UploadTrack _ _ ->
                                     Http.cancel tracker
 
-                                AddSlide _ _ ->
+                                AddSlide _ _ _ ->
                                     Http.cancel tracker
 
                                 AddGos _ _ ->
                                     Http.cancel tracker
 
-                                ReplaceSlide _ _ ->
+                                ReplaceSlide _ _ _ ->
                                     Http.cancel tracker
 
                                 ExportCapsule _ _ ->
@@ -904,6 +967,42 @@ update msg { serverConfig, clientConfig, clientState } =
                     , []
                     )
 
+                UploadRecordFailed taskId ->
+                    let
+                        taskMapper : TaskStatus -> TaskStatus
+                        taskMapper task =
+                            if getId task.task == taskId then
+                                { task | aborted = True }
+
+                            else
+                                task
+                    in
+                    ( { serverConfig = serverConfig
+                      , clientConfig = clientConfig
+                      , clientState = { clientState | tasks = List.map taskMapper clientState.tasks }
+                      }
+                    , False
+                    , []
+                    )
+
+                HasError ->
+                    ( { serverConfig = serverConfig
+                      , clientConfig = clientConfig
+                      , clientState = { clientState | hasError = True }
+                      }
+                    , False
+                    , []
+                    )
+
+                CloseNewClientInfo ->
+                    ( { serverConfig = serverConfig
+                      , clientConfig = { clientConfig | awareOfNewClient = True }
+                      , clientState = { clientState | popupType = NoPopup }
+                      }
+                    , True
+                    , []
+                    )
+
         saveCmd : List (Cmd Msg)
         saveCmd =
             if saveRequired then
@@ -953,6 +1052,7 @@ subs config =
                         _ ->
                             Noop
                 )
+            :: uploadRecordFailed UploadRecordFailed
             :: (config.clientState.tasks
                     |> List.filterMap
                         (\x ->
@@ -963,13 +1063,13 @@ subs config =
                                 UploadTrack taskId _ ->
                                     Just ( taskId, x.task )
 
-                                AddSlide taskId _ ->
+                                AddSlide taskId _ _ ->
                                     Just ( taskId, x.task )
 
                                 AddGos taskId _ ->
                                     Just ( taskId, x.task )
 
-                                ReplaceSlide taskId _ ->
+                                ReplaceSlide taskId _ _ ->
                                     Just ( taskId, x.task )
 
                                 _ ->
@@ -1067,3 +1167,8 @@ port scrollIntoViewPort : ( Float, String ) -> Cmd msg
 {-| A change in the status of web socket.
 -}
 port webSocketStatus : (Bool -> msg) -> Sub msg
+
+
+{-| A record upload that failed.
+-}
+port uploadRecordFailed : (Int -> msg) -> Sub msg

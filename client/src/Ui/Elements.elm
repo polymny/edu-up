@@ -1,13 +1,13 @@
 module Ui.Elements exposing
     ( primary, primaryGeneric, primaryIcon, secondary, secondaryGeneric, secondaryIcon, link, Action(..), navigationElement, icon, title, animatedEl, spin
-    , spinner, spinningSpinner, popup
+    , spinner, spinningSpinner, popup, fixedPopup
     , addLinkAttr, errorModal, longText, successModal
     )
 
 {-| This module contains helpers to easily make buttons.
 
 @docs primary, primaryGeneric, primaryIcon, secondary, secondaryGeneric, secondaryIcon, link, Action, navigationElement, icon, title, animatedEl, spin
-@docs spinner, spinningSpinner, popup
+@docs spinner, spinningSpinner, popup, fixedPopup
 @docs errorModaln successModal
 
 -}
@@ -305,8 +305,60 @@ spinningSpinner attr size =
 
 {-| A popup.
 -}
-popup : Int -> String -> Element msg -> Element msg
-popup size titleText content =
+popup : String -> Element msg -> Element msg
+popup titleText content =
+    let
+        popupElement : Element msg
+        popupElement =
+            Element.column
+                [ Background.color Colors.green2
+                , Ui.r 10
+                , Ui.b 1
+                , Ui.cy
+                , Ui.cx
+                , Element.htmlAttribute <| Html.Attributes.style "max-width" "80%"
+                , Element.htmlAttribute <| Html.Attributes.style "max-height" "80%"
+                , Element.htmlAttribute <| Html.Attributes.style "min-width" "40%"
+                , Element.htmlAttribute <| Html.Attributes.style "min-height" "40%"
+                , Border.color <| Colors.alphaColor 0.8 Colors.greyFont
+                , Border.shadow
+                    { offset = ( 0.0, 0.0 )
+                    , size = 3.0
+                    , blur = 3.0
+                    , color = Colors.alpha 0.1
+                    }
+                , Element.scrollbars
+                ]
+                [ Element.el [ Ui.p 10, Ui.cx, Font.color Colors.white, Font.bold ] (Element.text titleText)
+                , Element.el
+                    [ Background.color Colors.greyBackground
+                    , Ui.p 10
+                    , Ui.r 10
+                    , Ui.wf
+                    , Ui.hf
+                    , Border.shadow
+                        { offset = ( 0.0, 0.0 )
+                        , size = 3.0
+                        , blur = 3.0
+                        , color = Colors.alpha 0.1
+                        }
+                    ]
+                    content
+                ]
+    in
+    Element.el
+        [ Ui.zIndex 1
+        , Ui.wf
+        , Ui.hf
+        , Background.color (Element.rgba255 0 0 0 0.5)
+        ]
+        popupElement
+
+
+{-| A popup with fixed size.
+-}
+fixedPopup : Int -> String -> Element msg -> Element msg
+fixedPopup size titleText content =
     Element.row [ Ui.zIndex 1, Ui.wf, Ui.hf, Background.color (Element.rgba255 0 0 0 0.5), Element.scrollbars ]
         [ Element.el [ Ui.wfp 1 ] Element.none
         , Element.column [ Ui.hf, Ui.wfp size, Element.scrollbars ]

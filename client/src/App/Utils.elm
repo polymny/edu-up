@@ -13,20 +13,23 @@ doesn't allow circular module imports...
 import Acquisition.Types as Acquisition
 import App.Types as App
 import Browser.Navigation
+import Collaboration.Types as Collaboration
 import Config exposing (Config)
 import Courses.Types as Courses
 import Data.Capsule as Data
 import Data.Types as Data
 import Data.User as Data exposing (User)
+import Error.Types as Error
 import Home.Types as Home
 import Json.Decode as Decode
-import List exposing (product)
 import Options.Types as Options
 import Preparation.Types as Preparation
 import Production.Types as Production
 import Profile.Types as Profile
 import Publication.Types as Publication
 import Route exposing (Route)
+import Task
+import Time
 import Unlogged.Types as Unlogged
 import Url exposing (Url)
 
@@ -43,7 +46,10 @@ init flags url key =
             Decode.decodeValue (Decode.field "global" (Decode.field "clientConfig" Config.decodeClientConfig)) flags
 
         clientState =
-            Config.initClientState (Just key) (clientConfig |> Result.toMaybe |> Maybe.andThen .lang)
+            Config.initClientState
+                (Just key)
+                (clientConfig |> Result.toMaybe |> Maybe.andThen .lang)
+                (clientConfig |> Result.toMaybe |> Maybe.map .awareOfNewClient |> Maybe.withDefault True)
 
         sortBy =
             clientConfig |> Result.map .sortBy |> Result.withDefault Config.defaultClientConfig.sortBy
@@ -108,22 +114,23 @@ init flags url key =
                         , user = u
                         , page = page
                         }
-                    , Cmd.map App.LoggedMsg cm
+                    , Cmd.batch [ cm, Task.perform (App.ConfigMsg << Config.ZoneChanged) Time.here ]
+                        |> Cmd.map App.LoggedMsg
                     )
 
-                ( Ok s, Ok c, Ok Nothing ) ->
-                    ( App.Unlogged <| Unlogged.init { serverConfig = s, clientConfig = c, clientState = clientState } (Just url)
+                ( Ok s, Ok _, Ok Nothing ) ->
+                    ( App.Unlogged <| Unlogged.init clientState.lang False s.root (Just url)
                     , Cmd.none
                     )
 
                 ( Err s, _, _ ) ->
-                    ( App.Error (App.DecodeError s), Cmd.none )
+                    ( App.Failure (App.DecodeFailure s), Cmd.none )
 
                 ( _, Err c, _ ) ->
-                    ( App.Error (App.DecodeError c), Cmd.none )
+                    ( App.Failure (App.DecodeFailure c), Cmd.none )
 
                 ( _, _, Err u ) ->
-                    ( App.Error (App.DecodeError u), Cmd.none )
+                    ( App.Failure (App.DecodeFailure u), Cmd.none )
     in
     ( model, cmd )
 
@@ -146,6 +153,9 @@ capsuleIdFromPage page =
             Just m.capsule
 
         App.Options m ->
+            Just m.capsule
+
+        App.Collaboration m ->
             Just m.capsule
 
         _ ->
@@ -201,7 +211,7 @@ pageFromRoute _ user route =
             ( Data.getCapsuleById id user
                 |> Maybe.map Preparation.init
                 |> Maybe.map App.Preparation
-                |> Maybe.withDefault (App.Home Home.init)
+                |> (Maybe.withDefault <| App.Error <| Error.init Error.NotFound)
             , Cmd.none
             )
 
@@ -209,19 +219,19 @@ pageFromRoute _ user route =
             Data.getCapsuleById id user
                 |> Maybe.andThen (Acquisition.init gos)
                 |> Maybe.map (\( a, b ) -> ( App.Acquisition a, Cmd.map App.AcquisitionMsg b ))
-                |> Maybe.withDefault ( App.Home Home.init, Cmd.none )
+                |> Maybe.withDefault ( App.Error <| Error.init Error.NotFound, Cmd.none )
 
         Route.Production id gos ->
             Data.getCapsuleById id user
                 |> Maybe.andThen (Production.init gos)
                 |> Maybe.map (\( a, b ) -> ( App.Production a, Cmd.map App.ProductionMsg b ))
-                |> Maybe.withDefault ( App.Home Home.init, Cmd.none )
+                |> Maybe.withDefault ( App.Error <| Error.init Error.NotFound, Cmd.none )
 
         Route.Publication id ->
             ( Data.getCapsuleById id user
                 |> Maybe.map Publication.init
                 |> Maybe.map App.Publication
-                |> Maybe.withDefault (App.Home Home.init)
+                |> (Maybe.withDefault <| App.Error <| Error.init Error.NotFound)
             , Cmd.none
             )
 
@@ -229,12 +239,23 @@ pageFromRoute _ user route =
             ( Data.getCapsuleById id user
                 |> Maybe.map Options.init
                 |> Maybe.map App.Options
-                |> Maybe.withDefault (App.Home Home.init)
+                |> (Maybe.withDefault <| App.Error <| Error.init Error.NotFound)
+            , Cmd.none
+            )
+
+        Route.Collaboration id ->
+            ( Data.getCapsuleById id user
+                |> Maybe.map Collaboration.init
+                |> Maybe.map App.Collaboration
+                |> (Maybe.withDefault <| App.Error <| Error.init Error.NotFound)
             , Cmd.none
             )
 
         Route.Profile ->
             ( App.Profile Profile.init, Cmd.none )
+
+        Route.NotFound ->
+            ( App.Error <| Error.init <| Error.fromCode 404, Cmd.none )
 
         Route.Courses c ->
             ( App.Courses (Courses.init c), Cmd.none )
@@ -274,11 +295,17 @@ routeFromPage page =
         App.Publication m ->
             Route.Publication m.capsule
 
+        App.Collaboration m ->
+            Route.Collaboration m.capsule
+
         App.Options m ->
             Route.Options m.capsule
 
         App.Profile _ ->
             Route.Profile
+
+        App.Error _ ->
+            Route.NotFound
 
         App.Courses m ->
             case Maybe.map .assignment m.newAssignmentForm of

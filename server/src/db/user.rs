@@ -2,6 +2,8 @@
 
 use futures::future::try_join_all;
 
+use chrono::{NaiveDateTime, Utc};
+
 use serde::{Deserialize, Serialize};
 
 use ergol::prelude::*;
@@ -47,7 +49,6 @@ pub enum Plan {
 
 /// A user of polymny.
 #[ergol]
-#[derive(Serialize)]
 pub struct User {
     /// The id of the user.
     #[id]
@@ -91,6 +92,12 @@ pub struct User {
 
     /// The disk quota of user
     pub disk_quota: i32,
+
+    /// Date where the user has registered for the first time.
+    pub member_since: Option<NaiveDateTime>,
+
+    /// Date where the user has last visited.
+    pub last_visited: Option<NaiveDateTime>,
 }
 
 impl User {
@@ -126,7 +133,12 @@ impl User {
 
         let unsubscribe_key = if subscribed {
             let rng = OsRng {};
-            Some(rng.sample_iter(&Alphanumeric).take(40).collect::<String>())
+            Some(
+                rng.sample_iter(&Alphanumeric)
+                    .map(char::from)
+                    .take(40)
+                    .collect::<String>(),
+            )
         } else {
             None
         };
@@ -134,7 +146,11 @@ impl User {
         let user = if let Some(mailer) = mailer {
             // Generate activation key
             let rng = OsRng {};
-            let activation_key = rng.sample_iter(&Alphanumeric).take(40).collect::<String>();
+            let activation_key = rng
+                .sample_iter(&Alphanumeric)
+                .map(char::from)
+                .take(40)
+                .collect::<String>();
 
             let activation_url = format!("{}/activate/{}", mailer.root, activation_key);
             let text = validation_email_plain_text(&activation_url);
@@ -154,6 +170,8 @@ impl User {
                 unsubscribe_key,
                 Plan::Free,
                 config.quota_disk_free,
+                None,
+                None,
             )
         } else {
             User::create(
@@ -168,6 +186,8 @@ impl User {
                 unsubscribe_key,
                 Plan::Free,
                 config.quota_disk_free,
+                Some(Utc::now().naive_utc()),
+                None,
             )
         };
 
@@ -185,7 +205,11 @@ impl User {
         if let Some(mailer) = mailer {
             // Generate activation key
             let rng = OsRng {};
-            let activation_key = rng.sample_iter(&Alphanumeric).take(40).collect::<String>();
+            let activation_key = rng
+                .sample_iter(&Alphanumeric)
+                .map(char::from)
+                .take(40)
+                .collect::<String>();
 
             let activation_url = format!("{}/validate-email/{}", mailer.root, activation_key);
             let text = validation_new_email_plain_text(&activation_url);
@@ -268,7 +292,11 @@ impl User {
     pub async fn save_session(&self, db: &Db) -> Result<Session> {
         // Generate the secret
         let rng = OsRng {};
-        let secret = rng.sample_iter(&Alphanumeric).take(40).collect::<String>();
+        let secret = rng
+            .sample_iter(&Alphanumeric)
+            .map(char::from)
+            .take(40)
+            .collect::<String>();
 
         let session = Session::new(secret, self, db).await?;
         Ok(session)
@@ -339,7 +367,11 @@ impl User {
         db: &Db,
     ) -> Result<()> {
         let rng = OsRng {};
-        let key = rng.sample_iter(&Alphanumeric).take(40).collect::<String>();
+        let key = rng
+            .sample_iter(&Alphanumeric)
+            .map(char::from)
+            .take(40)
+            .collect::<String>();
 
         self.reset_password_key = Some(key.clone());
         self.save(&db).await?;
@@ -408,17 +440,27 @@ impl User {
                         // Generate a random password
                         let rng = OsRng {};
                         let hashed_password = bcrypt::hash(
-                            rng.sample_iter(&Alphanumeric).take(12).collect::<String>(),
+                            rng.sample_iter(&Alphanumeric)
+                                .map(char::from)
+                                .take(12)
+                                .collect::<String>(),
                             bcrypt::DEFAULT_COST,
                         )?;
                         // Generate activation key
                         let rng = OsRng {};
-                        let activation_key =
-                            rng.sample_iter(&Alphanumeric).take(40).collect::<String>();
+                        let activation_key = rng
+                            .sample_iter(&Alphanumeric)
+                            .map(char::from)
+                            .take(40)
+                            .collect::<String>();
 
                         let rng = OsRng {};
-                        let unsubscribe_key =
-                            Some(rng.sample_iter(&Alphanumeric).take(40).collect::<String>());
+                        let unsubscribe_key = Some(
+                            rng.sample_iter(&Alphanumeric)
+                                .map(char::from)
+                                .take(40)
+                                .collect::<String>(),
+                        );
 
                         let activation_url =
                             format!("{}/validate-invitation/{}", mailer.root, &activation_key);
@@ -439,6 +481,8 @@ impl User {
                             unsubscribe_key,
                             Plan::Free,
                             config.quota_disk_free,
+                            None,
+                            None,
                         )
                         .save(&db)
                         .await?;
@@ -497,13 +541,22 @@ impl<'r> FromRequest<'r> for User {
             _ => return Outcome::Failure((Status::Unauthorized, Error(Status::Unauthorized))),
         };
 
-        let user = match User::get_from_session(cookie.value(), &db).await {
+        let mut user = match User::get_from_session(cookie.value(), &db).await {
             Ok(Some(user)) => user,
             _ => return Outcome::Failure((Status::Unauthorized, Error(Status::Unauthorized))),
         };
 
         if !user.activated {
             return Outcome::Failure((Status::Unauthorized, Error(Status::Unauthorized)));
+        }
+
+        user.last_visited = Some(Utc::now().naive_utc());
+
+        if user.save(&db).await.is_err() {
+            return Outcome::Failure((
+                Status::InternalServerError,
+                Error(Status::InternalServerError),
+            ));
         }
 
         Outcome::Success(user)
@@ -514,6 +567,7 @@ impl<'r> FromRequest<'r> for User {
 ///
 /// This is just a wrapper for a user that has admin rights.
 pub struct Admin(pub User);
+
 #[rocket::async_trait]
 impl<'r> FromRequest<'r> for Admin {
     type Error = Error;

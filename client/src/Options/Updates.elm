@@ -5,12 +5,14 @@ import App.Types as App exposing (Page(..))
 import App.Utils as App
 import Config
 import Data.Capsule as Data
+import Data.Types as Data
 import Data.User as Data
 import File
 import FileValue
 import Json.Decode as Decode
 import Keyboard
 import Options.Types as Options
+import Production.Types as Production
 import RemoteData
 import Utils
 
@@ -26,19 +28,22 @@ update msg model =
     case ( model.page, maybeCapsule ) of
         ( App.Options m, Just capsule ) ->
             case msg of
-                Options.ToggleVideo ->
+                Options.WebcamSettingsMsg Production.Noop ->
+                    ( model, Cmd.none )
+
+                Options.WebcamSettingsMsg Production.ToggleVideo ->
                     let
                         newWebcamSettings =
                             case capsule.defaultWebcamSettings of
                                 Data.Disabled ->
-                                    Data.defaultWebcamSettings ( 533, 0 )
+                                    Data.defaultWebcamSettings 533
 
                                 _ ->
                                     Data.Disabled
                     in
                     updateModelWebcamSettings capsule newWebcamSettings model m
 
-                Options.SetOpacity opacity ->
+                Options.WebcamSettingsMsg (Production.SetOpacity opacity) ->
                     let
                         newWebcamSettings =
                             case capsule.defaultWebcamSettings of
@@ -50,19 +55,21 @@ update msg model =
                     in
                     updateModelWebcamSettings capsule newWebcamSettings model m
 
-                Options.SetWidth newWidth ->
+                Options.WebcamSettingsMsg Production.SetFullscreen ->
                     let
                         newWebcamSettings =
-                            case newWidth of
-                                Nothing ->
-                                    Data.setWebcamSettingsSize Nothing capsule.defaultWebcamSettings
-
-                                Just width ->
-                                    Data.setWebcamSettingsSize (Just ( width, 0 )) capsule.defaultWebcamSettings
+                            Data.setWebcamSettingsSize Nothing capsule.defaultWebcamSettings
                     in
-                    updateModelWebcamSettings capsule newWebcamSettings model m
+                    updateModelWebcamSettings capsule newWebcamSettings model { m | webcamSize = Nothing }
 
-                Options.SetAnchor anchor ->
+                Options.WebcamSettingsMsg (Production.SetWidth newWidth) ->
+                    let
+                        newWebcamSettings =
+                            Data.setWebcamSettingsSize (Just (newWidth |> Maybe.withDefault 1)) capsule.defaultWebcamSettings
+                    in
+                    updateModelWebcamSettings capsule newWebcamSettings model { m | webcamSize = newWidth }
+
+                Options.WebcamSettingsMsg (Production.SetAnchor anchor) ->
                     let
                         newWebcamSettings =
                             case capsule.defaultWebcamSettings of
@@ -102,15 +109,13 @@ update msg model =
                                 Config.update (Config.UpdateTaskStatus task) model.config
                         in
                         ( { model | page = newPage, config = Config.incrementTaskId newConfig }
-                        , Cmd.batch
-                            [ Api.uploadTrack
-                                { capsule = capsule
-                                , fileValue = fileValue
-                                , file = file
-                                , toMsg = \x -> App.OptionsMsg (Options.TrackUpload x)
-                                , taskId = model.config.clientState.taskId
-                                }
-                            ]
+                        , Api.uploadTrack
+                            { capsule = capsule
+                            , fileValue = fileValue
+                            , file = file
+                            , toMsg = (\x -> App.OptionsMsg (Options.TrackUpload x)) |> App.orError
+                            , taskId = model.config.clientState.taskId
+                            }
                         )
 
                     else
@@ -142,10 +147,12 @@ update msg model =
 
                         ( sync, newConfig ) =
                             ( Api.updateCapsule newCapsule
-                                (\_ ->
+                                ((\_ ->
                                     RemoteData.Success newCapsule
                                         |> Options.CapsuleUpdate model.config.clientState.lastRequest
                                         |> App.OptionsMsg
+                                 )
+                                    |> App.orError
                                 )
                             , Config.incrementRequest model.config
                             )
@@ -226,7 +233,7 @@ update msg model =
 {-| Changes the current webcamsettings in the model.
 -}
 updateModelWebcamSettings : Data.Capsule -> Data.WebcamSettings -> App.Model -> Options.Model String -> ( App.Model, Cmd App.Msg )
-updateModelWebcamSettings capsule ws model _ =
+updateModelWebcamSettings capsule ws model m =
     let
         newCapsule =
             { capsule | defaultWebcamSettings = ws }
@@ -234,8 +241,8 @@ updateModelWebcamSettings capsule ws model _ =
         newUser =
             Data.updateUser newCapsule model.user
     in
-    ( { model | user = newUser }
-    , Api.updateCapsule newCapsule (\_ -> App.Noop)
+    ( { model | user = newUser, page = App.Options m }
+    , Api.updateCapsule newCapsule ((\_ -> App.Noop) |> App.orError)
     )
 
 
@@ -252,7 +259,7 @@ updateModelSoundTrack capsule soundTrack model _ =
     in
     ( { model | user = newUser }
     , Cmd.batch
-        [ Api.updateCapsule newCapsule (\_ -> App.Noop)
+        [ Api.updateCapsule newCapsule ((\_ -> App.Noop) |> App.orError)
         , volumeChangedPort (Maybe.withDefault 1.0 (Maybe.map .volume soundTrack))
         ]
     )

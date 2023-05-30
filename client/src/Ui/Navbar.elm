@@ -21,6 +21,7 @@ import Html.Attributes
 import Lang exposing (Lang)
 import Material.Icons as Icons
 import Material.Icons.Types as Icons
+import RemoteData
 import Route exposing (Route)
 import Simple.Animation as Animation exposing (Animation)
 import Simple.Animation.Animated as Animated
@@ -81,6 +82,32 @@ navbar config page user =
 
                 _ ->
                     Ui.logo
+
+        errorMsg =
+            let
+                hasError =
+                    Maybe.map .clientState config
+                        |> Maybe.map .hasError
+                        |> Maybe.withDefault False
+
+                errorIcon =
+                    Ui.icon 25 Icons.error
+                        |> Element.el [ Font.color Colors.red ]
+            in
+            case ( hasError, page ) of
+                ( True, _ ) ->
+                    errorIcon
+
+                ( _, Just (App.Preparation m) ) ->
+                    case m.capsuleUpdate of
+                        RemoteData.Failure _ ->
+                            errorIcon
+
+                        _ ->
+                            Element.none
+
+                _ ->
+                    Element.none
 
         taskProgress : Maybe Float
         taskProgress =
@@ -164,7 +191,9 @@ navbar config page user =
                     , Ui.pr 5
                     , Ui.wfp 5
                     ]
-                    [ webSocketStatus
+                    [ Element.el [ Ui.wf ] Element.none
+                    , errorMsg
+                    , webSocketStatus
                     , Element.el
                         [ Ui.hf
                         , Ui.id "task-panel"
@@ -277,38 +306,96 @@ taskPanel clientState =
                 name : String
                 name =
                     case taskStatus.task of
-                        Config.UploadRecord _ _ gosId _ ->
+                        Config.UploadRecord _ capsuleId gosId _ ->
                             Strings.tasksUploadRecord lang
-                                ++ " ("
+                                ++ "\n ("
+                                ++ Strings.dataCapsuleCapsule lang 1
+                                ++ ": "
+                                ++ capsuleId
+                                ++ ", "
+                                ++ Strings.dataCapsuleGrain lang 1
+                                ++ ": "
                                 ++ String.fromInt (gosId + 1)
                                 ++ ")"
 
-                        Config.UploadTrack _ _ ->
+                        Config.UploadTrack _ capsuleId ->
                             Strings.tasksUploadTrack lang
+                                ++ "\n ("
+                                ++ Strings.dataCapsuleCapsule lang 1
+                                ++ ": "
+                                ++ capsuleId
+                                ++ ")"
 
-                        Config.AddGos _ _ ->
+                        Config.AddGos _ capsuleId ->
                             Strings.tasksUploadExtra lang
+                                ++ "\n ("
+                                ++ Strings.dataCapsuleCapsule lang 1
+                                ++ ": "
+                                ++ capsuleId
+                                ++ ")"
 
-                        Config.AddSlide _ _ ->
+                        Config.AddSlide _ capsuleId gosId ->
                             Strings.tasksUploadExtra lang
+                                ++ "\n ("
+                                ++ Strings.dataCapsuleCapsule lang 1
+                                ++ ": "
+                                ++ capsuleId
+                                ++ ", "
+                                ++ Strings.dataCapsuleGrain lang 1
+                                ++ ": "
+                                ++ String.fromInt (gosId + 1)
+                                ++ ")"
 
-                        Config.ReplaceSlide _ _ ->
+                        Config.ReplaceSlide _ capsuleId gosId ->
                             Strings.tasksUploadExtra lang
+                                ++ "\n ("
+                                ++ Strings.dataCapsuleCapsule lang 1
+                                ++ ": "
+                                ++ capsuleId
+                                ++ ", "
+                                ++ Strings.dataCapsuleGrain lang 1
+                                ++ ": "
+                                ++ String.fromInt (gosId + 1)
+                                ++ ")"
 
-                        Config.ExportCapsule _ _ ->
+                        Config.ExportCapsule _ capsuleId ->
                             Strings.tasksExportCapsule lang
+                                ++ "\n ("
+                                ++ Strings.dataCapsuleCapsule lang 1
+                                ++ ": "
+                                ++ capsuleId
+                                ++ ")"
 
                         Config.ImportCapsule _ ->
                             Strings.tasksImportCapsule lang
 
-                        Config.Production _ _ ->
+                        Config.Production _ capsuleId ->
                             Strings.tasksProductionCapsule lang
+                                ++ "\n ("
+                                ++ Strings.dataCapsuleCapsule lang 1
+                                ++ ": "
+                                ++ capsuleId
+                                ++ ")"
 
-                        Config.Publication _ _ ->
+                        Config.Publication _ capsuleId ->
                             Strings.tasksPublicationCapsule lang
+                                ++ "\n ("
+                                ++ Strings.dataCapsuleCapsule lang 1
+                                ++ ": "
+                                ++ capsuleId
+                                ++ ")"
 
-                        Config.TranscodeExtra _ _ _ ->
+                        Config.TranscodeExtra _ slideId capsuleId ->
                             Strings.tasksTranscodeExtra lang
+                                ++ "\n ("
+                                ++ Strings.dataCapsuleCapsule lang 1
+                                ++ ": "
+                                ++ capsuleId
+                                ++ ", "
+                                ++ Strings.dataCapsuleSlide lang 1
+                                ++ ": "
+                                ++ slideId
+                                ++ ")"
 
                 -- _ ->
                 --     Strings.tasksUnknown lang
@@ -545,6 +632,9 @@ navButtons lang capsuleId page =
                 App.Options _ ->
                     4
 
+                App.Collaboration _ ->
+                    5
+
                 _ ->
                     -1
 
@@ -632,16 +722,47 @@ navButtons lang capsuleId page =
         , makeButton (Route.Publication capsuleId) (Strings.stepsPublicationPublish lang) (selectorIndex /= 3)
         , separator
         , makeButton (Route.Options capsuleId) (Strings.stepsOptionsOptions lang) (selectorIndex /= 4)
+        , separator
+        , makeButton (Route.Collaboration capsuleId) (Strings.stepsCollaborationCollaboration lang) (selectorIndex /= 5)
         ]
 
 
 {-| This function creates the bottom bar of the application.
 -}
-bottombar : Maybe Config -> Element App.MaybeMsg
-bottombar config =
+bottombar : Maybe Config -> Maybe App.Page -> Element App.MaybeMsg
+bottombar config page =
     let
         lang =
             Maybe.map (\x -> x.clientState.lang) config |> Maybe.withDefault Lang.default
+
+        pagePath =
+            case page of
+                Just (App.Preparation s) ->
+                    "/o/capsule/preparation/" ++ s.capsule
+
+                Just (App.Acquisition s) ->
+                    "/o/capsule/acquisition/" ++ s.capsule ++ "/" ++ String.fromInt (s.gos + 1)
+
+                Just (App.Production s) ->
+                    "/o/capsule/production/" ++ s.capsule ++ "/" ++ String.fromInt (s.gos + 1)
+
+                Just (App.Publication s) ->
+                    "/o/capsule/publication/" ++ s.capsule
+
+                Just (App.Options s) ->
+                    "/o/capsule/preparation/" ++ s.capsule
+
+                Just (App.Collaboration s) ->
+                    "/o/capsule/settings/" ++ s.capsule
+
+                Just (App.Profile _) ->
+                    "/o/settings/"
+
+                _ ->
+                    "/o/"
+
+        serverUrl =
+            Maybe.map (\x -> x.serverConfig.root) config
     in
     Element.row
         [ Background.color (Colors.grey 3)
@@ -657,31 +778,48 @@ bottombar config =
             { label = "contacter@polymny.studio"
             , action = Ui.NewTab "mailto:contacter@polymny.studio"
             }
-        , Ui.link [ Ui.ar, Element.mouseOver [ Font.color Colors.greyBackground ] ]
-            { label = Strings.configLicense lang
+        , Maybe.map
+            (\x ->
+                Ui.link
+                    [ Ui.ar, Element.mouseOver [ Font.color Colors.greyBackground ] ]
+                    { label = Strings.uiGoBackToOldClient lang
+                    , action = Ui.Route <| Route.Custom <| x ++ pagePath
+                    }
+            )
+            serverUrl
+            |> Maybe.withDefault Element.none
+        , Ui.link
+            [ Ui.ar
+            , Element.mouseOver [ Font.color Colors.greyBackground ]
+            , Ui.tooltip <| Strings.configLicense lang
+            ]
+            { label = Strings.configLicenseShort lang
             , action = Ui.NewTab "https://github.com/polymny/polymny/blob/master/LICENSE"
             }
-        , Ui.link [ Ui.ar, Element.mouseOver [ Font.color Colors.greyBackground ] ]
-            { label = Strings.loginTermsOfService lang
+        , Ui.link
+            [ Ui.ar
+            , Element.mouseOver [ Font.color Colors.greyBackground ]
+            , Ui.tooltip <| Strings.loginTermsOfService lang
+            ]
+            { label = Strings.loginTermsOfServiceShort lang
             , action = Ui.NewTab "https://polymny.studio/cgu/"
             }
         , Ui.link [ Ui.ar, Element.mouseOver [ Font.color Colors.greyBackground ] ]
             { label = Strings.configSource lang
             , action = Ui.NewTab "https://github.com/polymny/polymny"
             }
-        , Ui.link [ Ui.ar, Element.mouseOver [ Font.color Colors.greyBackground ] ]
-            { label = Strings.configLang lang ++ " " ++ Lang.flag lang
+        , Ui.link
+            [ Ui.ar
+            , Element.mouseOver [ Font.color Colors.greyBackground ]
+            , Ui.tooltip <| Strings.configLang lang
+            ]
+            { label = Lang.flag lang
             , action = Ui.Msg <| App.LoggedMsg <| App.ConfigMsg <| Config.ToggleLangPicker
             }
         , config
             |> Maybe.map .serverConfig
             |> Maybe.map .version
             |> Maybe.map (\x -> Element.text (Strings.configVersion lang ++ " " ++ x))
-            |> Maybe.withDefault Element.none
-        , config
-            |> Maybe.map .serverConfig
-            |> Maybe.andThen .commit
-            |> Maybe.map (\x -> Element.text (Strings.configCommit lang ++ " " ++ x))
             |> Maybe.withDefault Element.none
         ]
 

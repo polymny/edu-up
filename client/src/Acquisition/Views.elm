@@ -10,7 +10,8 @@ import Acquisition.Types as Acquisition
 import App.Types as App
 import Config exposing (Config)
 import Data.Capsule as Data
-import Data.User exposing (User)
+import Data.Types exposing (Plan(..))
+import Data.User as Data exposing (User)
 import Device
 import Element exposing (Element)
 import Element.Background as Background
@@ -22,6 +23,7 @@ import Html.Attributes
 import Html.Events
 import Lang exposing (Lang)
 import Material.Icons
+import Material.Icons.Outlined
 import Strings
 import Time
 import TimeUtils
@@ -42,7 +44,7 @@ as the left column.
 
 -}
 view : Config -> User -> Acquisition.Model Data.Capsule Data.Gos -> ( Element App.Msg, Element App.Msg, Element App.Msg )
-view config _ model =
+view config user model =
     let
         -- Shortcut for lang
         lang =
@@ -179,7 +181,7 @@ view config _ model =
                         }
                     ]
                 ]
-                |> Ui.popup 1 (Strings.actionsDeleteRecord lang)
+                |> Ui.popup (Strings.actionsDeleteRecord lang)
 
         -- Popup to warn the user that they're leaving and that they might lose their record
         warnLeavingPopup : Element App.Msg
@@ -198,7 +200,7 @@ view config _ model =
                         }
                     ]
                 ]
-                |> Ui.popup 1 (Strings.uiWarning lang)
+                |> Ui.popup (Strings.uiWarning lang)
 
         -- Popup to show the help to the user
         helpPopup : Element App.Msg
@@ -213,7 +215,7 @@ view config _ model =
                     , label = Element.text <| Strings.uiConfirm lang
                     }
                 ]
-                |> Ui.popup 2 (Strings.uiHelp lang)
+                |> Ui.popup (Strings.uiHelp lang)
 
         -- Column that contains the device feedback element, the info, and the list of records
         rightColumn : Element App.Msg
@@ -222,7 +224,7 @@ view config _ model =
                 Element.column
                     [ Ui.wf, Ui.s 10 ]
                     ((if not model.showSettings then
-                        devicePlayer config model
+                        devicePlayer user config model
 
                       else
                         Element.none
@@ -241,37 +243,63 @@ view config _ model =
         -- Displays the recording status
         statusElement : Element App.Msg
         statusElement =
-            Element.row [ Ui.wf, Ui.p 10 ]
-                [ Element.el [ Ui.cx ] <|
-                    let
-                        slideIndexDisplay =
-                            String.fromInt (model.currentSlide + 1)
-                                ++ " / "
-                                ++ String.fromInt (List.length model.gos.slides)
+            let
+                slideIndexDisplay =
+                    String.fromInt (model.currentSlide + 1)
+                        ++ " / "
+                        ++ String.fromInt (List.length model.gos.slides)
 
-                        slideIndexElement =
-                            Strings.dataCapsuleSlide lang 1
-                                ++ " "
-                                ++ slideIndexDisplay
-                                |> Element.text
+                slideIndexElement =
+                    Strings.dataCapsuleSlide lang 1
+                        ++ " "
+                        ++ slideIndexDisplay
+                        |> Element.text
 
-                        lineIndexElement =
-                            Strings.dataCapsuleLine lang 1
-                                ++ " "
-                                ++ lineIndexDisplay
-                                |> Element.text
+                lineIndexElement =
+                    Strings.dataCapsuleLine lang 1
+                        ++ " "
+                        ++ lineIndexDisplay
+                        |> Element.text
 
-                        promptLength =
-                            currentSlide
-                                |> Maybe.map .prompt
-                                |> Maybe.withDefault ""
-                                |> String.split "\n"
-                                |> List.length
-                                |> String.fromInt
+                promptLength =
+                    currentSlide
+                        |> Maybe.map .prompt
+                        |> Maybe.withDefault ""
+                        |> String.split "\n"
+                        |> List.length
 
-                        lineIndexDisplay =
-                            String.fromInt (model.currentSentence + 1) ++ " / " ++ promptLength
-                    in
+                lineIndexDisplay =
+                    String.fromInt (model.currentSentence + 1) ++ " / " ++ String.fromInt promptLength
+            in
+            Element.column [ Ui.wf, Ui.p 10, Ui.s 10 ]
+                [ Ui.primary [ Ui.cx ]
+                    { action =
+                        if model.state == Acquisition.Ready then
+                            Ui.Msg <| App.AcquisitionMsg <| Acquisition.NextSentence True
+
+                        else
+                            Ui.None
+                    , label =
+                        Element.text <|
+                            case
+                                ( model.recording
+                                , model.currentSentence + 1 == promptLength
+                                , model.currentSlide + 1 == List.length model.gos.slides
+                                )
+                            of
+                                ( Nothing, _, _ ) ->
+                                    Strings.stepsAcquisitionStartRecording lang
+
+                                ( _, True, False ) ->
+                                    Strings.stepsAcquisitionRecordingNextSlide lang
+
+                                ( _, True, True ) ->
+                                    Strings.stepsAcquisitionStopRecording lang
+
+                                _ ->
+                                    Strings.stepsAcquisitionRecordingNextLine lang
+                    }
+                , Element.el [ Ui.cx ] <|
                     case model.recording of
                         Just t ->
                             Element.row [ Ui.s 30 ]
@@ -302,27 +330,42 @@ view config _ model =
         slideElement =
             case currentSlide of
                 Just s ->
-                    Element.el
-                        [ Ui.wf
-                        , Ui.hfp 2
-                        , Background.uncropped (Data.slidePath model.capsule s)
-                        , Element.html (Html.canvas [ Html.Attributes.id Acquisition.pointerCanvasId ] [])
-                            |> Element.el [ Ui.wf, Ui.cy ]
-                            |> Element.inFront
-                        ]
-                        Element.none
+                    Element.image [ Ui.wf, Ui.hf ] { src = Data.slidePath model.capsule s, description = "" }
+                        |> Element.el
+                            [ Element.htmlAttribute <| Html.Attributes.style "aspect-ratio" "16 / 9"
+                            , Element.htmlAttribute <| Html.Attributes.style "max-width" "100%"
+                            , Element.htmlAttribute <| Html.Attributes.style "max-height" "100%"
+                            , Ui.cx
+                            , Ui.cy
+                            , Html.canvas
+                                [ Html.Attributes.id Acquisition.pointerCanvasId
+                                , Html.Attributes.width 1920
+                                , Html.Attributes.height 1080
+                                , Html.Attributes.style "width" "100%"
+                                , Html.Attributes.style "height" "100%"
+                                ]
+                                []
+                                |> Element.html
+                                |> Element.el [ Ui.wf, Ui.hf ]
+                                |> Element.inFront
+                            ]
+                        |> Element.el [ Ui.wf, Ui.hf ]
 
                 _ ->
                     Element.none
 
         -- Full content of the page
         content =
-            Element.column [ Ui.wf, Ui.hf ]
+            Element.column [ Ui.wf, Ui.hf, Element.clip ]
                 [ promptElement config model
                 , statusElement
                 , Element.row
-                    [ Ui.wf, Ui.hf ]
-                    [ pointerControl model
+                    [ Ui.wf, Ui.hf, Element.clip ]
+                    [ if Data.isPremium user then
+                        pointerControl model
+
+                      else
+                        Element.none
                     , slideElement
                     ]
                 ]
@@ -330,7 +373,7 @@ view config _ model =
         -- Settings popup or popup to confirm the deletion of a record
         popup =
             if model.showSettings then
-                settingsPopup config model
+                settingsPopup user config model
 
             else if model.deleteRecord then
                 deleteRecordPopup
@@ -350,7 +393,7 @@ view config _ model =
 {-| Shows the element that contains the prompt text.
 -}
 promptElement : Config -> Acquisition.Model Data.Capsule Data.Gos -> Element App.Msg
-promptElement _ model =
+promptElement config model =
     let
         -- Whether a prompt exists in the grain
         hasPrompt : Bool
@@ -424,7 +467,7 @@ promptElement _ model =
         --
         -- Display navigation buttons that let the user move around the prompt text even if they're not recording
         navigationButtons =
-            Element.row [ Ui.ab, Ui.wf ]
+            Element.row [ Ui.ab, Ui.wf, Ui.p 10 ]
                 [ case ( model.recording, model.currentSentence > 0 && model.recording == Nothing ) of
                     ( Nothing, True ) ->
                         Ui.navigationElement
@@ -450,10 +493,28 @@ promptElement _ model =
                         |> Element.el [ Element.htmlAttribute (Html.Attributes.style "visibility" "hidden") ]
                 ]
 
+        -- Small icons to increase or decrease the size of the prompt
+        promptSizeIcons : Element App.Msg
+        promptSizeIcons =
+            Element.row [ Ui.s 10, Ui.p 10, Ui.ar, Ui.at ]
+                [ Ui.navigationElement
+                    (Ui.Msg <| App.ConfigMsg <| Config.PromptSizeChanged <| config.clientConfig.promptSize - 10)
+                    [ Ui.al ]
+                    (Ui.icon 25 Material.Icons.zoom_out)
+                , Ui.navigationElement
+                    (Ui.Msg <| App.ConfigMsg <| Config.PromptSizeChanged <| 40)
+                    [ Ui.al ]
+                    (Ui.icon 25 Material.Icons.youtube_searched_for)
+                , Ui.navigationElement
+                    (Ui.Msg <| App.ConfigMsg <| Config.PromptSizeChanged <| config.clientConfig.promptSize + 10)
+                    [ Ui.al ]
+                    (Ui.icon 25 Material.Icons.zoom_in)
+                ]
+
         -- Displays the current line of the prompt text
         currentSentencePrompt : String -> Element App.Msg
         currentSentencePrompt s =
-            Element.el [ Ui.cx, Font.center, Font.size 40 ]
+            Element.el [ Ui.cx, Font.center, Font.size config.clientConfig.promptSize ]
                 (Input.multiline
                     [ Background.color Colors.black
                     , Ui.b 0
@@ -474,7 +535,7 @@ promptElement _ model =
         -- Displays the next line of the prompt text
         nextSentencePrompt : String -> Element App.Msg
         nextSentencePrompt s =
-            Element.el [ Ui.cx, Font.center, Font.size 40, Font.color (Colors.grey 5) ]
+            Element.el [ Ui.cx, Font.center, Font.size config.clientConfig.promptSize, Font.color (Colors.grey 5) ]
                 (Input.multiline
                     [ Font.center
                     , Background.color Colors.black
@@ -498,10 +559,17 @@ promptElement _ model =
             Element.none
 
         ( _, Just s ) ->
-            Element.column [ Ui.wf, Background.color Colors.black, Font.color Colors.white, Ui.p 10, Ui.s 10 ]
+            Element.column
+                [ Ui.wf
+                , Background.color Colors.black
+                , Font.color Colors.white
+                , Ui.p 10
+                , Ui.s 10
+                , Element.inFront promptSizeIcons
+                , Element.inFront navigationButtons
+                ]
                 [ currentSentencePrompt s
                 , Maybe.withDefault "" nextSentence |> nextSentencePrompt
-                , navigationButtons
                 ]
 
         _ ->
@@ -565,8 +633,8 @@ deviceInfo config =
 
 {-| Creates a HTML video element on which the device feedback will be displayed.
 -}
-devicePlayer : Config -> Acquisition.Model Data.Capsule Data.Gos -> Element App.Msg
-devicePlayer config model =
+devicePlayer : User -> Config -> Acquisition.Model Data.Capsule Data.Gos -> Element App.Msg
+devicePlayer user config model =
     let
         -- Shortcut for lang
         lang =
@@ -627,11 +695,15 @@ devicePlayer config model =
         -- Element displayed in front of the device feedback with some buttons to manage the device settings
         settingsElement : Element App.Msg
         settingsElement =
-            if not model.showSettings then
+            if not model.showSettings && model.recording == Nothing && model.recordPlaying == Nothing then
                 Ui.navigationElement
                     (Ui.Msg <| App.AcquisitionMsg <| Acquisition.ToggleSettings)
-                    [ Font.color Colors.white, Ui.ab, Ui.ar, Ui.p 10 ]
-                    (Ui.icon 25 Material.Icons.settings)
+                    [ Ui.ab
+                    , Ui.ar
+                    , Ui.p 10
+                    , Element.behindContent <| Element.el [ Font.color Colors.white, Ui.cx, Ui.cy ] <| Ui.icon 30 Material.Icons.settings
+                    ]
+                    (Element.el [ Font.color Colors.black ] <| Ui.icon 30 Material.Icons.Outlined.settings)
 
             else
                 Element.none
@@ -651,10 +723,30 @@ devicePlayer config model =
     player
 
 
+
+{- Creates a canvas to previous the green screen video -}
+
+
+greenVideo : Bool -> Element App.Msg
+greenVideo display =
+    Element.html
+        (Html.canvas
+            [ Html.Attributes.class "wf hf"
+            , Html.Attributes.id "greened-video"
+            , Html.Attributes.style "display" <|
+                Utils.tern
+                    display
+                    "block"
+                    "none"
+            ]
+            []
+        )
+
+
 {-| Creates the settings popup, with all the information about the different devices.
 -}
-settingsPopup : Config -> Acquisition.Model Data.Capsule Data.Gos -> Element App.Msg
-settingsPopup config model =
+settingsPopup : User -> Config -> Acquisition.Model Data.Capsule Data.Gos -> Element App.Msg
+settingsPopup user config model =
     let
         -- Shortcut for lang
         lang =
@@ -705,29 +797,42 @@ settingsPopup config model =
             List.map (audioView (Maybe.andThen .audio config.clientConfig.preferredDevice)) config.clientConfig.devices.audio
                 |> Element.column [ Ui.s 10, Ui.pb 10 ]
 
+        -- Title before the reinit everything button
+        reinitTitle : Element App.Msg
+        reinitTitle =
+            Ui.title <| Strings.stepsAcquisitionReinitializeDevices lang
+
+        -- Button that reinitializes the camera detection
+        reinitButton : Element App.Msg
+        reinitButton =
+            Ui.primary []
+                { label = Element.text <| Strings.stepsAcquisitionReinitializeDevices lang
+                , action = Ui.Msg <| App.AcquisitionMsg <| Acquisition.ReinitializeDevices
+                }
+
         -- Element that contains all the device settings
         settings : Element App.Msg
         settings =
-            Element.column [ Ui.wf, Ui.cy, Ui.s 10 ]
-                [ videoTitle
-                , video
-                , resolutionTitle
-                , resolution
-                , audioTitle
-                , audio
+            Element.column [ Ui.wf, Ui.cy, Ui.s 20 ]
+                [ Element.column [ Ui.wf, Ui.s 10 ] [ videoTitle, video ]
+                , Element.column [ Ui.wf, Ui.s 10 ] [ resolutionTitle, resolution ]
+                , Element.column [ Ui.wf, Ui.s 10 ] [ audioTitle, audio ]
+                , Element.column [ Ui.wf, Ui.s 10 ] [ reinitTitle, reinitButton ]
                 ]
     in
-    Element.column [ Ui.wf, Ui.hf, Element.scrollbars ]
-        [ Element.row [ Ui.wf, Ui.hf, Element.scrollbars ]
+    Element.column [ Ui.wf, Ui.hf, Element.scrollbars, Ui.p 15 ]
+        [ Element.row [ Ui.wf, Ui.hf, Element.scrollbars, Ui.s 10 ]
             [ Element.el [ Ui.wf, Ui.hf, Element.scrollbars ] settings
-            , Element.el [ Ui.wf ] <| devicePlayer config model
+            , Element.column [ Ui.hf, Ui.wf ]
+                [ Element.el [ Ui.hf ] <| devicePlayer user config model
+                ]
             ]
         , Ui.primary [ Ui.ab, Ui.ar ]
             { label = Element.text <| Strings.uiConfirm lang
             , action = Ui.Msg <| App.AcquisitionMsg <| Acquisition.ToggleSettings
             }
         ]
-        |> Ui.popup 5 (Strings.navigationSettings lang)
+        |> Ui.fixedPopup 5 (Strings.navigationSettings lang)
 
 
 {-| Displays a button to select a specific video device.

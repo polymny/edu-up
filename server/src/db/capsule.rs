@@ -128,7 +128,7 @@ impl Default for WebcamSettings {
     fn default() -> WebcamSettings {
         WebcamSettings::Pip {
             anchor: Anchor::default(),
-            size: (533, 300),
+            size: (533, 400),
             position: (4, 4),
             opacity: 1.0,
             keycolor: None,
@@ -283,6 +283,7 @@ pub enum Privacy {
 
 /// A video capsule.
 #[ergol]
+#[derive(Clone)]
 pub struct Capsule {
     /// The id of the capsule.
     #[id]
@@ -334,7 +335,7 @@ pub struct Capsule {
     pub duration_ms: i32,
 
     /// The sound track of the capsule.
-    pub sound_track: Json<Option<SoundTrack>>,
+    pub sound_track: Option<Json<SoundTrack>>,
 
     /// The user that has rights on the capsule.
     #[many_to_many(capsules, Role)]
@@ -368,7 +369,7 @@ impl Capsule {
             Utc::now().naive_utc(),
             0,
             0,
-            Json(None),
+            None,
         )
         .save(&db)
         .await?;
@@ -413,7 +414,7 @@ impl Capsule {
             "prompt_subtitles": self.prompt_subtitles,
             "disk_usage": self.disk_usage,
             "duration_ms": self.duration_ms,
-            "sound_track": self.sound_track.0,
+            "sound_track": self.sound_track.as_ref().map(|x| &x.0),
         }))
     }
 

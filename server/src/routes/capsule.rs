@@ -25,6 +25,7 @@ use crate::config::Config;
 use crate::db::capsule::{
     Capsule, Fade, Gos, Privacy, Record, Role, Slide, SoundTrack, WebcamSettings,
 };
+use crate::db::stats::{TaskStat, TaskStatType};
 use crate::db::task_status::TaskStatus;
 use crate::db::user::{Plan, User};
 use crate::websockets::WebSockets;
@@ -163,7 +164,7 @@ pub async fn edit_capsule(
     capsule.prompt_subtitles = prompt_subtitles;
     capsule.structure = EJson(structure);
     capsule.webcam_settings = EJson(webcam_settings);
-    capsule.sound_track = EJson(sound_track);
+    capsule.sound_track = sound_track.map(|x| EJson(x));
     capsule.set_changed();
     capsule.save(&db).await?;
 
@@ -654,6 +655,8 @@ pub async fn add_slide(
         prompt: String::new(),
     });
 
+    gos.record = None;
+
     capsule.set_changed();
     capsule.save(&db).await?;
 
@@ -777,17 +780,21 @@ pub async fn produce(
         return Err(Error(Status::Conflict));
     }
 
+    let mut stat = TaskStat::new(TaskStatType::Production, &db).await?;
+
     let socks = socks.inner().clone();
     let sem = sem.inner().clone();
 
     let output_path = config.data_path.join(format!("{}", *id)).join("output.mp4");
 
     tokio::spawn(async move {
-        let sound_track_info = if let Some(sound_track) = &capsule.sound_track.0 {
-            format!("{}:{}", sound_track.uuid, sound_track.volume)
+        let sound_track_info = if let Some(sound_track) = &capsule.sound_track {
+            format!("{}:{}", sound_track.0.uuid, sound_track.0.volume)
         } else {
             "null".to_string()
         };
+
+        stat.start(&db).await.unwrap();
         let child = Command::new("../scripts/psh")
             .arg("on-produce")
             .arg(format!("{}", capsule.id))
@@ -805,13 +812,14 @@ pub async fn produce(
 
             if let Some(stdin) = child.stdin.as_mut() {
                 // replace null webcamsteeings with default webcam settings
-                for gos in &mut capsule.structure.0 {
+                let mut capsule_clone = capsule.clone();
+                for gos in &mut capsule_clone.structure.0 {
                     if gos.webcam_settings.is_none() {
-                        gos.webcam_settings = Some(capsule.webcam_settings.0.clone());
+                        gos.webcam_settings = Some(capsule_clone.webcam_settings.0.clone());
                     }
                 }
                 stdin
-                    .write_all(json!(capsule.structure.0).to_string().as_bytes())
+                    .write_all(json!(capsule_clone.structure.0).to_string().as_bytes())
                     .await
                     .unwrap();
 
@@ -842,6 +850,8 @@ pub async fn produce(
         } else {
             false
         };
+
+        stat.end(&db).await.unwrap();
 
         capsule.produced = if succeed {
             TaskStatus::Done
@@ -1060,6 +1070,8 @@ pub async fn publish(
         return Err(Error(Status::Conflict));
     }
 
+    let mut stat = TaskStat::new(TaskStatType::Publication, &db).await?;
+
     let input = config.data_path.join(format!("{}", *id)).join("output.mp4");
     let output = config.data_path.join(format!("{}", *id)).join("output");
 
@@ -1089,6 +1101,7 @@ pub async fn publish(
                 capsule.save(&db).await.ok();
 
                 if let Ok(_) = sem.acquire().await {
+                    stat.start(&db).await.unwrap();
                     let res = child.wait().await;
                     res.map(|x| x.success()).unwrap_or_else(|_| false)
                 } else {
@@ -1100,6 +1113,8 @@ pub async fn publish(
         } else {
             false
         };
+
+        stat.end(&db).await.unwrap();
 
         capsule.published = if succeed {
             TaskStatus::Done
@@ -1416,9 +1431,9 @@ pub async fn sound_track(
     // Delete old track if any.
     let mut volume = 0.8;
     let old_track = capsule.sound_track;
-    if let Some(old_track) = old_track.0 {
-        let old_uuid = old_track.uuid;
-        volume = old_track.volume;
+    if let Some(old_track) = old_track {
+        let old_uuid = old_track.0.uuid;
+        volume = old_track.0.volume;
         let old_path = path.join(format!("{}", old_uuid)).with_extension("m4a");
         remove_file(&old_path).await.ok();
     }
@@ -1452,11 +1467,11 @@ pub async fn sound_track(
 
     // Save the track in the database.
     let sound_track = SoundTrack {
-        uuid: uuid,
+        uuid,
         name: name.to_string(),
-        volume: volume,
+        volume,
     };
-    capsule.sound_track = EJson(Some(sound_track));
+    capsule.sound_track = Some(EJson(sound_track));
     capsule.save(&db).await?;
 
     Ok(capsule.to_json(role, &db).await?)

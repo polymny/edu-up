@@ -12,6 +12,8 @@ import Api.User as Api
 import App.Types as App
 import App.Utils as App
 import Browser.Navigation
+import Collaboration.Types as Collaboration
+import Collaboration.Updates as Collaboration
 import Config
 import Courses.Updates as Courses
 import Data.Capsule as Data
@@ -48,22 +50,13 @@ update message model =
         -- because the submodulse will not know about UnloggedModel or LoggedModel.
         -- This can happen :
         -- When login succeeds
-        ( App.UnloggedMsg (Unlogged.LoginRequestChanged (RemoteData.Success user)), App.Unlogged m ) ->
-            App.pageFromRoute m.config user Route.Home
-                |> Tuple.mapBoth
-                    (\x -> App.Logged { config = m.config, user = user, page = x })
-                    (Cmd.map App.LoggedMsg)
-
-        -- When the user changes their password after reset
-        ( App.UnloggedMsg (Unlogged.ResetPasswordRequestChanged (RemoteData.Success user)), App.Unlogged m ) ->
-            App.pageFromRoute m.config user Route.Home
-                |> Tuple.mapBoth
-                    (\x -> App.Logged { config = m.config, user = user, page = x })
-                    (\x -> Cmd.batch [ Cmd.map App.LoggedMsg x, Route.push m.config.clientState.key Route.Home ])
+        ( App.UnloggedMsg (Unlogged.LoginRequestChanged (RemoteData.Success _)), App.Unlogged _ ) ->
+            -- Reload page to fetch server data and connect to websocket
+            ( model, Browser.Navigation.reload )
 
         -- When the user deletes their account
         ( App.LoggedMsg (App.ProfileMsg (Profile.DeleteAccountDataChanged (RemoteData.Success _))), App.Logged m ) ->
-            ( App.Unlogged (Unlogged.init m.config Nothing)
+            ( model
             , case m.config.serverConfig.home of
                 Just url ->
                     Browser.Navigation.load url
@@ -330,6 +323,9 @@ updateModel msg model =
                 App.OptionsMsg oMsg ->
                     Options.update oMsg model
 
+                App.CollaborationMsg cMsg ->
+                    Collaboration.update cMsg model
+
                 App.ProfileMsg sMsg ->
                     Profile.update sMsg model
 
@@ -487,7 +483,7 @@ updateModel msg model =
                         ( { model | page = page }, cmd )
 
                 App.InternalUrl url ->
-                    case ( String.startsWith "/data/" url.path, model.config.clientState.key ) of
+                    case ( String.startsWith "/data/" url.path || String.startsWith "/o" url.path, model.config.clientState.key ) of
                         ( True, _ ) ->
                             ( model, Browser.Navigation.load url.path )
 
@@ -570,7 +566,7 @@ subs m =
                         Options.subs
 
                     ( App.Profile _, _, _ ) ->
-                        Sub.none
+                        Profile.subs
 
                     ( App.Courses _, _, _ ) ->
                         Courses.subs

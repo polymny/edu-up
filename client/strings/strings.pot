@@ -18,6 +18,10 @@ msgstr ""
 msgid "Login.termsOfService"
 msgstr ""
 
+#. The shorthand for termis of service.
+msgid "Login.termsOfServiceShort"
+msgstr ""
+
 #. Begning of the sentence that the user pronounces when accepting the terms of service.
 msgid "Login.acceptTermsOfServiceBegining"
 msgstr ""
@@ -312,6 +316,14 @@ msgstr ""
 msgid "Steps.Preparation.dndWillBreak"
 msgstr ""
 
+#. A sentence that explains that adding a slide will destroy the record.
+msgid "Steps.Preparation.addSlideWillBreak"
+msgstr ""
+
+#. A sentence that explains that deleting a slide will destroy the record.
+msgid "Steps.Preparation.deleteSlideWillBreak"
+msgstr ""
+
 #. Select a pdf file.
 msgid "Steps.Preparation.selectPdf"
 msgstr ""
@@ -382,6 +394,18 @@ msgstr ""
 
 #. Action to start the recording.
 msgid "Steps.Acquisition.startRecording"
+msgstr ""
+
+#. Action to stop the recording.
+msgid "Steps.Acquisition.stopRecording"
+msgstr ""
+
+#. Action to go to the next line during recording.
+msgid "Steps.Acquisition.recordingNextLine"
+msgstr ""
+
+#. Action to go to the next slide during recording.
+msgid "Steps.Acquisition.recordingNextSlide"
 msgstr ""
 
 #. Action to record a video.
@@ -467,6 +491,10 @@ msgstr ""
 
 #. Starts recording the pointer.
 msgid "Steps.Acquisition.recordPointer"
+msgstr ""
+
+#. Reinitialize all devices.
+msgid "Steps.Acquisition.reinitializeDevices"
 msgstr ""
 
 #. First line of help.
@@ -605,6 +633,18 @@ msgstr ""
 msgid "Steps.Production.downloadVideo"
 msgstr ""
 
+#. This grain uses the default production options.
+msgid "Steps.Production.grainUsesDefaultProductionOptions"
+msgstr ""
+
+#. Change options below to change options for this particular grain.
+msgid "Steps.Production.changeOptionsBelow"
+msgstr ""
+
+#. Go to options tab to change options for all grains.
+msgid "Steps.Production.changeOptionsInOptionsTab"
+msgstr ""
+
 #. Step of video publication.
 msgid "Steps.Publication.publication"
 msgstr ""
@@ -671,6 +711,10 @@ msgstr ""
 
 #. Not produced yet.
 msgid "Steps.Publication.notProducedYet"
+msgstr ""
+
+#. Show integration HTML code.
+msgid "Steps.Publication.integrationHtmlCode"
 msgstr ""
 
 #. Share capsule with someone.
@@ -743,6 +787,10 @@ msgstr ""
 
 #. Help.
 msgid "Ui.help"
+msgstr ""
+
+#. Open Polymny.
+msgid "Ui.openPolymny"
 msgstr ""
 
 #. The admin can edit a user.
@@ -917,6 +965,10 @@ msgstr ""
 msgid "Config.license"
 msgstr ""
 
+#. The shorthand for the license of the code.
+msgid "Config.licenseShort"
+msgstr ""
+
 #. Welcome on Polymny.
 msgid "Intro.welcomeOnPolymny"
 msgstr ""
@@ -967,6 +1019,31 @@ msgstr ""
 
 #. No sound track.
 msgid "Steps.Options.noTrack"
+msgstr ""
+
+#. Collaboration.
+msgid "Steps.Collaboration.collaboration"
+msgstr ""
+
+#. Collaborators.
+msgid "Steps.Collaboration.collaborator"
+msgid_plural ""
+msgstr[0] ""
+
+#. Add a collaborator.
+msgid "Steps.Collaboration.addCollaborator"
+msgstr ""
+
+#. Addition of a collaborator failed.
+msgid "Steps.Collaboration.addCollaboratorFailed"
+msgstr ""
+
+#. Is the username or email correct.
+msgid "Steps.Collaboration.addCollaboratorFailed2"
+msgstr ""
+
+#. Remove a collaborator.
+msgid "Steps.Collaboration.removeCollaborator"
 msgstr ""
 
 #. Delete track action.
@@ -1143,6 +1220,22 @@ msgstr ""
 msgid "Ui.webSocketWaitRefreshContactAdmin"
 msgstr ""
 
+#. Fatal error occured.
+msgid "Ui.fatalError"
+msgstr ""
+
+#. Connection to Polymny Studio has been interrupted.
+msgid "Ui.connectionInterrupted"
+msgstr ""
+
+#. Try refreshing the page, or contacting us if the problem persists.
+msgid "Ui.refreshOrContactAdmin"
+msgstr ""
+
+#. Go back to the old client.
+msgid "Ui.goBackToOldClient"
+msgstr ""
+
 #. Upload record task.
 msgid "Tasks.uploadRecord"
 msgstr ""
@@ -1177,4 +1270,40 @@ msgstr ""
 
 #. Unknown task.
 msgid "Tasks.unknown"
+msgstr ""
+
+#. This page does not exist.
+msgid "Error.NotFound.pageNotFound"
+msgstr ""
+
+#. Sorry, but we're experiencing some technical difficulties.
+msgid "Error.ServerError.technicalDifficulties"
+msgstr ""
+
+#. Please try refreshing the page by clicking here.
+msgid "Error.ServerError.tryRefreshingByClickingHere"
+msgstr ""
+
+#. If the problem persists, feel free to contact us at.
+msgid "Error.ServerError.problemPersists"
+msgstr ""
+
+#. Welcome to the new version.
+msgid "NewClient.welcome"
+msgstr ""
+
+#. New UI, improvements and bug fixes
+msgid "NewClient.updates"
+msgstr ""
+
+#. Click here to check the release note for more information.
+msgid "NewClient.checkReleaseNote"
+msgstr ""
+
+#. You can go back to the previous version by clicking the link in the bottom bar.
+msgid "NewClient.youCanGoBack"
+msgstr ""
+
+#. Don't hesitate to send us feed back at ... .
+msgid "NewClient.pleaseSendFeedback"
 msgstr ""

@@ -47,11 +47,71 @@ params_black_video(){
 
 }
 
+
+
 generate_black_video(){
     duration=$1
     output=$2
     command=$(header && params_black_video $duration $output)
     $command
+    if (( $? != 0 )); then
+        echo "error with $1" >&2
+        return $1
+    fi
+
+}
+
+
+
+params_extract_audio(){
+    local input=$1
+    local output=$2
+
+    echo -n \
+        -i $input \
+        -vn \
+        -acodec copy \
+        $output
+
+}
+
+
+
+extract_audio(){
+    local input=$1
+    local output=$2
+    cmd=$(header && params_extract_audio $input $output)
+    echo $cmd >&2
+    $cmd
+    if (( $? != 0 )); then
+        echo "error with $1" >&2
+        return $1
+    fi
+
+}
+
+merge_audio_video(){
+    params_merge_audio_video(){
+
+        local input_video=$1
+        local input_audio=$2
+        local output=$3
+
+        echo -n \
+            -i $input_video \
+            -i $input_audio \
+            -c:v copy \
+            -c:a aac \
+            $output
+        }
+
+
+    local input_video=$1
+    local input_audio=$2
+    local output=$3
+    cmd=$(header && params_merge_audio_video  $input_video $input_audio $output)
+    echo $cmd >&2
+    $cmd
     if (( $? != 0 )); then
         echo "error with $1" >&2
         return $1
@@ -85,16 +145,42 @@ transcode_with_silent_audio_track() {
 
 }
 # USAGE:
+#   transcode_with_silent_audio_track  <input_path> <output_path>
+#
+# EXAMPLE:
+#   transcode_video  invideo.mp4   outvideo.mp4
+transcode_with_silent_audio_track() {
+
+    local input=$1
+    local output=$2
+
+    acodec="aac"
+    arate="48000"
+    abitrate="128k"
+
+    echo "-i $input \
+        -f lavfi -i anullsrc=channel_layout=stereo:sample_rate=48000 \
+        -shortest \
+        -acodec $acodec  \
+        -ar $arate \
+        -ac 2 \
+        -b:a $abitrate \
+        -max_muxing_queue_size 2048 \
+        $output"
+
+}
+# USAGE:
 #   transocode_video  <input_path> <output_path>
 #
 # EXAMPLE:
 #   transcode_video  invideo.mp4  mode  tmp/video.mp4
 transcode_video() {
 
-    input=$1
-    mode=$2
-    output=$3
+    local input=$1
+    local mode=$2
+    local output=$3
 
+    echo "input = $input, mode = $mode, output=$output" >&2
     fps="25"
     vcodec="$vcodec264"
     vcodec_opts="-crf 15"
@@ -188,6 +274,11 @@ get_alpha()
 get_keycolor()
 {
 
+if (( $? != 0 )); then
+            echo "error with $1" >&2
+            return $1
+        fi
+
     echo  $(echo $1| jq -cr ".keycolor")
 }
 
@@ -241,9 +332,9 @@ get_aspect_ratio() {
 colorkey(){
     colorkey_color="$1"
     # color key params
-    colorkey_similarity="0.3"
-    colorkey_blend="0.2"
-    colorkey="colorkey=$colorkey_color:$colorkey_similarity:$colorkey_blend"
+    colorkey_similarity="0.15"
+    colorkey_blend="0.1"
+    local colorkey="colorkey=$colorkey_color:$colorkey_similarity:$colorkey_blend"
     despill="despill=green"
     echo "$colorkey,$despill"
 }
@@ -252,7 +343,7 @@ pointerkey(){
     colorkey_color="$1"
     # color key params
     colorkey_similarity="0.3"
-    colorkey_blend="0.2"
+    colorkey_blend="0.0"
     colorkey="colorkey=$colorkey_color:$colorkey_similarity:$colorkey_blend"
     despill="despill=$1"
     echo "$colorkey,$despill"
@@ -298,12 +389,15 @@ params_pip_slide_record() {
     keying_filter="null"
     color=$(get_keycolor "$webcam_settings")
 
+
     if [[  "$color" != "null" ]]; then
         keying_filter=$(colorkey $color)
     fi
+
+
     pointer_filter=$(colorkey black)
 
-    fade_filter=$(get_fadefilter "$gos" "$duration")
+
     case $composition_type in
          "pip" )
             webcam_alpha=$(get_alpha "$webcam_settings")
@@ -312,12 +406,21 @@ params_pip_slide_record() {
             webcam_overlay=$(get_overlay "$webcam_settings")
             scale_record="scale=${webcam_size},format=argb,colorchannelmixer=aa=${webcam_alpha}"
             if [[ "$pointer_overlay" == "null" ]] ; then
-                inputs="-i $slide -i $record "
-                filter_complex="[0]scale=$width_slide:$height_slide[slide];[1]$keying_filter,$scale_record[record];[slide][record]overlay=$webcam_overlay,$fade_filter,fps=fps=$fps[vout]"
+                inputs="-i $slide -i $record"
+                filter_complex=$(echo "
+                    [0]scale=$width_slide:$height_slide[slide];\
+                    [1]$keying_filter,$scale_record[record];\
+                    [slide][record]overlay=$webcam_overlay,fps=fps=$fps[vout]\
+                    " | sed 's/ //g')
             else
-                inputs="-i $slide -i $record -i $pointer_overlay "
-                filter_complex="[0]scale=$width_slide:$height_slide[slide];[1]$keying_filter,$scale_record[record];[2]$pointer_filter[pointer];[slide][record]overlay=$webcam_overlay[pip];[pip][pointer]overlay=0:0,$fade_filter,fps=fps=$fps[vout]"
-
+                inputs="-i $slide -i $record -i $pointer_overlay"
+                filter_complex=$(echo "
+                    [0]scale=$width_slide:$height_slide[slide];\
+                    [1]$keying_filter,$scale_record[record];\
+                    [2]$pointer_filter[pointer];\
+                    [slide][record]overlay=$webcam_overlay[pip];\
+                    [pip][pointer]overlay=0:0,fps=fps=$fps[vout]\
+                    " | sed 's/ //g')
             fi
             echo -n -fflags \
                      +genpts \
@@ -331,6 +434,8 @@ params_pip_slide_record() {
             record_alpha=$(get_alpha "$webcam_settings")
             overlay="0:0"
             aspect_ratio=$(get_aspect_ratio $record)
+
+            inputs="-i $slide -i $record"
             case $aspect_ratio in
                 "4:3")
                     record_filter="[1]$keying_filter,scale=1440:-1:flags=lanczos,format=argb,colorchannelmixer=aa=${record_alpha}[record]"
@@ -347,12 +452,10 @@ params_pip_slide_record() {
                     ;;
 
             esac
-            filter_complex="[0]scale=$width_slide:$height_slide[slide];${record_filter};[slide][record]overlay=$overlay,$fade_filter,fps=fps=$fps[vout]"
-
+            filter_complex="[0]scale=$width_slide:$height_slide[slide];${record_filter};[slide][record]overlay=$overlay,fps=fps=$fps[vout]"
             echo -n -fflags \
                  +genpts \
-                 -i $slide \
-                 -i $record \
+                 $inputs \
                  -filter_complex "$filter_complex"\
                  -map [vout] \
                  -map 1:a
@@ -360,15 +463,35 @@ params_pip_slide_record() {
 
 
         "disabled" )
+
+            if [[ "$pointer_overlay" == "null" ]] ; then
                  echo -n -fflags \
                  +genpts \
                  -i $slide \
                  -i $record \
                  -map 0:v \
                  -map 1:a
-             ;;
+            else
+                inputs="-i $slide -i $record -i $pointer_overlay"
+                filter_complex=$(echo "
+                    [0]scale=$width_slide:$height_slide[slide];\
+                    [2]$pointer_filter[pointer];\
+                    [slide][pointer]overlay=0:0,fps=fps=$fps[vout];\
+                    [1]anull[aout]\
+                    " | sed 's/ //g')
+
+                echo -n -fflags \
+                +genpts \
+                $inputs \
+                -filter_complex "$filter_complex" \
+                -map [vout] \
+                -map [aout]
+
+            fi
+            ;;
 
         "slide" )
+                echo SLIDE >&2
                  echo -n -fflags \
                  +genpts \
                  -f lavfi \
@@ -396,7 +519,6 @@ params_pip_slide_record() {
 
 
 }
-
 
 
 # USAGE:
@@ -521,6 +643,7 @@ concat_goss() {
 
 
 # USAGE:
+# UNUSED
 #   Returns audio and video fadea filters
 #   filter_complex syntax
 #
@@ -592,21 +715,28 @@ get_fadefilter() {
 #   miniatures video.mkv 12233 video
 miniatures() {
     input=$1
-    duration=$2
-    output=$3
+    color=$2
+    duration=$3
+    output=$4
     middle=$(echo 'scale=6;' $duration ' / 2' | bc)
     if [ "${middle:0:1}" = "." ] ; then
         middle="0"
     fi
 
+    keying_filter="null"
+    if [[  "$color" != "null" ]]; then
+        keying_filter=$(colorkey $color)
+    fi
+
     width="400"
-    filter="scale=$width:-1"
+    filter="scale=$width:-1,$keying_filter"
     echo -i $input \
         -vf $filter \
         -ss $middle \
         -vframes 1 \
         $output
 }
+
 
 # Get vars from Config.toml
 # USAGE:
@@ -724,7 +854,7 @@ transcode_records(){
         printf 'trancode duration = %s - record duration =%s  \n' "$ELAPSED_TIME" "$duration"
 
         output="$tmp_path/$i.png"
-        command=$(header && miniatures $input  $duration $output)
+        command=$(header && miniatures $input "null" $duration $output)
         echo $command
         $command
         if (( $? != 0 )); then
@@ -944,6 +1074,7 @@ compose_gos(){
         $cmd
 
     else
+        # Compose slide with record
         cmd=$(header_progress && params_pip_slide_record $video_slides $input_record "${duration_ms}ms" "$webcam_settings" $input_pointer "${tmp_path}/$output_gos")
         total_frames=$(echo "($slide_duration*25)/1000" | bc)
 
@@ -1059,7 +1190,7 @@ compose_goss(){
 
             # Get path to the audio track
             track_path="$capsule_path/assets/$track_uuid.m4a"
-            
+
             # Set fade duration
             fade_duration=1.0
 
@@ -1106,7 +1237,7 @@ on-record() {
             output="${capsule_path}/assets/${uuid}.png"
             duration="0.000000"
 
-            command=$(header && miniatures $input  $duration $output)
+            command=$(header && miniatures $input "null" $duration $output)
             $command
             if (( $? != 0 )); then
                 echo "error with $1" >&2
@@ -1318,12 +1449,13 @@ main() {
         "on-record")
             on-record "$@"
             ;;
+
         "on-video-upload")
             on-video-upload "$@"
             ;;
         "on-produce")
             read -r capsule_structure
-            #DEBUG echo "$capsule_structure" | jq . >&2
+            # echo "$capsule_structure" | jq . >&2
             on-produce "$@"
             ;;
         "on-publish")
@@ -1357,7 +1489,7 @@ main() {
             cmd=$(header && transcode_video "$@")
             $cmd
             ;;
-        
+
         "transcode-audio")
             transcode_audio "$@"
             ;;

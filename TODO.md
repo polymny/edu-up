@@ -6,14 +6,13 @@
  - [ ] drag n drop toujours capricieux
  - [ ] scoll vers haut au bas de page si slide drag
  - [x] left column non clickable
- - [ ] pas de zoom / dezoom possible
+ - [x] pas de zoom / dezoom possible
  - [ ] peut être enlever le pop up et laisser le client se balader (task) conversion PDF/PNG un peu lente
  - [x] impossilité de supprimer un extra
  - [x] impossibilité de drag n drop un extra
  - [x] envoi de slide change pas la vu du grain dans left column
  - [ ] ajouter un slide ne supprime pas le record
  - [ ] feedback sur l'existence du prompt
- - [ ] message d'erreur si cam utilisée
 
 # Aciquisition
  - [x] interdire rec pointer si record playing
@@ -27,9 +26,10 @@
  - [x] pointeur peut se faire désactiver entre slide avec prompt vs sans prompt
  - [ ] clear cache dans les settings ?
  - [x] manque un clear canvas à la fin du record
- - [X] il faut clear proprement quand on change de page
+ - [x] il faut clear proprement quand on change de page
  - [ ] scroll bar dans aqcquisition
  - [ ] si autorisation au mic refusée : inifnite loop binding device
+ - [x] message d'erreur si cam utilisée
 
 # Production
  - [ ] taille de la webcam : autotriser la chaine vide serait vachement pratique
@@ -38,9 +38,9 @@
  - [x] format 4:3 fait chier
 
 # Settings
- - [ ] page d'accueil vide
- - [ ] touche entrée ne valide pas
- - [ ] spinning spinner est align right au lieu de center
+ - [x] page d'accueil vide
+ - [x] touche entrée ne valide pas
+ - [x] spinning spinner est align right au lieu de center
 
 # Publication
  - [ ] bouton published en bas a droite ?
@@ -48,15 +48,35 @@
 
 # Global
  - [x] nom projet / capsule dans la navbar ?
- - [ ] title de la page html
+ - [x] title de la page html
  - [x] feedback sur l'etat du websocket ?
  - [x] touche entrée ne valide pas
  - [ ] plus d'info sur les tasks (quelle capsule)
- - [ ] validate e-mail : add trailing slash + redirect
+ - [x] validate e-mail : add trailing slash + redirect
  - [x] disabled button doesn't show up greyed
 
 # Home
  - [x] quotas ont disparu
- - [ ] plus de boutons (copier l'URL de la vidéo)
+ - [x] plus de boutons (copier l'URL de la vidéo)
  - [x] bouton dupliquer la capsule
  - [x] long text sur project name / capsule name
+
+# Matting
+ - [ ] dans record:
+    - [x] option camera, acitver ou non le matting
+    - [x] si option matting activé, live preview du matting
+    - [ ] validation record, lance le matting si activé dans les settings
+ - [ ] dans production:
+    - [ ] activer désactiver le matting 
+        (si idle, alors waiting)
+    - [ ] choisir le downsampling ratio 
+        (check lors du lancement de la production si il est différent de ce qui a déjà été fait)
+    - [ ] ajouter background
+    - [ ] supprimer background
+    - [ ] modifier background
+    - [ ] modifier keying (activé si matting activé)
+ - [ ] task:
+    - [ ] task matting en cours
+    - [ ] motifier python matting pour avoir le progress
+    - [ ] passer le progress dans le task
+ 

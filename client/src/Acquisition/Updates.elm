@@ -50,7 +50,7 @@ update msg model =
             in
             case msg of
                 Acquisition.RequestCameraPermission deviceId ->
-                    ( { model | page = App.Acquisition { m | state = Acquisition.DetectingDevices } }, Device.detectDevices (Just deviceId) )
+                    ( { model | page = App.Acquisition { m | state = Acquisition.DetectingDevices } }, Device.detectDevices (Just deviceId) False )
 
                 Acquisition.DeviceChanged ->
                     ( { model | page = App.Acquisition { m | state = Acquisition.BindingWebcam, deviceLevel = Nothing } }
@@ -330,7 +330,7 @@ update msg model =
                                 }
                         , user = Data.updateUser newCapsule model.user
                       }
-                    , Api.deleteRecord capsule m.gos (\_ -> App.Noop)
+                    , Api.deleteRecord capsule m.gos ((\_ -> App.Noop) |> App.orError)
                     )
 
                 Acquisition.EscapePressed ->
@@ -435,7 +435,7 @@ update msg model =
                         | user = Data.updateUser newCapsule model.user
                         , page = App.Acquisition { m | currentReplacementPrompt = Nothing }
                       }
-                    , Api.updateCapsule newCapsule (\_ -> App.Noop)
+                    , Api.updateCapsule newCapsule ((\_ -> App.Noop) |> App.orError)
                     )
 
                 Acquisition.StartEditingSecondPrompt ->
@@ -517,11 +517,23 @@ update msg model =
                         | user = Data.updateUser newCapsule model.user
                         , page = App.Acquisition { m | nextReplacementPrompt = Nothing }
                       }
-                    , Api.updateCapsule newCapsule (\_ -> App.Noop)
+                    , Api.updateCapsule newCapsule ((\_ -> App.Noop) |> App.orError)
                     )
 
                 Acquisition.ToggleHelp ->
                     ( { model | page = App.Acquisition { m | showHelp = not m.showHelp } }, Cmd.none )
+
+                Acquisition.ReinitializeDevices ->
+                    let
+                        ( newConfig, cmd ) =
+                            Config.update Config.ReinitializeDevices model.config
+                    in
+                    ( { model
+                        | page = App.Acquisition { m | showSettings = False, state = Acquisition.DetectingDevices }
+                        , config = newConfig
+                      }
+                    , Cmd.map App.ConfigMsg cmd
+                    )
 
         _ ->
             ( model, Cmd.none )

@@ -19,7 +19,6 @@ import Keyboard
 import List.Extra
 import Preparation.Types as Preparation
 import RemoteData
-import Svg.Attributes exposing (display)
 import Utils
 
 
@@ -67,7 +66,9 @@ update msg model =
 
                         ( sync, newConfig ) =
                             ( Api.updateCapsule newCapsule
-                                (\x -> App.PreparationMsg (Preparation.CapsuleUpdate model.config.clientState.lastRequest x))
+                                ((\x -> App.PreparationMsg (Preparation.CapsuleUpdate model.config.clientState.lastRequest x))
+                                    |> App.orError
+                                )
                             , Config.incrementRequest model.config
                             )
                     in
@@ -101,7 +102,9 @@ update msg model =
 
                         ( sync, newConfig ) =
                             ( Api.updateCapsule newCapsule
-                                (\x -> App.PreparationMsg (Preparation.CapsuleUpdate model.config.clientState.lastRequest x))
+                                ((\x -> App.PreparationMsg (Preparation.CapsuleUpdate model.config.clientState.lastRequest x))
+                                    |> App.orError
+                                )
                             , Config.incrementRequest model.config
                             )
                     in
@@ -154,9 +157,17 @@ update msg model =
 
                         sync =
                             Api.updateCapsule newCapsule
-                                (\x -> App.PreparationMsg (Preparation.CapsuleUpdate model.config.clientState.lastRequest x))
+                                ((\x -> App.PreparationMsg (Preparation.CapsuleUpdate model.config.clientState.lastRequest x))
+                                    |> App.orError
+                                )
                     in
-                    ( { model | user = Data.updateUser newCapsule model.user, page = App.Preparation (Preparation.init newCapsule) }, sync )
+                    ( { model
+                        | user = Data.updateUser newCapsule model.user
+                        , page = App.Preparation (Preparation.init newCapsule)
+                        , config = Config.incrementRequest model.config
+                      }
+                    , sync
+                    )
 
                 Preparation.GoToPreviousSlide currentSlideIndex currentSlide ->
                     let
@@ -165,7 +176,9 @@ update msg model =
 
                         sync =
                             Api.updateCapsule newCapsule
-                                (\x -> App.PreparationMsg (Preparation.CapsuleUpdate model.config.clientState.lastRequest x))
+                                ((\x -> App.PreparationMsg (Preparation.CapsuleUpdate model.config.clientState.lastRequest x))
+                                    |> App.orError
+                                )
 
                         previousSlide =
                             capsule.structure
@@ -174,7 +187,8 @@ update msg model =
                                 |> List.head
                     in
                     ( { model
-                        | page =
+                        | config = Config.incrementRequest model.config
+                        , page =
                             App.Preparation <|
                                 case previousSlide of
                                     Just previousSlidee ->
@@ -196,7 +210,9 @@ update msg model =
 
                         sync =
                             Api.updateCapsule newCapsule
-                                (\x -> App.PreparationMsg (Preparation.CapsuleUpdate model.config.clientState.lastRequest x))
+                                ((\x -> App.PreparationMsg (Preparation.CapsuleUpdate model.config.clientState.lastRequest x))
+                                    |> App.orError
+                                )
 
                         nextSlide =
                             capsule.structure
@@ -205,7 +221,8 @@ update msg model =
                                 |> List.head
                     in
                     ( { model
-                        | page =
+                        | config = Config.incrementRequest model.config
+                        , page =
                             App.Preparation <|
                                 case nextSlide of
                                     Just nextSlidee ->
@@ -270,6 +287,16 @@ update msg model =
                                     )
                                     model
 
+                            Preparation.ConfirmAddSlide gos ->
+                                let
+                                    ( newModel, newCmd, newConfig ) =
+                                        updateExtra model.user
+                                            (Preparation.Select Utils.Confirm (Preparation.AddSlide gos))
+                                            m
+                                            model.config
+                                in
+                                ( { model | config = newConfig, page = App.Preparation newModel }, newCmd )
+
                     else
                         ( model, Cmd.none )
 
@@ -277,8 +304,11 @@ update msg model =
                     if m.displayPopup then
                         case m.popupType of
                             Preparation.ConfirmUpdateCapsulePopup c ->
-                                ( { model | page = App.Preparation <| Preparation.init c }
-                                , Api.updateCapsule c (\_ -> App.Noop)
+                                ( { model | page = App.Preparation <| Preparation.init c, config = Config.incrementRequest model.config }
+                                , Api.updateCapsule c
+                                    ((\x -> App.PreparationMsg (Preparation.CapsuleUpdate model.config.clientState.lastRequest x))
+                                        |> App.orError
+                                    )
                                 )
 
                             _ ->
@@ -303,7 +333,26 @@ updateExtra user msg model config =
             Data.getCapsuleById model.capsule user
     in
     case ( msg, maybeCapsule ) of
-        ( Preparation.Select changeSlide, Just _ ) ->
+        ( Preparation.Select Utils.Request (Preparation.AddSlide gos), Just capsule ) ->
+            -- We need to check that the slide is not added to a gos with a record, otherwise, we need to delete the
+            -- record.
+            let
+                canChange =
+                    List.drop gos capsule.structure
+                        |> List.head
+                        |> Maybe.map (\x -> x.record == Nothing)
+                        |> Maybe.withDefault True
+            in
+            if canChange then
+                updateExtra user (Preparation.Select Utils.Confirm (Preparation.AddSlide gos)) model config
+
+            else
+                ( { model | popupType = Preparation.ConfirmAddSlide gos, displayPopup = True }, Cmd.none, config )
+
+        ( Preparation.Select Utils.Cancel (Preparation.AddSlide _), Just _ ) ->
+            ( { model | displayPopup = False }, Cmd.none, config )
+
+        ( Preparation.Select Utils.Confirm changeSlide, Just _ ) ->
             let
                 mimes =
                     case changeSlide of
@@ -342,13 +391,13 @@ updateExtra user msg model config =
                             { task =
                                 case changeSlide of
                                     Preparation.AddSlide _ ->
-                                        Config.AddSlide config.clientState.taskId capsule.id
+                                        Config.AddSlide config.clientState.taskId capsule.id p
 
                                     Preparation.AddGos _ ->
                                         Config.AddGos config.clientState.taskId capsule.id
 
                                     Preparation.ReplaceSlide _ ->
-                                        Config.ReplaceSlide config.clientState.taskId capsule.id
+                                        Config.ReplaceSlide config.clientState.taskId capsule.id p
                             , progress = Just 0.0
                             , finished = False
                             , aborted = False
@@ -361,19 +410,19 @@ updateExtra user msg model config =
                     case changeSlide of
                         Preparation.AddSlide gos ->
                             ( { model | changeSlide = RemoteData.Loading Nothing }
-                            , Api.addSlide capsule gos p file config.clientState.taskId mkMsg
+                            , Api.addSlide capsule gos p file config.clientState.taskId (App.orError mkMsg)
                             , Config.incrementTaskId newConfig
                             )
 
                         Preparation.AddGos gos ->
                             ( { model | changeSlide = RemoteData.Loading Nothing }
-                            , Api.addGos capsule gos p file config.clientState.taskId mkMsg
+                            , Api.addGos capsule gos p file config.clientState.taskId (App.orError mkMsg)
                             , Config.incrementTaskId newConfig
                             )
 
                         Preparation.ReplaceSlide slide ->
                             ( { model | changeSlide = RemoteData.Loading Nothing }
-                            , Api.replaceSlide capsule slide p file config.clientState.taskId mkMsg
+                            , Api.replaceSlide capsule slide p file config.clientState.taskId (App.orError mkMsg)
                             , Config.incrementTaskId newConfig
                             )
 
@@ -404,9 +453,11 @@ updateExtra user msg model config =
                 cmd : Cmd App.Msg
                 cmd =
                     Api.updateCapsule c
-                        (\_ -> App.Noop)
+                        ((\x -> App.PreparationMsg (Preparation.CapsuleUpdate config.clientState.lastRequest x))
+                            |> App.orError
+                        )
             in
-            ( Preparation.init c, cmd, config )
+            ( Preparation.init c, cmd, Config.incrementRequest config )
 
         ( Preparation.ChangeSlideUpdated d, Just _ ) ->
             ( { model | changeSlide = d }, Cmd.none, config )
@@ -456,7 +507,9 @@ updateDnD user msg model config =
                     if dropped && capsule.structure /= newStructure && not broken then
                         ( Api.updateCapsule
                             { capsule | structure = newStructure }
-                            (\x -> App.PreparationMsg (Preparation.CapsuleUpdate config.clientState.lastRequest x))
+                            ((\x -> App.PreparationMsg (Preparation.CapsuleUpdate config.clientState.lastRequest x))
+                                |> App.orError
+                            )
                         , Config.incrementRequest config
                         )
 

@@ -11,7 +11,7 @@ import Config exposing (Config)
 import Data.Capsule as Data exposing (Capsule)
 import Data.User exposing (User)
 import DnDList.Groups
-import Element exposing (Element, modular)
+import Element exposing (Element)
 import Element.Background as Background
 import Element.Border as Border
 import Element.Font as Font
@@ -81,6 +81,9 @@ view config user model =
                     Preparation.ConfirmUpdateCapsulePopup c ->
                         confirmUpdateCapsulePopup lang
 
+                    Preparation.ConfirmAddSlide gos ->
+                        confirmAddSlidePopup lang gos
+
         groupedSlides : List (NeList Preparation.Slide)
         groupedSlides =
             model.slides
@@ -138,7 +141,7 @@ gosView config user model ( head, gos ) gosIndex =
                     -- Virtual gos, the button will create a new gos
                     Ui.primaryIcon [ Ui.cy ]
                         { icon = Icons.add
-                        , action = mkUiExtra (Preparation.Select (Preparation.AddGos (head.totalGosId // 2)))
+                        , action = mkUiExtra (Preparation.Select Utils.Confirm (Preparation.AddGos (head.totalGosId // 2)))
                         , tooltip = Strings.stepsPreparationCreateGrain config.clientState.lang
                         }
 
@@ -146,7 +149,7 @@ gosView config user model ( head, gos ) gosIndex =
                     -- Real gos, the button will add a slide at the end of the gos
                     Ui.primaryIcon [ Ui.cy ]
                         { icon = Icons.add
-                        , action = mkUiExtra (Preparation.Select (Preparation.AddSlide head.gosId))
+                        , action = mkUiExtra (Preparation.Select Utils.Request (Preparation.AddSlide head.gosId))
                         , tooltip = Strings.stepsPreparationAddSlide config.clientState.lang
                         }
 
@@ -226,7 +229,7 @@ slideView config _ model ghost default s =
                             , Ui.primaryIcon []
                                 { icon = Icons.image
                                 , tooltip = Strings.stepsPreparationReplaceSlideOrAddExternalResource lang
-                                , action = mkUiExtra (Preparation.Select (Preparation.ReplaceSlide dataSlide))
+                                , action = mkUiExtra (Preparation.Select Utils.Confirm (Preparation.ReplaceSlide dataSlide))
                                 }
                             , Ui.primaryIcon []
                                 { icon = Icons.delete
@@ -245,6 +248,19 @@ slideView config _ model ghost default s =
                                 }
                             ]
 
+                inFrontPrompt =
+                    slide.slide
+                        |> Maybe.map .prompt
+                        |> Maybe.map (String.split "\n")
+                        |> Maybe.andThen List.head
+                        |> Maybe.andThen (\x -> Utils.tern (x == "") Nothing (Just x))
+                        |> Maybe.map (String.left 30)
+                        |> Maybe.map (\x -> String.trim x ++ " ...")
+                        |> Maybe.map Element.text
+                        |> Maybe.map (Element.el [ Ui.p 5, Ui.r 5, Background.color Colors.greyBorder ])
+                        |> Maybe.map (Element.el [ Ui.cx, Ui.ab, Ui.p 5 ])
+                        |> Maybe.withDefault Element.none
+
                 slideElement =
                     case Maybe.andThen .extra slide.slide of
                         Just v ->
@@ -253,6 +269,7 @@ slideView config _ model ghost default s =
                                     :: Ui.b 1
                                     :: Border.color Colors.greyBorder
                                     :: Element.inFront inFrontLabel
+                                    :: Element.inFront inFrontPrompt
                                     :: slideStyle model.slideModel slide.totalSlideId Drag
                                     ++ slideStyle model.slideModel slide.totalSlideId Drop
                                     ++ Utils.tern ghost (slideStyle model.slideModel slide.totalSlideId Ghost) []
@@ -277,6 +294,7 @@ slideView config _ model ghost default s =
                                     :: Ui.b 1
                                     :: Border.color Colors.greyBorder
                                     :: Element.inFront inFrontLabel
+                                    :: Element.inFront inFrontPrompt
                                     :: slideStyle model.slideModel slide.totalSlideId Drag
                                     ++ slideStyle model.slideModel slide.totalSlideId Drop
                                     ++ Utils.tern ghost (slideStyle model.slideModel slide.totalSlideId Ghost) []
@@ -303,10 +321,31 @@ slideView config _ model ghost default s =
 {-| Popup to confirm the slide deletion.
 -}
 deleteSlideConfirmPopup : Lang -> Preparation.Model Capsule -> Data.Slide -> Element App.Msg
-deleteSlideConfirmPopup lang _ s =
-    Element.column [ Ui.wf, Ui.hf ]
+deleteSlideConfirmPopup lang model s =
+    let
+        willDestroyRecord : Bool
+        willDestroyRecord =
+            model.capsule.structure
+                |> List.filter (\x -> List.any (\y -> y.uuid == s.uuid) x.slides)
+                |> List.head
+                |> Maybe.map (\x -> x.record /= Nothing)
+                |> Maybe.withDefault False
+    in
+    Element.column [ Ui.wf, Ui.hf, Ui.s 10 ]
         [ Element.paragraph [ Ui.wf, Ui.cy, Font.center ]
             [ Element.text (Lang.question Strings.actionsConfirmDeleteSlide lang) ]
+        , if willDestroyRecord then
+            Element.paragraph [ Ui.wf, Ui.cy, Ui.pt 20, Font.center ]
+                [ Element.text (Lang.warning Strings.uiWarning lang) ]
+
+          else
+            Element.none
+        , if willDestroyRecord then
+            Element.paragraph [ Ui.wf, Ui.cy, Font.center ]
+                [ Element.text (Strings.stepsPreparationDeleteSlideWillBreak lang ++ ".") ]
+
+          else
+            Element.none
         , Element.row [ Ui.ab, Ui.ar, Ui.s 10 ]
             [ Ui.secondary []
                 { action = mkUiMsg (Preparation.DeleteSlide Utils.Cancel s)
@@ -318,7 +357,7 @@ deleteSlideConfirmPopup lang _ s =
                 }
             ]
         ]
-        |> Ui.popup 1 (Strings.actionsDeleteSlide lang)
+        |> Ui.popup (Strings.actionsDeleteSlide lang)
 
 
 {-| Popup to confirm the extra deletion.
@@ -339,7 +378,7 @@ deleteExtraConfirmPopup lang _ s =
                 }
             ]
         ]
-        |> Ui.popup 1 (Strings.actionsDeleteExtra lang)
+        |> Ui.popup (Strings.actionsDeleteExtra lang)
 
 
 {-| Popup to input prompt texts.
@@ -417,7 +456,7 @@ promptPopup lang model slide =
                 ]
             ]
         ]
-        |> Ui.popup 5 (Strings.actionsEditPrompt lang)
+        |> Ui.popup (Strings.actionsEditPrompt lang)
 
 
 {-| Popup to confirm drag n drop that will destroy records.
@@ -437,7 +476,27 @@ confirmUpdateCapsulePopup lang =
                 }
             ]
         ]
-        |> Ui.popup 1 (Strings.uiWarning lang)
+        |> Ui.popup (Strings.uiWarning lang)
+
+
+{-| Popup to confirm add slide that will destroy records.
+-}
+confirmAddSlidePopup : Lang -> Int -> Element App.Msg
+confirmAddSlidePopup lang gos =
+    Element.column [ Ui.wf, Ui.hf, Ui.s 10 ]
+        [ Ui.paragraph [ Ui.cx, Ui.cy, Font.center ] (Strings.stepsPreparationAddSlideWillBreak lang ++ ".")
+        , Element.row [ Ui.ab, Ui.ar, Ui.s 10 ]
+            [ Ui.secondary []
+                { label = Element.text <| Strings.uiCancel lang
+                , action = mkUiMsg <| Preparation.Extra <| Preparation.Select Utils.Cancel <| Preparation.AddSlide gos
+                }
+            , Ui.primary []
+                { label = Element.text <| Strings.uiConfirm lang
+                , action = mkUiMsg <| Preparation.Extra <| Preparation.Select Utils.Confirm <| Preparation.AddSlide gos
+                }
+            ]
+        ]
+        |> Ui.popup (Strings.uiWarning lang)
 
 
 {-| Popup to select the page number when uploading a slide.
@@ -516,7 +575,7 @@ selectPageNumberPopup lang model f =
         , errorMsg
         , buttonBar
         ]
-        |> Ui.popup 1 (title lang)
+        |> Ui.popup (title lang)
 
 
 {-| Finds whether a slide is being dragged.

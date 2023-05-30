@@ -1,6 +1,6 @@
 module App.Types exposing
     ( Model, Page(..), Msg(..), onUrlRequest
-    , Error(..), errorToString
+    , Failure(..), failureToString, orError
     , MaybeModel(..), MaybeMsg(..), WebSocketMsg(..), toMaybe
     )
 
@@ -14,16 +14,18 @@ module App.Types exposing
 
 # Error management
 
-@docs Error, errorToString
+@docs Failure, failureToString, unwrapRemoteData, unwrapResult, orError
 
 -}
 
 import Acquisition.Types as Acquisition
 import Browser
+import Collaboration.Types as Collaboration
 import Config exposing (Config)
 import Courses.Types as Courses
 import Data.Capsule as Data
 import Data.User as Data exposing (User)
+import Error.Types as Error
 import Home.Types as Home
 import Json.Decode as Decode
 import NewCapsule.Types as NewCapsule
@@ -32,6 +34,7 @@ import Preparation.Types as Preparation
 import Production.Types as Production
 import Profile.Types as Profile
 import Publication.Types as Publication
+import RemoteData exposing (RemoteData)
 import Unlogged.Types as Unlogged
 import Url
 
@@ -39,7 +42,7 @@ import Url
 {-| This type helps us deal with errors at the startup of the application.
 -}
 type MaybeModel
-    = Error Error
+    = Failure Failure
     | Unlogged Unlogged.Model
     | Logged Model
 
@@ -82,22 +85,24 @@ type Page
     | Production (Production.Model String Int)
     | Publication (Publication.Model String)
     | Options (Options.Model String)
+    | Collaboration (Collaboration.Model String)
     | Profile Profile.Model
+    | Error Error.Model
     | Courses (Courses.Model Int)
 
 
 {-| This type represents the errors that can occur when the page starts.
 -}
-type Error
-    = DecodeError Decode.Error
+type Failure
+    = DecodeFailure Decode.Error
 
 
-{-| Convers the error to a string.
+{-| Convers the efailure to a string.
 -}
-errorToString : Error -> String
-errorToString error =
+failureToString : Failure -> String
+failureToString error =
     case error of
-        DecodeError e ->
+        DecodeFailure e ->
             "Error decoding JSON: " ++ Decode.errorToString e
 
 
@@ -112,6 +117,7 @@ type Msg
     | ProductionMsg Production.Msg
     | PublicationMsg Publication.Msg
     | OptionsMsg Options.Msg
+    | CollaborationMsg Collaboration.Msg
     | ProfileMsg Profile.Msg
     | CoursesMsg Courses.Msg
     | ConfigMsg Config.Msg
@@ -122,6 +128,18 @@ type Msg
     | CopyString String
     | Logout
     | LoggedOut
+
+
+{-| Returns ErrorOccured if an error occured or just calls the function passed as paramter.
+-}
+orError : (RemoteData a b -> Msg) -> RemoteData a b -> Msg
+orError toMsg result =
+    case result of
+        RemoteData.Failure _ ->
+            ConfigMsg Config.HasError
+
+        _ ->
+            toMsg result
 
 
 {-| This type contains the different types of web socket messages that can be received from server.

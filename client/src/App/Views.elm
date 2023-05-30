@@ -11,6 +11,8 @@ import Acquisition.Views as Acquisition
 import App.Types as App
 import App.Utils as App
 import Browser
+import Collaboration.Types as Collaboration
+import Collaboration.Views as Collaboration
 import Config
 import Courses.Types as Courses
 import Courses.Views as Courses
@@ -19,6 +21,8 @@ import Element exposing (Element)
 import Element.Background as Background
 import Element.Border as Border
 import Element.Font as Font
+import Error.Types as Error
+import Error.Views as Error
 import Home.Views as Home
 import Html
 import Html.Attributes
@@ -34,6 +38,7 @@ import Production.Views as Production
 import Profile.Views as Profile
 import Publication.Types as Publication
 import Publication.Views as Publication
+import Route
 import Strings
 import Ui.Colors as Colors
 import Ui.Elements as Ui
@@ -47,7 +52,7 @@ import Unlogged.Views as Unlogged
 -}
 view : App.MaybeModel -> Browser.Document App.MaybeMsg
 view fullModel =
-    { title = "Polymny Studio"
+    { title = title fullModel
     , body =
         [ Element.layout
             [ Ui.wf
@@ -64,6 +69,78 @@ view fullModel =
             (viewContent fullModel)
         ]
     }
+
+
+{-| Returns the title of the app.
+-}
+title : App.MaybeModel -> String
+title model =
+    let
+        base =
+            "Polymny Studio"
+
+        lang =
+            case model of
+                App.Logged { config } ->
+                    config.clientState.lang
+
+                _ ->
+                    Lang.default
+
+        -- This is officially the ugliest piece of code I've ever written
+        pageParts =
+            case model of
+                App.Logged { user, page } ->
+                    case page of
+                        App.Home _ ->
+                            []
+
+                        App.NewCapsule _ ->
+                            []
+
+                        App.Preparation m ->
+                            Data.getCapsuleById m.capsule user
+                                |> Maybe.map (\c -> [ Strings.stepsPreparationPreparation lang, c.project, c.name ])
+                                |> Maybe.withDefault []
+
+                        App.Acquisition m ->
+                            Data.getCapsuleById m.capsule user
+                                |> Maybe.map (\c -> [ Strings.stepsAcquisitionAcquisition lang, c.project, c.name ])
+                                |> Maybe.withDefault []
+
+                        App.Production m ->
+                            Data.getCapsuleById m.capsule user
+                                |> Maybe.map (\c -> [ Strings.stepsProductionProduction lang, c.project, c.name ])
+                                |> Maybe.withDefault []
+
+                        App.Publication m ->
+                            Data.getCapsuleById m.capsule user
+                                |> Maybe.map (\c -> [ Strings.stepsPublicationPublication lang, c.project, c.name ])
+                                |> Maybe.withDefault []
+
+                        App.Options m ->
+                            Data.getCapsuleById m.capsule user
+                                |> Maybe.map (\c -> [ Strings.stepsPublicationPublication lang, c.project, c.name ])
+                                |> Maybe.withDefault []
+
+                        App.Collaboration m ->
+                            Data.getCapsuleById m.capsule user
+                                |> Maybe.map (\c -> [ Strings.stepsCollaborationCollaboration lang, c.project, c.name ])
+                                |> Maybe.withDefault []
+
+                        App.Profile _ ->
+                            [ Strings.uiProfile lang ]
+
+                        App.Error _ ->
+                            []
+
+                        App.Courses m ->
+                            [ "[Mes devoirs" ]
+
+                _ ->
+                    []
+    in
+    String.join " — " (base :: pageParts)
 
 
 {-| Stylizes all the content of the app.
@@ -86,19 +163,16 @@ viewContent fullModel =
                     , Element.none
                     )
 
-                App.Error error ->
+                App.Failure error ->
                     ( viewError error |> Element.map App.LoggedMsg, Element.none )
 
-        clientState =
+        ( clientState, home ) =
             case fullModel of
                 App.Logged { config } ->
-                    config.clientState
-
-                App.Unlogged { config } ->
-                    config.clientState
+                    ( config.clientState, config.serverConfig.home )
 
                 _ ->
-                    Config.initClientState Nothing Nothing
+                    ( Config.initClientState Nothing Nothing True, Nothing )
 
         realPopup =
             case clientState.popupType of
@@ -110,6 +184,9 @@ viewContent fullModel =
 
                 Config.WebSocketInfo ->
                     webSocketInfo clientState.lang
+
+                Config.NewClientInfo ->
+                    newClientInfo clientState.lang home
     in
     Element.column
         [ Ui.wf
@@ -144,7 +221,9 @@ viewContent fullModel =
                 }
             ]
             content
-        , Ui.bottombar (fullModel |> App.toMaybe |> Maybe.map .config)
+        , Ui.bottombar
+            (fullModel |> App.toMaybe |> Maybe.map .config)
+            (fullModel |> App.toMaybe |> Maybe.map .page)
         ]
 
 
@@ -156,37 +235,63 @@ viewSuccess model =
         ( maybeCapsule, maybeGos ) =
             App.capsuleAndGos model.user model.page
     in
-    case ( model.page, maybeCapsule, maybeGos ) of
-        ( App.Home m, _, _ ) ->
+    case ( ( model.page, model.config.clientState.hasError ), ( maybeCapsule, maybeGos ) ) of
+        ( ( _, True ), _ ) ->
+            Error.view model.config model.user (Error.init Error.ServerError)
+
+        ( ( App.Home m, _ ), _ ) ->
             Home.view model.config model.user m
 
-        ( App.NewCapsule m, _, _ ) ->
+        ( ( App.NewCapsule m, _ ), _ ) ->
             NewCapsule.view model.config model.user m
 
-        ( App.Preparation m, Just capsule, _ ) ->
+        ( ( App.Preparation m, _ ), ( Just capsule, _ ) ) ->
             Preparation.view model.config model.user (Preparation.withCapsule capsule m)
                 |> Ui.addLeftColumn model.config.clientState.lang model.page capsule Nothing
 
-        ( App.Acquisition m, Just capsule, Just gos ) ->
+        ( ( App.Acquisition m, _ ), ( Just capsule, Just gos ) ) ->
             Acquisition.view model.config model.user (Acquisition.withCapsuleAndGos capsule gos m)
                 |> Ui.addLeftAndRightColumn model.config.clientState.lang model.page capsule (Just m.gos)
 
-        ( App.Production m, Just capsule, Just gos ) ->
-            Production.view model.config model.user (Production.withCapsuleAndGos capsule gos m)
-                |> Ui.addLeftColumn model.config.clientState.lang model.page capsule (Just m.gos)
+        ( ( App.Production m, _ ), ( Just capsule, Just gos ) ) ->
+            let
+                ( c1, c2, p ) =
+                    Production.view model.config model.user (Production.withCapsuleAndGos capsule gos m)
 
-        ( App.Publication m, Just capsule, _ ) ->
+                finalView =
+                    Element.row [ Ui.wf, Ui.hf, Element.scrollbars ]
+                        [ Element.el [ Ui.wfp 2, Ui.hf, Element.scrollbarY ]
+                            (Ui.leftColumn
+                                model.config.clientState.lang
+                                (App.Production m)
+                                capsule
+                                (Just m.gos)
+                            )
+                        , Element.el [ Ui.wfp 5, Ui.hf, Element.scrollbarY ] c1
+                        , Element.el [ Ui.wfp 5, Ui.hf, Element.scrollbarY ] c2
+                        ]
+            in
+            ( finalView, p )
+
+        ( ( App.Publication m, _ ), ( Just capsule, _ ) ) ->
             Publication.view model.config model.user (Publication.withCapsule capsule m)
                 |> Ui.addLeftColumn model.config.clientState.lang model.page capsule Nothing
 
-        ( App.Options m, Just capsule, _ ) ->
+        ( ( App.Options m, _ ), ( Just capsule, _ ) ) ->
             Options.view model.config model.user (Options.withCapsule capsule m)
                 |> Ui.addLeftColumn model.config.clientState.lang model.page capsule Nothing
 
-        ( App.Profile m, _, _ ) ->
+        ( ( App.Collaboration m, _ ), ( Just capsule, _ ) ) ->
+            Collaboration.view model.config model.user (Collaboration.withCapsule capsule m)
+                |> Ui.addLeftColumn model.config.clientState.lang model.page capsule Nothing
+
+        ( ( App.Profile m, _ ), _ ) ->
             Profile.view model.config model.user m
 
-        ( App.Courses m, _, _ ) ->
+        ( ( App.Error m, _ ), _ ) ->
+            Error.view model.config model.user m
+
+        ( ( App.Courses m, _ ), _ ) ->
             Maybe.andThen (\x -> Data.getGroupById x model.user) m.selectedGroup
                 |> (\x -> Courses.withGroup x m)
                 |> Courses.view model.config model.user
@@ -197,9 +302,9 @@ viewSuccess model =
 
 {-| Returns the view if the model is in error.
 -}
-viewError : App.Error -> Element App.Msg
+viewError : App.Failure -> Element App.Msg
 viewError error =
-    Element.text (App.errorToString error)
+    Element.text (App.failureToString error)
 
 
 {-| The popup for the lang picker.
@@ -234,7 +339,7 @@ langPicker lang =
             Element.wrappedRow [ Ui.cx, Ui.cy, Ui.s 10 ] <|
                 List.map langChoice Lang.langs
     in
-    Ui.popup 1 (Strings.configLang lang) <|
+    Ui.popup (Strings.configLang lang) <|
         Element.column [ Ui.wf, Ui.hf, Ui.s 10 ]
             [ langChoices
             , confirmButton
@@ -259,6 +364,48 @@ webSocketInfo lang =
                 , label = Element.text <| Strings.uiConfirm lang
                 }
     in
-    Ui.popup 1 (Strings.uiInfo lang) <|
+    Ui.popup (Strings.uiInfo lang) <|
+        Element.column [ Ui.wf, Ui.hf, Ui.s 10 ]
+            [ info, confirmButton ]
+
+
+{-| A popup that shows up the first time a user arrives on the new client.
+-}
+newClientInfo : Lang -> Maybe String -> Element App.MaybeMsg
+newClientInfo lang home =
+    let
+        info =
+            Element.column [ Font.center, Ui.cx, Ui.cy, Ui.s 30 ]
+                [ Ui.paragraph [] <| Lang.hurray Strings.newClientWelcome lang
+                , Ui.paragraph [] <| Lang.exclamation Strings.newClientUpdates lang
+                , case home of
+                    Just h ->
+                        Element.paragraph [] <|
+                            [ Ui.link [ Font.bold ]
+                                { action = Ui.Route <| Route.Custom <| h ++ "/notes-de-versions/2-0-0/"
+                                , label = Strings.newClientCheckReleaseNote lang ++ "."
+                                }
+                            ]
+
+                    _ ->
+                        Ui.paragraph [] <| Strings.newClientCheckReleaseNote lang ++ "."
+                , Ui.paragraph [ Font.italic ] <| Strings.newClientYouCanGoBack lang ++ "."
+                , Element.paragraph [] <|
+                    [ Element.text <| Strings.newClientPleaseSendFeedback lang ++ " "
+                    , Ui.link [ Font.bold ]
+                        { action = Ui.Route <| Route.Custom <| "mailto:contacter@polymny.studio"
+                        , label = "contacter@polymny.studio"
+                        }
+                    , Element.text <| Lang.exclamation (\_ -> "") lang
+                    ]
+                ]
+
+        confirmButton =
+            Ui.primary [ Ui.ab, Ui.ar ]
+                { action = Ui.Msg <| App.LoggedMsg <| App.ConfigMsg <| Config.CloseNewClientInfo
+                , label = Element.text <| Strings.uiConfirm lang
+                }
+    in
+    Ui.popup (Lang.hurray Strings.newClientWelcome lang) <|
         Element.column [ Ui.wf, Ui.hf, Ui.s 10 ]
             [ info, confirmButton ]

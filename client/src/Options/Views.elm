@@ -3,7 +3,8 @@ module Options.Views exposing (..)
 import App.Types as App
 import Config exposing (Config)
 import Data.Capsule as Data
-import Data.User exposing (User)
+import Data.Types as Data
+import Data.User as Data exposing (User)
 import Element exposing (Element)
 import Element.Background as Background
 import Element.Font as Font
@@ -11,8 +12,9 @@ import Element.Input as Input
 import Html.Attributes
 import Lang exposing (Lang)
 import Material.Icons as Icons
-import Material.Icons.Types exposing (Icon)
+import Material.Icons.Types
 import Options.Types as Options
+import Production.Types as Production
 import RemoteData
 import Route exposing (Route(..))
 import Strings
@@ -23,7 +25,7 @@ import Utils
 
 
 view : Config -> User -> Options.Model Data.Capsule -> ( Element App.Msg, Element App.Msg )
-view config _ model =
+view config user model =
     let
         -- Helper to get client lang
         lang =
@@ -44,15 +46,15 @@ view config _ model =
                 _ ->
                     Element.none
     in
-    ( Element.row []
-        [ Element.column [ Ui.s 10, Ui.p 100 ]
+    ( Element.row [ Ui.wf, Ui.p 10, Ui.s 10 ]
+        [ Element.column [ Ui.s 10, Ui.wf, Ui.at ]
             [ Strings.stepsOptionsOptionsExplanation config.clientState.lang
                 |> title
             , Element.column [ Ui.s 10, Ui.pt 20, Ui.wf ]
-                [ defaultProd config model
+                [ defaultProd config user model
                 ]
             ]
-        , Element.column [ Ui.s 10, Ui.p 100 ]
+        , Element.column [ Ui.s 10, Ui.wf, Ui.at ]
             [ Strings.stepsOptionsGeneralOptions config.clientState.lang
                 |> title
             , Element.column [ Ui.s 10, Ui.pt 20, Ui.wf ]
@@ -64,8 +66,8 @@ view config _ model =
     )
 
 
-defaultProd : Config -> Options.Model Data.Capsule -> Element App.Msg
-defaultProd config model =
+defaultProd : Config -> User -> Options.Model Data.Capsule -> Element App.Msg
+defaultProd config user model =
     let
         --- HELPERS ---
         -- Shortcut for lang
@@ -83,7 +85,7 @@ defaultProd config model =
         width =
             case model.capsule.defaultWebcamSettings of
                 Data.Pip { size } ->
-                    Just (Tuple.first size)
+                    Just size
 
                 _ ->
                     Nothing
@@ -147,7 +149,7 @@ defaultProd config model =
                 { checked = model.capsule.defaultWebcamSettings /= Data.Disabled
                 , icon = Input.defaultCheckbox
                 , label = Input.labelRight [] <| Element.text <| Strings.stepsProductionUseVideo lang
-                , onChange = \_ -> App.OptionsMsg Options.ToggleVideo
+                , onChange = \_ -> App.OptionsMsg <| Options.WebcamSettingsMsg <| Production.ToggleVideo
                 }
 
         -- Whether the webcam size is disabled
@@ -159,25 +161,55 @@ defaultProd config model =
             Strings.stepsProductionWebcamSize lang
                 |> title webcamSizeDisabled
 
+        mkSetWidth disabled x =
+            if disabled then
+                Ui.None
+
+            else
+                Ui.Msg <| App.OptionsMsg <| Options.WebcamSettingsMsg <| Production.SetWidth x
+
+        -- Helper to increment the width of the webcam.
+        incrementWidth : Int -> Int
+        incrementWidth step =
+            case width of
+                Just x ->
+                    x + step
+
+                Nothing ->
+                    400 + step
+
         -- Element to control the webcam size
         webcamSizeText =
-            disableIf webcamSizeDisabled
-                Input.text
-                [ Element.htmlAttribute <| Html.Attributes.type_ "number"
-                , Element.htmlAttribute <| Html.Attributes.min "10"
-                ]
-                { label = Input.labelHidden <| Strings.stepsProductionCustom lang
-                , onChange =
-                    \x ->
-                        case String.toInt x of
-                            Just y ->
-                                App.OptionsMsg <| Options.SetWidth <| Just y
+            Element.row []
+                [ disableIf webcamSizeDisabled
+                    Input.text
+                    []
+                    { label = Input.labelHidden <| Strings.stepsProductionCustom lang
+                    , onChange =
+                        \x ->
+                            case ( x, String.toInt x ) of
+                                ( _, Just y ) ->
+                                    App.OptionsMsg <| Options.WebcamSettingsMsg <| Production.SetWidth <| Just y
 
-                            _ ->
-                                App.Noop
-                , placeholder = Nothing
-                , text = Maybe.map String.fromInt width |> Maybe.withDefault ""
-                }
+                                ( "", _ ) ->
+                                    App.OptionsMsg <| Options.WebcamSettingsMsg <| Production.SetWidth <| Nothing
+
+                                _ ->
+                                    App.Noop
+                    , placeholder = Nothing
+                    , text = Maybe.map String.fromInt model.webcamSize |> Maybe.withDefault ""
+                    }
+                , Element.column []
+                    [ Ui.navigationElement
+                        (mkSetWidth webcamSizeDisabled <| Just <| incrementWidth 1)
+                        []
+                        (Ui.icon 25 Icons.expand_less)
+                    , Ui.navigationElement
+                        (mkSetWidth webcamSizeDisabled <| Just <| incrementWidth -1)
+                        []
+                        (Ui.icon 25 Icons.expand_more)
+                    ]
+                ]
 
         -- Element to choose the webcam size among small, medium, large, fullscreen
         webcamSizeRadio =
@@ -185,7 +217,13 @@ defaultProd config model =
                 Input.radio
                 [ Ui.s 10 ]
                 { label = Input.labelHidden <| Strings.stepsProductionWebcamSize lang
-                , onChange = \x -> App.OptionsMsg <| Options.SetWidth x
+                , onChange =
+                    \x ->
+                        if x == Nothing then
+                            App.OptionsMsg <| Options.WebcamSettingsMsg <| Production.SetFullscreen
+
+                        else
+                            App.OptionsMsg <| Options.WebcamSettingsMsg <| Production.SetWidth x
                 , options =
                     [ Input.option (Just 200) <| Element.text <| Strings.stepsProductionSmall lang
                     , Input.option (Just 400) <| Element.text <| Strings.stepsProductionMedium lang
@@ -196,8 +234,8 @@ defaultProd config model =
                 , selected =
                     case model.capsule.defaultWebcamSettings of
                         Data.Pip { size } ->
-                            if List.member (Tuple.first size) [ 200, 400, 800 ] then
-                                Just <| Just <| Tuple.first size
+                            if List.member size [ 200, 400, 800 ] then
+                                Just <| Just <| size
 
                             else
                                 Just <| Just 533
@@ -224,7 +262,7 @@ defaultProd config model =
                 Input.radio
                 [ Ui.s 10 ]
                 { label = Input.labelHidden <| Strings.stepsProductionWebcamPosition lang
-                , onChange = \x -> App.OptionsMsg <| Options.SetAnchor x
+                , onChange = \x -> App.OptionsMsg <| Options.WebcamSettingsMsg <| Production.SetAnchor x
                 , options =
                     [ Input.option Data.TopLeft <| Element.text <| Strings.stepsProductionTopLeft lang
                     , Input.option Data.TopRight <| Element.text <| Strings.stepsProductionTopRight lang
@@ -251,7 +289,7 @@ defaultProd config model =
                     Input.slider
                     [ Element.behindContent <| Element.el [ Ui.wf, Ui.hpx 2, Ui.cy, Background.color Colors.greyBorder ] Element.none
                     ]
-                    { onChange = \x -> App.OptionsMsg <| Options.SetOpacity x
+                    { onChange = \x -> App.OptionsMsg <| Options.WebcamSettingsMsg <| Production.SetOpacity x
                     , label = Input.labelHidden <| Strings.stepsProductionOpacity lang
                     , max = 1
                     , min = 0
@@ -435,7 +473,7 @@ generalOptions config model =
                         Options.DeleteTrack Utils.Request model.capsule.soundTrack
                             |> App.OptionsMsg
                             |> Ui.Msg
-                
+
                 icon : Material.Icons.Types.Icon msg
                 icon =
                     if uploading then
@@ -443,7 +481,7 @@ generalOptions config model =
 
                     else
                         Icons.delete
-                
+
                 tooltip : String
                 tooltip =
                     if uploading then
@@ -568,7 +606,7 @@ deleteTrackConfirmPopup lang _ s =
                 }
             ]
         ]
-        |> Ui.popup 1 (Strings.actionsDeleteTrack lang)
+        |> Ui.popup (Strings.actionsDeleteTrack lang)
 
 
 {-| Easily creates the Ui.Msg for options msg.

@@ -9,21 +9,27 @@ import Data.Types as Data
 
 type alias Model a =
     { capsule : a
-    , showPrivacyPopup : Bool
+    , popupType : PopupType
     }
+
+
+type PopupType
+    = NoPopup
+    | PrivacyPopup
+    | IntegrationPopup
 
 
 withCapsule : Capsule -> Model String -> Model Capsule
 withCapsule capsule model =
     { capsule = capsule
-    , showPrivacyPopup = model.showPrivacyPopup
+    , popupType = model.popupType
     }
 
 
 init : Capsule -> Model String
 init capsule =
     { capsule = capsule.id
-    , showPrivacyPopup = False
+    , popupType = NoPopup
     }
 
 
@@ -33,3 +39,4 @@ type Msg
     | SetPromptSubtitles Bool
     | PublishVideo
     | UnpublishVideo
+    | ToggleIntegrationPopup

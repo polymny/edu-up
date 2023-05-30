@@ -13,7 +13,7 @@ import Element.Background as Background
 import Element.Border as Border
 import Element.Font as Font
 import Element.Input as Input
-import Html exposing (canvas)
+import Html
 import Html.Attributes
 import Material.Icons as Icons
 import Publication.Types as Publication
@@ -48,6 +48,20 @@ view config _ model =
                     )
                 )
 
+        -- Title for additionnal information of published capsule
+        publicationInformationTitle =
+            title <| Strings.stepsPublicationIntegrationHtmlCode lang
+
+        -- Text area showing the iframe code for the capsule
+        iframeCode =
+            Input.multiline []
+                { label = Input.labelHidden "HTML"
+                , onChange = \_ -> App.Noop
+                , placeholder = Nothing
+                , spellcheck = False
+                , text = Data.iframeHtml config model.capsule
+                }
+
         -- View of the video
         video =
             Element.column [ Ui.wf, Ui.hf, Element.spacing 10 ] <|
@@ -55,6 +69,14 @@ view config _ model =
                     Just p ->
                         [ title <| Strings.stepsProductionCurrentProducedVideo lang
                         , Element.el [ Ui.wf ] <| videoElement p
+                        , if model.capsule.published == Data.Done then
+                            Ui.secondary []
+                                { action = Ui.Msg <| App.PublicationMsg <| Publication.ToggleIntegrationPopup
+                                , label = Element.text <| Strings.stepsPublicationIntegrationHtmlCode lang
+                                }
+
+                          else
+                            Element.none
                         ]
 
                     Nothing ->
@@ -122,7 +144,7 @@ view config _ model =
 
         -- The privacy selection popup
         privacyPopup =
-            Ui.popup 1
+            Ui.popup
                 (Strings.stepsPublicationPrivacyPrivacySettings lang)
                 (Element.column [ Ui.hf, Ui.wf, Ui.s 50, Ui.p 10 ]
                     [ Element.column
@@ -142,6 +164,22 @@ view config _ model =
                     , Ui.primary [ Ui.ab, Ui.ar ]
                         { label = Element.text <| Strings.uiConfirm lang
                         , action = Ui.Msg <| App.PublicationMsg <| Publication.TogglePrivacyPopup
+                        }
+                    ]
+                )
+
+        -- The integration popup
+        integrationPopup =
+            Ui.popup
+                (Strings.stepsPublicationIntegrationHtmlCode lang)
+                (Element.column [ Ui.wf, Ui.hf, Ui.s 50, Ui.p 10 ]
+                    [ Element.column [ Ui.s 10 ]
+                        [ publicationInformationTitle
+                        , iframeCode
+                        ]
+                    , Ui.primary [ Ui.ab, Ui.ar ]
+                        { label = Element.text <| Strings.uiConfirm lang
+                        , action = Ui.Msg <| App.PublicationMsg <| Publication.ToggleIntegrationPopup
                         }
                     ]
                 )
@@ -230,20 +268,6 @@ view config _ model =
                 Element.el [ Background.color Colors.redLight, Border.color Colors.red, Ui.b 1, Ui.r 10, Ui.p 10 ]
                     (Element.paragraph [] [ Element.text (Strings.stepsPublicationNotProducedYet lang) ])
 
-        -- Title for additionnal information of published capsule
-        publicationInformationTitle =
-            title "Code d'intégration HTML"
-
-        -- Text area showing the iframe code for the capsule
-        iframeCode =
-            Input.multiline []
-                { label = Input.labelHidden "HTML"
-                , onChange = \_ -> App.Noop
-                , placeholder = Nothing
-                , spellcheck = False
-                , text = Data.iframeHtml config model.capsule
-                }
-
         -- Menu for publication
         menu =
             Element.column [ Ui.wf, Ui.hf, Ui.s 30 ]
@@ -270,17 +294,17 @@ view config _ model =
                         , cantPublish
                         ]
                     ]
-                , Element.column [ Ui.s 10 ]
-                    [ publicationInformationTitle
-                    , iframeCode
-                    ]
                 ]
     in
     ( Element.row [ Ui.wf, Ui.hf, Ui.p 10, Ui.s 10 ]
-        [ menu, video ]
-    , if model.showPrivacyPopup then
-        privacyPopup
+        [ video, menu ]
+    , case model.popupType of
+        Publication.PrivacyPopup ->
+            privacyPopup
 
-      else
-        Element.none
+        Publication.IntegrationPopup ->
+            integrationPopup
+
+        Publication.NoPopup ->
+            Element.none
     )
