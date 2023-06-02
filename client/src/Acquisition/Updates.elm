@@ -535,6 +535,18 @@ update msg model =
                     , Cmd.map App.ConfigMsg cmd
                     )
 
+                Acquisition.PlayExtra ->
+                    ( model, playExtraPort () )
+
+                Acquisition.StopExtra ->
+                    ( model, stopExtraPort () )
+
+                Acquisition.ExtraPlayed ->
+                    ( { model | page = App.Acquisition { m | isExtraPlaying = True } }, Cmd.none )
+
+                Acquisition.ExtraPaused ->
+                    ( { model | page = App.Acquisition { m | isExtraPlaying = False } }, Cmd.none )
+
         _ ->
             ( model, Cmd.none )
 
@@ -712,3 +724,13 @@ port nextSentenceReceived : (() -> msg) -> Sub msg
 {-| Sub for when there is an error while binding the device.
 -}
 port bindingDeviceFailed : (() -> msg) -> Sub msg
+
+
+{-| Triggers the play or pause of the extra.
+-}
+port playExtraPort : () -> Cmd msg
+
+
+{-| Triggers the stop or pause of the extra.
+-}
+port stopExtraPort : () -> Cmd msg

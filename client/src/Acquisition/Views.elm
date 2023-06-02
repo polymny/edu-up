@@ -21,6 +21,7 @@ import Element.Input as Input
 import Html
 import Html.Attributes
 import Html.Events
+import Json.Decode as Decode
 import Lang exposing (Lang)
 import Material.Icons
 import Material.Icons.Outlined
@@ -330,7 +331,14 @@ view config user model =
         videoElement =
             case currentSlide |> Maybe.andThen .extra of
                 Just video ->
-                    Html.video []
+                    Html.video
+                        [ Html.Attributes.id "extra"
+                        , Html.Events.on "playing" (Decode.succeed <| App.AcquisitionMsg <| Acquisition.ExtraPlayed)
+                        , Html.Events.on "pause" (Decode.succeed <| App.AcquisitionMsg <| Acquisition.ExtraPaused)
+
+                        -- , Html.Events.on "durationchange" decodeDurationChanged
+                        -- , Html.Events.on "progress" decodeProgress
+                        ]
                         [ Html.source
                             [ Html.Attributes.src <| Data.assetPath model.capsule video ++ ".mp4"
                             , Html.Attributes.controls False
@@ -348,15 +356,20 @@ view config user model =
             case currentSlide |> Maybe.andThen .extra of
                 Just video ->
                     Element.row [ Ui.wf, Ui.s 10, Ui.p 10 ]
-                        [ Ui.primaryIcon []
-                            { action = Ui.None
-                            , icon = Material.Icons.play_arrow
+                        [ Ui.secondaryIcon []
+                            { action = Ui.Msg <| App.AcquisitionMsg <| Acquisition.PlayExtra
+                            , icon = Utils.tern model.isExtraPlaying Material.Icons.pause Material.Icons.play_arrow
                             , tooltip = Strings.stepsAcquisitionPlayRecord lang
                             }
-                        , Ui.navigationElement Ui.None [ Ui.wf, Ui.hf ] <|
-                            Element.el [ Ui.hf, Ui.wf ] <|
-                                Element.el [ Ui.wf, Ui.cy, Border.width 1, Border.color Colors.red ] <|
-                                    Element.none
+                        , Ui.secondaryIcon []
+                            { action = Ui.Msg <| App.AcquisitionMsg <| Acquisition.StopExtra
+                            , icon = Material.Icons.stop
+                            , tooltip = Strings.stepsAcquisitionStopRecording lang
+                            }
+                        , Element.none
+                            |> Element.el [ Ui.wf, Ui.cy, Border.width 1, Border.color Colors.red ]
+                            |> Element.el [ Ui.hf, Ui.wf ]
+                            |> Ui.navigationElement Ui.None [ Ui.wf, Ui.hf ]
                         ]
 
                 _ ->

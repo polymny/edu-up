@@ -1666,6 +1666,34 @@ function init(node, flags) {
         beforeUnloadValue = arg;
     });
 
+    // Plays or pauses the extra resource in acquisition phase.
+    makePort("playExtra", function() {
+        let extra = document.getElementById('extra');
+        if (extra === null) {
+            return;
+        }
+
+        if (extra.paused) {
+            extra.play();
+        } else if (extra.ended) {
+            extra.currentTime = 0;
+            extra.play();
+        } else {
+            extra.pause();
+        }
+    });
+
+    // Stops the extra resource in acquisition phase.
+    makePort("stopExtra", function() {
+        let extra = document.getElementById('extra');
+        if (extra === null) {
+            return;
+        }
+
+        extra.pause();
+        extra.currentTime = 0;
+    });
+
     makePort("detectDevices", (args) => detectDevices(true, args[0], args[1]));
     makePort("bindDevice", bindDevice);
     makePort("unbindDevice", unbindDevice);

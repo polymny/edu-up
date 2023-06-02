@@ -47,6 +47,7 @@ type alias Model a b =
     , pointerStyle : PointerStyle
     , warnLeaving : Maybe Route
     , showHelp : Bool
+    , isExtraPlaying : Bool
     }
 
 
@@ -71,6 +72,7 @@ withCapsuleAndGos capsule gos model =
     , pointerStyle = model.pointerStyle
     , warnLeaving = model.warnLeaving
     , showHelp = model.showHelp
+    , isExtraPlaying = model.isExtraPlaying
     }
 
 
@@ -205,6 +207,7 @@ init gos capsule =
                   , pointerStyle = defaultPointerStyle
                   , warnLeaving = Nothing
                   , showHelp = False
+                  , isExtraPlaying = False
                   }
                 , Cmd.batch [ Device.detectDevices Nothing False, setupCanvas, setPointerStyle defaultPointerStyle ]
                 )
@@ -249,6 +252,10 @@ type Msg
     | Leave Utils.Confirmation
     | ToggleHelp
     | ReinitializeDevices
+    | PlayExtra
+    | StopExtra
+    | ExtraPlayed
+    | ExtraPaused
 
 
 {-| Alias for the setup canvas port.
