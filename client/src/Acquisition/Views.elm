@@ -325,6 +325,43 @@ view config user model =
                                 ]
                 ]
 
+        -- Displays the video element in case the slide has an extra resource
+        videoElement : Element App.Msg
+        videoElement =
+            case currentSlide |> Maybe.andThen .extra of
+                Just video ->
+                    Html.video []
+                        [ Html.source
+                            [ Html.Attributes.src <| Data.assetPath model.capsule video ++ ".mp4"
+                            , Html.Attributes.controls False
+                            ]
+                            []
+                        ]
+                        |> Element.html
+
+                _ ->
+                    Element.none
+
+        -- Displays the video control bar if the slide has an extra resource
+        videoControls : Element App.Msg
+        videoControls =
+            case currentSlide |> Maybe.andThen .extra of
+                Just video ->
+                    Element.row [ Ui.wf, Ui.s 10, Ui.p 10 ]
+                        [ Ui.primaryIcon []
+                            { action = Ui.None
+                            , icon = Material.Icons.play_arrow
+                            , tooltip = Strings.stepsAcquisitionPlayRecord lang
+                            }
+                        , Ui.navigationElement Ui.None [ Ui.wf, Ui.hf ] <|
+                            Element.el [ Ui.hf, Ui.wf ] <|
+                                Element.el [ Ui.wf, Ui.cy, Border.width 1, Border.color Colors.red ] <|
+                                    Element.none
+                        ]
+
+                _ ->
+                    Element.none
+
         -- Displays the current slide
         slideElement : Element App.Msg
         slideElement =
@@ -337,6 +374,7 @@ view config user model =
                             , Element.htmlAttribute <| Html.Attributes.style "max-height" "100%"
                             , Ui.cx
                             , Ui.cy
+                            , Element.inFront videoElement
                             , Html.canvas
                                 [ Html.Attributes.id Acquisition.pointerCanvasId
                                 , Html.Attributes.width 1920
@@ -368,6 +406,7 @@ view config user model =
                         Element.none
                     , slideElement
                     ]
+                , videoControls
                 ]
 
         -- Settings popup or popup to confirm the deletion of a record
