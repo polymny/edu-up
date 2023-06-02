@@ -376,7 +376,18 @@ view config user model =
                           , Element.el [ Ui.wfp (precision - progress), Border.width 2, Border.color Colors.greyBorder ] <| Element.none
                           ]
                             |> Element.row [ Ui.wf, Ui.cy ]
-                            |> Element.el [ Ui.hf, Ui.wf ]
+                            |> Element.el
+                                [ Ui.hf
+                                , Ui.wf
+                                , Element.inFront <|
+                                    Element.el
+                                        [ Ui.wf
+                                        , Ui.hf
+                                        , Element.pointer
+                                        , Element.htmlAttribute (Html.Events.on "pointerdown" (decodeSeek model.extraDuration))
+                                        ]
+                                        Element.none
+                                ]
                         ]
 
                 _ ->
@@ -1191,6 +1202,15 @@ mkUiMsg msg =
 mkMsg : Acquisition.Msg -> App.Msg
 mkMsg msg =
     App.AcquisitionMsg msg
+
+
+{-| Decodes a seek event.
+-}
+decodeSeek : Float -> Decode.Decoder App.Msg
+decodeSeek duration =
+    Decode.map2 (\x y -> App.AcquisitionMsg <| Acquisition.SeekExtra <| toFloat x / toFloat y * duration)
+        (Decode.field "layerX" Decode.int)
+        (Decode.field "target" <| Decode.field "offsetWidth" Decode.int)
 
 
 {-| Decode a change in the duration of a video.

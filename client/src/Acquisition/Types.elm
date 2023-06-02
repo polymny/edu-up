@@ -262,6 +262,7 @@ type Msg
     | StopExtra
     | ExtraPlayed
     | ExtraPaused
+    | SeekExtra Float
     | ExtraDurationChanged Float
     | ExtraPositionChanged Float
 

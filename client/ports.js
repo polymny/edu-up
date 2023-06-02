@@ -1694,6 +1694,15 @@ function init(node, flags) {
         extra.currentTime = 0;
     });
 
+    makePort("seekExtra", function(x) {
+        let extra = document.getElementById('extra');
+        if (extra === null) {
+            return;
+        }
+
+        extra.currentTime = x;
+    });
+
     makePort("detectDevices", (args) => detectDevices(true, args[0], args[1]));
     makePort("bindDevice", bindDevice);
     makePort("unbindDevice", unbindDevice);

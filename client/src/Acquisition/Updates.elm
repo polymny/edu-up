@@ -541,6 +541,9 @@ update msg model =
                 Acquisition.StopExtra ->
                     ( model, stopExtraPort () )
 
+                Acquisition.SeekExtra x ->
+                    ( model, seekExtraPort x )
+
                 Acquisition.ExtraPlayed ->
                     ( { model | page = App.Acquisition { m | isExtraPlaying = True } }, Cmd.none )
 
@@ -740,3 +743,8 @@ port playExtraPort : () -> Cmd msg
 {-| Triggers the stop or pause of the extra.
 -}
 port stopExtraPort : () -> Cmd msg
+
+
+{-| Seeks the extra resource.
+-}
+port seekExtraPort : Float -> Cmd msg
