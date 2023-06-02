@@ -335,9 +335,8 @@ view config user model =
                         [ Html.Attributes.id "extra"
                         , Html.Events.on "playing" (Decode.succeed <| App.AcquisitionMsg <| Acquisition.ExtraPlayed)
                         , Html.Events.on "pause" (Decode.succeed <| App.AcquisitionMsg <| Acquisition.ExtraPaused)
-
-                        -- , Html.Events.on "durationchange" decodeDurationChanged
-                        -- , Html.Events.on "progress" decodeProgress
+                        , Html.Events.on "durationchange" decodeDurationChanged
+                        , Html.Events.on "timeupdate" decodePosition
                         ]
                         [ Html.source
                             [ Html.Attributes.src <| Data.assetPath model.capsule video ++ ".mp4"
@@ -355,6 +354,13 @@ view config user model =
         videoControls =
             case currentSlide |> Maybe.andThen .extra of
                 Just video ->
+                    let
+                        precision =
+                            1000
+
+                        progress =
+                            precision * (model.extraPosition / model.extraDuration) |> floor
+                    in
                     Element.row [ Ui.wf, Ui.s 10, Ui.p 10 ]
                         [ Ui.secondaryIcon []
                             { action = Ui.Msg <| App.AcquisitionMsg <| Acquisition.PlayExtra
@@ -366,10 +372,11 @@ view config user model =
                             , icon = Material.Icons.stop
                             , tooltip = Strings.stepsAcquisitionStopRecording lang
                             }
-                        , Element.none
-                            |> Element.el [ Ui.wf, Ui.cy, Border.width 1, Border.color Colors.red ]
+                        , [ Element.el [ Ui.wfp progress, Border.width 2, Border.color Colors.red ] <| Element.none
+                          , Element.el [ Ui.wfp (precision - progress), Border.width 2, Border.color Colors.greyBorder ] <| Element.none
+                          ]
+                            |> Element.row [ Ui.wf, Ui.cy ]
                             |> Element.el [ Ui.hf, Ui.wf ]
-                            |> Ui.navigationElement Ui.None [ Ui.wf, Ui.hf ]
                         ]
 
                 _ ->
@@ -1184,3 +1191,21 @@ mkUiMsg msg =
 mkMsg : Acquisition.Msg -> App.Msg
 mkMsg msg =
     App.AcquisitionMsg msg
+
+
+{-| Decode a change in the duration of a video.
+-}
+decodeDurationChanged : Decode.Decoder App.Msg
+decodeDurationChanged =
+    Decode.field "target" <|
+        Decode.map (\x -> App.AcquisitionMsg <| Acquisition.ExtraDurationChanged x)
+            (Decode.field "duration" Decode.float)
+
+
+{-| Decode a change in the position of a video.
+-}
+decodePosition : Decode.Decoder App.Msg
+decodePosition =
+    Decode.field "target" <|
+        Decode.map (\x -> App.AcquisitionMsg <| Acquisition.ExtraPositionChanged x)
+            (Decode.field "currentTime" Decode.float)

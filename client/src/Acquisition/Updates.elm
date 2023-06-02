@@ -547,6 +547,12 @@ update msg model =
                 Acquisition.ExtraPaused ->
                     ( { model | page = App.Acquisition { m | isExtraPlaying = False } }, Cmd.none )
 
+                Acquisition.ExtraDurationChanged x ->
+                    ( { model | page = App.Acquisition { m | extraDuration = x } }, Cmd.none )
+
+                Acquisition.ExtraPositionChanged x ->
+                    ( { model | page = App.Acquisition { m | extraPosition = x } }, Cmd.none )
+
         _ ->
             ( model, Cmd.none )
 

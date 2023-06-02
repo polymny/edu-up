@@ -48,6 +48,8 @@ type alias Model a b =
     , warnLeaving : Maybe Route
     , showHelp : Bool
     , isExtraPlaying : Bool
+    , extraPosition : Float
+    , extraDuration : Float
     }
 
 
@@ -73,6 +75,8 @@ withCapsuleAndGos capsule gos model =
     , warnLeaving = model.warnLeaving
     , showHelp = model.showHelp
     , isExtraPlaying = model.isExtraPlaying
+    , extraPosition = model.extraPosition
+    , extraDuration = model.extraDuration
     }
 
 
@@ -208,6 +212,8 @@ init gos capsule =
                   , warnLeaving = Nothing
                   , showHelp = False
                   , isExtraPlaying = False
+                  , extraPosition = 0.0
+                  , extraDuration = 0.0
                   }
                 , Cmd.batch [ Device.detectDevices Nothing False, setupCanvas, setPointerStyle defaultPointerStyle ]
                 )
@@ -256,6 +262,8 @@ type Msg
     | StopExtra
     | ExtraPlayed
     | ExtraPaused
+    | ExtraDurationChanged Float
+    | ExtraPositionChanged Float
 
 
 {-| Alias for the setup canvas port.
