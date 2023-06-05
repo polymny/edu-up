@@ -714,11 +714,19 @@ function init(node, flags) {
     }
 
     // Registers an event in the currentEvents array.
-    function registerEvent(eventType) {
-        currentEvents.push({
-            ty: eventType,
-            time: Math.round(window.performance.now() - currentEvents[0].time),
-        });
+    function registerEvent(event) {
+        let jsonEvent = {
+            ty: event.ty,
+            time: Math.round(window.performance.now() - (currentEvents.length === 0 ? 0 : currentEvents[0].time)),
+        };
+
+        if (event.ty === "seek") {
+            jsonEvent.extra_time = event.extra_time;
+        }
+
+        console.log(jsonEvent);
+
+        currentEvents.push(jsonEvent);
     }
 
     function clearPointerAndCallbacks(pointerCanvas, pointerCtx) {

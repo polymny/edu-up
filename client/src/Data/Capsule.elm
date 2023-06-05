@@ -456,6 +456,8 @@ type EventType
     | PreviousSlide
     | NextSentence
     | Play
+    | Pause
+    | Seek Int
     | Stop
     | End
 
@@ -480,6 +482,12 @@ eventTypeToString e =
         Play ->
             "play"
 
+        Pause ->
+            "pause"
+
+        Seek _ ->
+            "seek"
+
         Stop ->
             "stop"
 
@@ -496,34 +504,43 @@ encodeEventType e =
 
 {-| JSON decoder for event types.
 -}
-decodeEventType : Decoder EventType
-decodeEventType =
+decodeEventType : Maybe Int -> Decoder EventType
+decodeEventType extraTime =
     Decode.string
         |> Decode.andThen
             (\str ->
-                case str of
-                    "start" ->
+                case ( str, extraTime ) of
+                    ( "start", _ ) ->
                         Decode.succeed Start
 
-                    "next_slide" ->
+                    ( "next_slide", _ ) ->
                         Decode.succeed NextSlide
 
-                    "previous_slide" ->
+                    ( "previous_slide", _ ) ->
                         Decode.succeed PreviousSlide
 
-                    "next_sentence" ->
+                    ( "next_sentence", _ ) ->
                         Decode.succeed NextSentence
 
-                    "play" ->
+                    ( "play", _ ) ->
                         Decode.succeed Play
 
-                    "stop" ->
+                    ( "pause", _ ) ->
+                        Decode.succeed Pause
+
+                    ( "seek", Just e ) ->
+                        Decode.succeed (Seek e)
+
+                    ( "seek", _ ) ->
+                        Decode.fail <| "Can't decode Seek event without extra time"
+
+                    ( "stop", _ ) ->
                         Decode.succeed Stop
 
-                    "end" ->
+                    ( "end", _ ) ->
                         Decode.succeed End
 
-                    x ->
+                    ( x, _ ) ->
                         Decode.fail <| "Unknown event type: " ++ x
             )
 
@@ -540,19 +557,32 @@ type alias Event =
 -}
 encodeEvent : Event -> Encode.Value
 encodeEvent e =
-    Encode.object
-        [ ( "ty", encodeEventType e.ty )
-        , ( "time", Encode.int e.time )
-        ]
+    case e.ty of
+        Seek time ->
+            Encode.object
+                [ ( "ty", encodeEventType e.ty )
+                , ( "time", Encode.int e.time )
+                , ( "extra_time", Encode.int time )
+                ]
+
+        _ ->
+            Encode.object
+                [ ( "ty", encodeEventType e.ty )
+                , ( "time", Encode.int e.time )
+                ]
 
 
 {-| JSON decoder for events.
 -}
 decodeEvent : Decoder Event
 decodeEvent =
-    Decode.map2 Event
-        (Decode.field "ty" decodeEventType)
-        (Decode.field "time" Decode.int)
+    Decode.maybe (Decode.field "extra_time" Decode.int)
+        |> Decode.andThen
+            (\e ->
+                Decode.map2 Event
+                    (Decode.field "ty" (decodeEventType e))
+                    (Decode.field "time" Decode.int)
+            )
 
 
 {-| Anchor to which a record is attached in production.

@@ -545,16 +545,24 @@ update msg model =
                     ( model, seekExtraPort x )
 
                 Acquisition.ExtraPlayed ->
-                    ( { model | page = App.Acquisition { m | isExtraPlaying = True } }, Cmd.none )
+                    ( { model | page = App.Acquisition { m | isExtraPlaying = True, isExtraSeeking = False } }
+                    , if m.isExtraSeeking then
+                        registerEvent <| Data.Seek <| round (1000 * m.extraPosition)
+
+                      else
+                        registerEvent Data.Play
+                    )
 
                 Acquisition.ExtraPaused ->
-                    ( { model | page = App.Acquisition { m | isExtraPlaying = False } }, Cmd.none )
+                    ( { model | page = App.Acquisition { m | isExtraPlaying = False } }
+                    , registerEvent Data.Pause
+                    )
 
                 Acquisition.ExtraDurationChanged x ->
                     ( { model | page = App.Acquisition { m | extraDuration = x } }, Cmd.none )
 
                 Acquisition.ExtraPositionChanged x ->
-                    ( { model | page = App.Acquisition { m | extraPosition = x } }, Cmd.none )
+                    ( { model | page = App.Acquisition { m | extraPosition = x, isExtraSeeking = True } }, Cmd.none )
 
         _ ->
             ( model, Cmd.none )
@@ -630,12 +638,12 @@ This should only be used for NextSlide and NextSentence because the other case a
 -}
 registerEvent : Data.EventType -> Cmd msg
 registerEvent event =
-    registerEventPort (Data.eventTypeToString event)
+    registerEventPort (Data.encodeEvent { ty = event, time = 0 })
 
 
 {-| Port that registers a specific event that occured during the record.
 -}
-port registerEventPort : String -> Cmd msg
+port registerEventPort : Encode.Value -> Cmd msg
 
 
 {-| Starts the recording.

@@ -48,6 +48,7 @@ type alias Model a b =
     , warnLeaving : Maybe Route
     , showHelp : Bool
     , isExtraPlaying : Bool
+    , isExtraSeeking : Bool
     , extraPosition : Float
     , extraDuration : Float
     }
@@ -75,6 +76,7 @@ withCapsuleAndGos capsule gos model =
     , warnLeaving = model.warnLeaving
     , showHelp = model.showHelp
     , isExtraPlaying = model.isExtraPlaying
+    , isExtraSeeking = model.isExtraSeeking
     , extraPosition = model.extraPosition
     , extraDuration = model.extraDuration
     }
@@ -212,6 +214,7 @@ init gos capsule =
                   , warnLeaving = Nothing
                   , showHelp = False
                   , isExtraPlaying = False
+                  , isExtraSeeking = False
                   , extraPosition = 0.0
                   , extraDuration = 0.0
                   }

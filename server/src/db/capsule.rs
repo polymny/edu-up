@@ -182,6 +182,12 @@ pub enum EventType {
     /// Start to play extra media.
     Play,
 
+    /// Pauses the extra media.
+    Pause,
+
+    /// Seeks at a certain position in the extra media.
+    Seek,
+
     /// Stop the extra media.
     Stop,
 
@@ -198,6 +204,10 @@ pub struct Event {
 
     /// The time of the event in ms.
     pub time: i32,
+
+    /// The extra time of the event if there is such a time.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub extra_time: Option<i32>,
 }
 
 /// Options for audio/video fade in and fade out
