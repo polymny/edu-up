@@ -251,6 +251,10 @@ impl<'a> FromParam<'a> for HashId {
 
 /// Resets the database.
 pub async fn reset_db() {
+    use ergol::tokio_postgres::types::Json as EJson;
+
+    use crate::db::capsule::{Capsule, Event, EventType, Fade, Gos, Record, Slide};
+
     let config = Config::from_figment(&rocket::Config::figment());
     let pool = ergol::pool(&config.databases.database.url, 32).unwrap();
     let db = Db::from_pool(pool).await.unwrap();
@@ -287,6 +291,155 @@ pub async fn reset_db() {
     )
     .await
     .unwrap();
+
+    // Create the capsule of the assignment
+    let mut capsule = Capsule::new("Mario", "Une triste histoire", &user, &db)
+        .await
+        .unwrap();
+
+    let path = config
+        .data_path
+        .join(format!("{}", capsule.id))
+        .join("assets");
+
+    tokio::fs::create_dir_all(&path).await.unwrap();
+
+    let gos = command::export_slides(&config, "../slides.pdf", path, None)
+        .unwrap()
+        .into_iter()
+        .take(1)
+        .map(|x| Gos {
+            record: Some(Record {
+                uuid: uuid::uuid!("226b0d6b-46ec-40cf-a84c-413e30c628e9"),
+                pointer_uuid: Some(uuid::uuid!("44bc8f42-6ff5-4496-8ba1-96792a58c0f6")),
+                size: Some((1280, 720)),
+            }),
+            slides: vec![Slide {
+                uuid: x,
+                extra: Some(uuid::uuid!("4d033872-2988-4a2f-aef0-eda53d83cccf")),
+                prompt: String::new(),
+            }],
+            events: vec![
+                // User starts the recording
+                Event {
+                    ty: EventType::Start,
+                    time: 0,
+                    extra_time: None,
+                },
+                // User clicks the play button
+                Event {
+                    ty: EventType::Play,
+                    time: 20500,
+                    extra_time: None,
+                },
+                // Extra resource naturally reach its end
+                Event {
+                    ty: EventType::Pause,
+                    time: 33000,
+                    extra_time: None,
+                },
+                // User seeks to the begining of the extra resource
+                Event {
+                    ty: EventType::Seek,
+                    time: 44000,
+                    extra_time: Some(0),
+                },
+                // User clicks the play button
+                Event {
+                    ty: EventType::Play,
+                    time: 44000,
+                    extra_time: None,
+                },
+                // User clicks the pause button
+                Event {
+                    ty: EventType::Pause,
+                    time: 47500,
+                    extra_time: None,
+                },
+                // User clicks the play button
+                Event {
+                    ty: EventType::Play,
+                    time: 58000,
+                    extra_time: None,
+                },
+                // User clicks the pause button
+                Event {
+                    ty: EventType::Pause,
+                    time: 60500,
+                    extra_time: None,
+                },
+                // User clicks the play button
+                Event {
+                    ty: EventType::Play,
+                    time: 75000,
+                    extra_time: None,
+                },
+                // Extra resource naturally reach its end
+                Event {
+                    ty: EventType::Pause,
+                    time: 78000,
+                    extra_time: None,
+                },
+                // User ends its record
+                Event {
+                    ty: EventType::End,
+                    time: 83000,
+                    extra_time: None,
+                },
+            ],
+            webcam_settings: None,
+            fade: Fade::none(),
+        })
+        .collect::<Vec<_>>();
+
+    eprintln!(
+        "{}",
+        config
+            .data_path
+            .join("1/assets/226b0d6b-46ec-40cf-a84c-413e30c628e9.webm")
+            .display()
+    );
+    tokio::fs::copy(
+        "../record.webm",
+        config
+            .data_path
+            .join("1/assets/226b0d6b-46ec-40cf-a84c-413e30c628e9.webm"),
+    )
+    .await
+    .unwrap();
+
+    tokio::fs::copy(
+        "../pointer.webm",
+        config
+            .data_path
+            .join("1/assets/44bc8f42-6ff5-4496-8ba1-96792a58c0f6.webm"),
+    )
+    .await
+    .unwrap();
+
+    tokio::fs::copy(
+        "../extra.mp4",
+        config
+            .data_path
+            .join("1/assets/4d033872-2988-4a2f-aef0-eda53d83cccf.mp4"),
+    )
+    .await
+    .unwrap();
+
+    command::run_command(&vec![
+        "../scripts/psh",
+        "on-record",
+        &format!("{}", capsule.id),
+        &format!(
+            "{}",
+            gos.get(0).as_ref().unwrap().record.as_ref().unwrap().uuid
+        ),
+    ])
+    .unwrap();
+
+    capsule.structure = EJson(gos);
+    capsule.set_changed();
+    capsule.save(&db).await.unwrap();
 }
 
 /// Calculate disk usage for each user.
