@@ -538,9 +538,6 @@ update msg model =
                 Acquisition.PlayExtra ->
                     ( model, playExtraPort () )
 
-                Acquisition.StopExtra ->
-                    ( model, stopExtraPort () )
-
                 Acquisition.SeekExtra x ->
                     ( model, seekExtraPort x )
 
@@ -746,11 +743,6 @@ port bindingDeviceFailed : (() -> msg) -> Sub msg
 {-| Triggers the play or pause of the extra.
 -}
 port playExtraPort : () -> Cmd msg
-
-
-{-| Triggers the stop or pause of the extra.
--}
-port stopExtraPort : () -> Cmd msg
 
 
 {-| Seeks the extra resource.

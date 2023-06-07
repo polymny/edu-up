@@ -1691,17 +1691,7 @@ function init(node, flags) {
         }
     });
 
-    // Stops the extra resource in acquisition phase.
-    makePort("stopExtra", function() {
-        let extra = document.getElementById('extra');
-        if (extra === null) {
-            return;
-        }
-
-        extra.pause();
-        extra.currentTime = 0;
-    });
-
+    // Seeks at a certain position in the extra video.
     makePort("seekExtra", function(x) {
         let extra = document.getElementById('extra');
         if (extra === null) {

@@ -367,11 +367,6 @@ view config user model =
                             , icon = Utils.tern model.isExtraPlaying Material.Icons.pause Material.Icons.play_arrow
                             , tooltip = Strings.stepsAcquisitionPlayRecord lang
                             }
-                        , Ui.secondaryIcon []
-                            { action = Ui.Msg <| App.AcquisitionMsg <| Acquisition.StopExtra
-                            , icon = Material.Icons.stop
-                            , tooltip = Strings.stepsAcquisitionStopRecording lang
-                            }
                         , [ Element.el [ Ui.wfp progress, Border.width 2, Border.color Colors.red ] <| Element.none
                           , Element.el [ Ui.wfp (precision - progress), Border.width 2, Border.color Colors.greyBorder ] <| Element.none
                           ]

@@ -262,7 +262,6 @@ type Msg
     | ToggleHelp
     | ReinitializeDevices
     | PlayExtra
-    | StopExtra
     | ExtraPlayed
     | ExtraPaused
     | SeekExtra Float
