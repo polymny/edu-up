@@ -714,11 +714,19 @@ function init(node, flags) {
     }
 
     // Registers an event in the currentEvents array.
-    function registerEvent(eventType) {
-        currentEvents.push({
-            ty: eventType,
-            time: Math.round(window.performance.now() - currentEvents[0].time),
-        });
+    function registerEvent(event) {
+        let jsonEvent = {
+            ty: event.ty,
+            time: Math.round(window.performance.now() - (currentEvents.length === 0 ? 0 : currentEvents[0].time)),
+        };
+
+        if (event.ty === "seek") {
+            jsonEvent.extra_time = event.extra_time;
+        }
+
+        console.log(jsonEvent);
+
+        currentEvents.push(jsonEvent);
     }
 
     function clearPointerAndCallbacks(pointerCanvas, pointerCtx) {
@@ -1664,6 +1672,33 @@ function init(node, flags) {
     // Sets the before unload value.
     makePort("onBeforeUnload", function (arg) {
         beforeUnloadValue = arg;
+    });
+
+    // Plays or pauses the extra resource in acquisition phase.
+    makePort("playExtra", function() {
+        let extra = document.getElementById('extra');
+        if (extra === null) {
+            return;
+        }
+
+        if (extra.paused) {
+            extra.play();
+        } else if (extra.ended) {
+            extra.currentTime = 0;
+            extra.play();
+        } else {
+            extra.pause();
+        }
+    });
+
+    // Seeks at a certain position in the extra video.
+    makePort("seekExtra", function(x) {
+        let extra = document.getElementById('extra');
+        if (extra === null) {
+            return;
+        }
+
+        extra.currentTime = x;
     });
 
     makePort("detectDevices", (args) => detectDevices(true, args[0], args[1]));

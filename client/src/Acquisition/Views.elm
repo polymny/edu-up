@@ -21,6 +21,7 @@ import Element.Input as Input
 import Html
 import Html.Attributes
 import Html.Events
+import Json.Decode as Decode
 import Lang exposing (Lang)
 import Material.Icons
 import Material.Icons.Outlined
@@ -325,6 +326,68 @@ view config user model =
                                 ]
                 ]
 
+        -- Displays the video element in case the slide has an extra resource
+        videoElement : Element App.Msg
+        videoElement =
+            case currentSlide |> Maybe.andThen .extra of
+                Just video ->
+                    Html.video
+                        [ Html.Attributes.id "extra"
+                        , Html.Events.on "playing" (Decode.succeed <| App.AcquisitionMsg <| Acquisition.ExtraPlayed)
+                        , Html.Events.on "pause" (Decode.succeed <| App.AcquisitionMsg <| Acquisition.ExtraPaused)
+                        , Html.Events.on "durationchange" decodeDurationChanged
+                        , Html.Events.on "timeupdate" decodePosition
+                        ]
+                        [ Html.source
+                            [ Html.Attributes.src <| Data.assetPath model.capsule video ++ ".mp4"
+                            , Html.Attributes.controls False
+                            ]
+                            []
+                        ]
+                        |> Element.html
+
+                _ ->
+                    Element.none
+
+        -- Displays the video control bar if the slide has an extra resource
+        videoControls : Element App.Msg
+        videoControls =
+            case currentSlide |> Maybe.andThen .extra of
+                Just video ->
+                    let
+                        precision =
+                            1000
+
+                        progress =
+                            precision * (model.extraPosition / model.extraDuration) |> floor
+                    in
+                    Element.row [ Ui.wf, Ui.s 10, Ui.p 10 ]
+                        [ Ui.secondaryIcon []
+                            { action = Ui.Msg <| App.AcquisitionMsg <| Acquisition.PlayExtra
+                            , icon = Utils.tern model.isExtraPlaying Material.Icons.pause Material.Icons.play_arrow
+                            , tooltip = Strings.stepsAcquisitionPlayRecord lang
+                            }
+                        , [ Element.el [ Ui.wfp progress, Border.width 2, Border.color Colors.red ] <| Element.none
+                          , Element.el [ Ui.wfp (precision - progress), Border.width 2, Border.color Colors.greyBorder ] <| Element.none
+                          ]
+                            |> Element.row [ Ui.wf, Ui.cy ]
+                            |> Element.el
+                                [ Ui.hf
+                                , Ui.wf
+                                , Element.inFront <|
+                                    Element.el
+                                        [ Ui.wf
+                                        , Ui.hf
+                                        , Element.pointer
+                                        , Element.htmlAttribute (Html.Events.on "pointerdown" (decodeSeek model.extraDuration))
+                                        ]
+                                        Element.none
+                                ]
+                        ]
+
+                _ ->
+                    Element.none
+
         -- Displays the current slide
         slideElement : Element App.Msg
         slideElement =
@@ -337,6 +400,7 @@ view config user model =
                             , Element.htmlAttribute <| Html.Attributes.style "max-height" "100%"
                             , Ui.cx
                             , Ui.cy
+                            , Element.inFront videoElement
                             , Html.canvas
                                 [ Html.Attributes.id Acquisition.pointerCanvasId
                                 , Html.Attributes.width 1920
@@ -368,6 +432,7 @@ view config user model =
                         Element.none
                     , slideElement
                     ]
+                , videoControls
                 ]
 
         -- Settings popup or popup to confirm the deletion of a record
@@ -1132,3 +1197,30 @@ mkUiMsg msg =
 mkMsg : Acquisition.Msg -> App.Msg
 mkMsg msg =
     App.AcquisitionMsg msg
+
+
+{-| Decodes a seek event.
+-}
+decodeSeek : Float -> Decode.Decoder App.Msg
+decodeSeek duration =
+    Decode.map2 (\x y -> App.AcquisitionMsg <| Acquisition.SeekExtra <| toFloat x / toFloat y * duration)
+        (Decode.field "layerX" Decode.int)
+        (Decode.field "target" <| Decode.field "offsetWidth" Decode.int)
+
+
+{-| Decode a change in the duration of a video.
+-}
+decodeDurationChanged : Decode.Decoder App.Msg
+decodeDurationChanged =
+    Decode.field "target" <|
+        Decode.map (\x -> App.AcquisitionMsg <| Acquisition.ExtraDurationChanged x)
+            (Decode.field "duration" Decode.float)
+
+
+{-| Decode a change in the position of a video.
+-}
+decodePosition : Decode.Decoder App.Msg
+decodePosition =
+    Decode.field "target" <|
+        Decode.map (\x -> App.AcquisitionMsg <| Acquisition.ExtraPositionChanged x)
+            (Decode.field "currentTime" Decode.float)

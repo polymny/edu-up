@@ -535,20 +535,65 @@ assignmentManager config user model =
                 templateCapsule =
                     Data.getCapsuleById assignment.answerTemplate user
                         |> Maybe.withDefault emptyCapsule
+
+                ( statusLabel, statusColor ) =
+                    case assignment.state of
+                        Data.Preparation ->
+                            ( "[En préparation]", Colors.greyFont )
+
+                        Data.Prepared ->
+                            ( "[Préparé]", Colors.blue )
+
+                        Data.Working ->
+                            ( "[En cours]", Colors.blue )
+
+                        Data.Evaluation ->
+                            ( "[En évaluation]", Colors.orange )
+
+                        Data.Finished ->
+                            ( "[Terminé]", Colors.green2 )
             in
-            Ui.navigationElement (Ui.Route <| Route.Assignment assignment.id) [] <|
-                Element.row [ Ui.s 10 ]
-                    [ Element.row [ Ui.s 10 ]
-                        [ Element.text "[Sujet:]"
-                        , Element.text <| "[" ++ subjectCapsule.project ++ "]"
-                        , Element.text subjectCapsule.name
+            Ui.navigationElement (Ui.Route <| Route.Assignment assignment.id) [ Ui.wf ] <|
+                Element.row
+                    [ Ui.wf
+                    , Ui.s 50
+                    , Ui.b 1
+                    , Border.color Colors.greyBorder
+                    , Ui.r 10
+                    , Ui.p 10
+                    , Background.color Colors.white
+                    ]
+                    [ Element.el
+                        [ Ui.p 10
+                        , Ui.b 1
+                        , Ui.r 100
+                        , Ui.wpx 200
+                        , Border.color Colors.greyBorder
+                        , Background.color statusColor
+                        , Font.color Colors.greyBackground
                         ]
-                    , Element.row [ Ui.s 10 ]
-                        [ Element.text "[Answer:]"
-                        , Element.text <| "[" ++ templateCapsule.project ++ "]"
-                        , Element.text templateCapsule.name
+                        (Element.el [ Ui.cx ] <| Element.text statusLabel)
+                    , Element.column [ Ui.s 10, Ui.wfp 3 ]
+                        [ Element.row [ Ui.s 10 ]
+                            [ Element.text "[Sujet:]"
+                            , Element.text <| "[" ++ subjectCapsule.project ++ "]"
+                            , Element.text subjectCapsule.name
+                            ]
+                        , Element.row [ Ui.s 10 ]
+                            [ Element.text "[Answer:]"
+                            , Element.text <| "[" ++ templateCapsule.project ++ "]"
+                            , Element.text templateCapsule.name
+                            ]
                         ]
                     ]
+
+        header : String -> Element App.Msg
+        header string =
+            Element.row [ Ui.wf, Ui.s 10 ]
+                [ Element.el [ Ui.wf, Ui.hpx 1, Background.color <| Colors.alpha 0.1, Ui.px 10 ] Element.none
+                , Element.text string
+                , Element.el [ Ui.wf, Ui.hpx 1, Background.color <| Colors.alpha 0.1, Ui.px 10 ] Element.none
+                ]
 
         inPreparationView : Element App.Msg
         inPreparationView =
@@ -556,19 +601,9 @@ assignmentManager config user model =
                 Element.none
 
             else
-                List.map
-                    assignmentView
-                    inPreparation
-                    |> List.intersperse (Element.el [ Ui.wf, Ui.hpx 1, Background.color <| Colors.alpha 0.1, Ui.px 10 ] Element.none)
-                    |> (\x ->
-                            Element.row [ Ui.wf, Ui.s 10 ]
-                                [ Element.el [ Ui.wf, Ui.hpx 1, Background.color <| Colors.alpha 0.1, Ui.px 10 ] Element.none
-                                , Element.text "[In preparation]"
-                                , Element.el [ Ui.wf, Ui.hpx 1, Background.color <| Colors.alpha 0.1, Ui.px 10 ] Element.none
-                                ]
-                                :: x
-                       )
-                    |> Element.column [ Ui.s 10, Ui.wf ]
+                List.map assignmentView inPreparation
+                    -- |> (\x -> header "[In preparation]" :: x)
+                    |> Element.column [ Ui.s 30, Ui.wf ]
 
         workInProgressView : Element App.Msg
         workInProgressView =
@@ -576,17 +611,9 @@ assignmentManager config user model =
                 Element.none
 
             else
-                (Element.row [ Ui.wf ]
-                    [ Element.el [ Ui.wf, Ui.hpx 1, Background.color <| Colors.alpha 0.1, Ui.p 10 ] Element.none
-                    , Element.text "[Work in progress]"
-                    , Element.el [ Ui.wf, Ui.hpx 1, Background.color <| Colors.alpha 0.1, Ui.p 10 ] Element.none
-                    ]
-                    :: List.map
-                        assignmentView
-                        workInProgress
-                )
-                    |> List.intersperse (Element.el [ Ui.wf, Ui.hpx 1, Background.color <| Colors.alpha 0.1, Ui.p 10 ] Element.none)
-                    |> Element.column []
+                List.map assignmentView workInProgress
+                    -- |> (\x -> header "[Work in progress]" :: x)
+                    |> Element.column [ Ui.s 30, Ui.wf ]
 
         finishedView : Element App.Msg
         finishedView =

@@ -32,7 +32,6 @@ tungstenite = "0.18.0"
 futures-sink = "0.3.28"
 lazy_static = "1.4"
 simplelog = { git = "https://github.com/polymny/simplelog.rs" }
-color-backtrace = "0.5"
 
 [[bin]]
 name = "server"
