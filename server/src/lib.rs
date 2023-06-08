@@ -252,6 +252,8 @@ impl<'a> FromParam<'a> for HashId {
 
 /// Resets the database.
 pub async fn reset_db() {
+    color_backtrace::install();
+
     let config = Config::from_figment(&rocket::Config::figment());
     let pool = ergol::pool(&config.databases.database.url, 32).unwrap();
     let db = Db::from_pool(pool).await.unwrap();
@@ -282,6 +284,8 @@ pub async fn reset_db() {
 
 /// Calculate disk usage for each user.
 pub async fn user_disk_usage() {
+    color_backtrace::install();
+
     let config = Config::from_figment(&rocket::Config::figment());
     let pool = ergol::pool(&config.databases.database.url, 32).unwrap();
     let db = Db::from_pool(pool).await.unwrap();
@@ -322,6 +326,8 @@ pub async fn user_disk_usage() {
 
 /// update duration of all capsules
 pub async fn update_video_duration() {
+    color_backtrace::install();
+
     let config = Config::from_figment(&rocket::Config::figment());
     let pool = ergol::pool(&config.databases.database.url, 32).unwrap();
     let db = Db::from_pool(pool).await.unwrap();
@@ -365,6 +371,8 @@ pub async fn update_video_duration() {
 
 /// Starts the rocket server.
 pub async fn rocket() -> StdResult<Rocket<Ignite>, rocket::Error> {
+    color_backtrace::install();
+
     let figment = rocket::Config::figment();
     let config = Config::from_figment(&figment);
 
