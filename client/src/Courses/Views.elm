@@ -531,10 +531,58 @@ assignmentManager config user model =
                     Data.getCapsuleById assignment.subject user
                         |> Maybe.withDefault emptyCapsule
 
+                subjectFirstSlide : Maybe Data.Slide
+                subjectFirstSlide =
+                    subjectCapsule.structure
+                        |> List.head
+                        |> Maybe.map .slides
+                        |> Maybe.andThen List.head
+
+                subjectFirstSlideElement : Element App.Msg
+                subjectFirstSlideElement =
+                    case subjectFirstSlide of
+                        Just s ->
+                            Element.image [ Ui.hpx 200 ]
+                                { src = Data.slidePath subjectCapsule s, description = "" }
+                                |> Element.el
+                                    [ Element.text "[Sujet]"
+                                        |> Element.el [ Ui.p 5, Ui.at, Ui.al, Background.color Colors.greyBorder, Ui.rbr 5 ]
+                                        |> Element.inFront
+                                    , Ui.b 1
+                                    , Border.color Colors.greyBorder
+                                    ]
+
+                        _ ->
+                            Element.none
+
                 templateCapsule : Data.Capsule
                 templateCapsule =
                     Data.getCapsuleById assignment.answerTemplate user
                         |> Maybe.withDefault emptyCapsule
+
+                templateFirstSlide : Maybe Data.Slide
+                templateFirstSlide =
+                    templateCapsule.structure
+                        |> List.head
+                        |> Maybe.map .slides
+                        |> Maybe.andThen List.head
+
+                templateFirstSlideElement : Element App.Msg
+                templateFirstSlideElement =
+                    case templateFirstSlide of
+                        Just s ->
+                            Element.image [ Ui.hpx 200 ]
+                                { src = Data.slidePath templateCapsule s, description = "" }
+                                |> Element.el
+                                    [ Element.text "[Modèle]"
+                                        |> Element.el [ Ui.p 5, Ui.at, Ui.al, Background.color Colors.greyBorder, Ui.rbr 5 ]
+                                        |> Element.inFront
+                                    , Ui.b 1
+                                    , Border.color Colors.greyBorder
+                                    ]
+
+                        _ ->
+                            Element.none
 
                 ( statusLabel, statusColor ) =
                     case assignment.state of
@@ -560,7 +608,7 @@ assignmentManager config user model =
                     , Ui.b 1
                     , Border.color Colors.greyBorder
                     , Ui.r 10
-                    , Ui.p 10
+                    , Element.paddingEach { left = 50, right = 10, top = 10, bottom = 10 }
                     , Background.color Colors.white
                     ]
                     [ Element.el
@@ -585,6 +633,8 @@ assignmentManager config user model =
                             , Element.text templateCapsule.name
                             ]
                         ]
+                    , subjectFirstSlideElement
+                    , templateFirstSlideElement
                     ]
 
         header : String -> Element App.Msg
