@@ -135,13 +135,18 @@ impl Assignment {
 
     /// Returns a JSON value representing the assignment.
     pub async fn to_json(&self, db: &Db) -> Result<Value> {
+        let answers = self.answers(&db).await?;
+        let answers = answers.iter().map(|x| x.to_json(db));
+        let answers = futures::future::try_join_all(answers).await?;
+
         Ok(json!({
             "id": self.id,
             "subject": HARSH.encode(self.subject(&db).await?.id),
-            "answer": HARSH.encode(self.answer_template(&db).await?.id),
+            "answer_template": HARSH.encode(self.answer_template(&db).await?.id),
             "group": self.group(&db).await?.id,
             "criteria": self.criteria.split("\n").collect::<Vec<_>>(),
             "state": self.state,
+            "answers": answers,
         }))
     }
 }
@@ -160,6 +165,9 @@ pub struct Answer {
     /// The subject used as an answer.
     #[many_to_one(subject_answers)]
     pub capsule: Capsule,
+
+    /// Whether the student has finished is answer or not.
+    pub finished: bool,
 }
 
 impl Answer {
@@ -172,6 +180,20 @@ impl Answer {
         }
 
         Err(Error(Status::NotFound))
+    }
+
+    /// Creates a non finished answer.
+    pub fn new(assignment: &Assignment, capsule: &Capsule) -> AnswerWithoutId {
+        Answer::create(assignment, capsule, false)
+    }
+
+    /// JSON representation of the answer.
+    pub async fn to_json(&self, db: &Db) -> Result<Value> {
+        Ok(json!({
+            "id": self.id,
+            "capsule": HARSH.encode(self.capsule(db).await?.id),
+            "finished": self.finished,
+        }))
     }
 }
 

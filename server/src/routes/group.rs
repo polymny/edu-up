@@ -399,7 +399,7 @@ pub async fn validate_assignment(
         new.save(&db).await?;
         new.notify_change(&db, &socks).await?;
 
-        Answer::create(&assignment, &new).save(&db).await?;
+        Answer::new(&assignment, &new).save(&db).await?;
     }
 
     let mut assignment = Assignment::get_by_id(form.assignment_id, &db)

@@ -51,6 +51,7 @@ type alias Assignment =
     , criteria : List String
     , subject : String
     , answerTemplate : String
+    , answers : List Answer
     , group : Int
     , state : AssignmentState
     }
@@ -60,11 +61,12 @@ type alias Assignment =
 -}
 decodeAssignment : Decoder Assignment
 decodeAssignment =
-    Decode.map6 Assignment
+    Decode.map7 Assignment
         (Decode.field "id" Decode.int)
         (Decode.field "criteria" (Decode.list Decode.string))
         (Decode.field "subject" Decode.string)
-        (Decode.field "answer" Decode.string)
+        (Decode.field "answer_template" Decode.string)
+        (Decode.field "answers" <| Decode.list decodeAnswer)
         (Decode.field "group" Decode.int)
         (Decode.field "state" decodeAssignmentState)
 
@@ -105,3 +107,22 @@ decodeAssignmentState =
                     _ ->
                         Decode.fail ("Unknown assignment state: " ++ state)
             )
+
+
+{-| An answer to an assignment.
+-}
+type alias Answer =
+    { id : Int
+    , capsule : String
+    , finished : Bool
+    }
+
+
+{-| JSON decoder for answer.
+-}
+decodeAnswer : Decoder Answer
+decodeAnswer =
+    Decode.map3 Answer
+        (Decode.field "id" Decode.int)
+        (Decode.field "capsule" Decode.string)
+        (Decode.field "finished" Decode.bool)
