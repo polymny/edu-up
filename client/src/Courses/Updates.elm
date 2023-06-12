@@ -16,6 +16,10 @@ import Utils
 -}
 update : Courses.Msg -> App.Model -> ( App.Model, Cmd App.Msg )
 update msg model =
+    let
+        { user } =
+            model
+    in
     case model.page of
         App.Courses m ->
             case msg of
@@ -45,10 +49,6 @@ update msg model =
                             , participants = [ selfParticipant ]
                             , assignments = []
                             }
-
-                        user : Data.User
-                        user =
-                            model.user
                     in
                     ( { model
                         | page =
@@ -215,11 +215,6 @@ update msg model =
                     )
 
                 Courses.DeleteGroup Utils.Confirm group ->
-                    let
-                        user : Data.User
-                        user =
-                            model.user
-                    in
                     case m.selectedGroup of
                         Just selectedGroup ->
                             ( { model
@@ -242,11 +237,6 @@ update msg model =
                             ( model, Cmd.none )
 
                 Courses.Response (Success group) ->
-                    let
-                        user : Data.User
-                        user =
-                            model.user
-                    in
                     ( { model
                         | user = { user | groups = updateGroup group user.groups }
                         , page = App.Courses { m | selectedGroup = Just group.id }
@@ -288,11 +278,6 @@ update msg model =
                     )
 
                 Courses.SelfRemove Utils.Confirm ->
-                    let
-                        user : Data.User
-                        user =
-                            model.user
-                    in
                     case m.selectedGroup of
                         Just selectedGroup ->
                             ( { model
@@ -434,6 +419,28 @@ update msg model =
                         , page = App.Courses { m | newAssignmentForm = newAssignmentForm }
                       }
                     , Api.validateAssignment assignment.id (\_ -> App.Noop)
+                    )
+
+                Courses.ValidateAnswer answer ->
+                    let
+                        answerMapper : Data.Answer -> Data.Answer
+                        answerMapper a =
+                            if answer.id == a.id then
+                                { answer | finished = True }
+
+                            else
+                                a
+
+                        assignmentMapper : Data.Assignment -> Data.Assignment
+                        assignmentMapper a =
+                            { a | answers = List.map answerMapper a.answers }
+
+                        groupMapper : Data.Group -> Data.Group
+                        groupMapper group =
+                            { group | assignments = List.map assignmentMapper group.assignments }
+                    in
+                    ( { model | user = { user | groups = List.map groupMapper user.groups } }
+                    , Api.validateAnswer answer.id (\_ -> App.Noop)
                     )
 
         _ ->

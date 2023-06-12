@@ -414,3 +414,42 @@ pub async fn validate_assignment(
 
     Ok(())
 }
+
+/// Form for validating an answer.
+#[derive(Serialize, Deserialize)]
+pub struct ValidateAnswerForm {
+    /// The id of the answer to validate.
+    pub answer_id: i32,
+}
+
+/// Validates an answer.
+#[post("/validate-answer", data = "<form>")]
+pub async fn validate_answer(user: User, db: Db, form: Json<ValidateAnswerForm>) -> Result<()> {
+    let form = form.into_inner();
+
+    let mut answer = Answer::get_by_id(form.answer_id, &db)
+        .await?
+        .ok_or(Error(Status::NotFound))?;
+
+    let capsule = answer.capsule(&db).await?;
+
+    let mut allowed = false;
+    for (participant, role) in capsule.users(&db).await? {
+        if participant.username == user.username && role == Role::Write {
+            allowed = true;
+            break;
+        }
+    }
+
+    if !allowed {
+        return Err(Error(Status::Forbidden));
+    }
+
+    capsule.remove_user(&user, &db).await?;
+    capsule.add_user(&user, Role::Read, &db).await?;
+
+    answer.finished = true;
+    answer.save(&db).await?;
+
+    Ok(())
+}

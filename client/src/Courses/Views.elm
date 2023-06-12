@@ -96,12 +96,19 @@ studentView : Config -> Data.User -> Courses.Model Data.Group -> ( Element App.M
 studentView config user model =
     let
         -- The current assignments of the student
-        assignments : List ( Data.Assignment, Maybe Data.Capsule )
+        assignments : List ( Data.Assignment, Maybe ( Data.Answer, Data.Capsule ) )
         assignments =
             user.groups
                 |> List.concatMap .assignments
                 |> List.filter (\x -> x.state == Data.Working)
-                |> List.map (\x -> ( x, x.answers |> List.filterMap (\y -> Data.getCapsuleById y.capsule user) |> List.head ))
+                |> List.map
+                    (\x ->
+                        ( x
+                        , x.answers
+                            |> List.filterMap (\y -> Data.getCapsuleById y.capsule user |> Maybe.map (\z -> ( y, z )))
+                            |> List.head
+                        )
+                    )
     in
     ( List.map (assignmentView config user) assignments |> Element.column [ Ui.s 10 ] |> Element.el [ Ui.p 10 ]
     , Element.none
@@ -110,7 +117,7 @@ studentView config user model =
 
 {-| Assignment view.
 -}
-assignmentView : Config -> Data.User -> ( Data.Assignment, Maybe Data.Capsule ) -> Element App.Msg
+assignmentView : Config -> Data.User -> ( Data.Assignment, Maybe ( Data.Answer, Data.Capsule ) ) -> Element App.Msg
 assignmentView config user ( assignment, answer ) =
     let
         subjectCapsule : Data.Capsule
@@ -142,9 +149,17 @@ assignmentView config user ( assignment, answer ) =
                 _ ->
                     Element.none
 
+        assignmentAnswer : Maybe Data.Answer
+        assignmentAnswer =
+            Maybe.map Tuple.first answer
+
+        answerFinished : Maybe Bool
+        answerFinished =
+            Maybe.map .finished assignmentAnswer
+
         answerCapsule : Data.Capsule
         answerCapsule =
-            case answer of
+            case answer |> Maybe.map Tuple.second of
                 Just c ->
                     c
 
@@ -176,21 +191,27 @@ assignmentView config user ( assignment, answer ) =
                     Element.none
 
         ( statusLabel, statusColor ) =
-            case assignment.state of
-                Data.Preparation ->
+            case ( answerFinished, assignment.state ) of
+                ( Nothing, Data.Preparation ) ->
                     ( "[En préparation]", Colors.greyFont )
 
-                Data.Prepared ->
+                ( Nothing, Data.Prepared ) ->
                     ( "[Préparé]", Colors.blue )
 
-                Data.Working ->
+                ( Nothing, Data.Working ) ->
                     ( "[En cours]", Colors.blue )
 
-                Data.Evaluation ->
+                ( Nothing, Data.Evaluation ) ->
                     ( "[En évaluation]", Colors.orange )
 
-                Data.Finished ->
+                ( Nothing, Data.Finished ) ->
                     ( "[Terminé]", Colors.green2 )
+
+                ( Just False, _ ) ->
+                    ( "[En cours]", Colors.blue )
+
+                ( Just True, _ ) ->
+                    ( "[Validé]", Colors.green2 )
     in
     Element.row
         [ Ui.wf
@@ -222,6 +243,37 @@ assignmentView config user ( assignment, answer ) =
                 , Element.text <| "[" ++ answerCapsule.project ++ "]"
                 , Element.text answerCapsule.name
                 ]
+            , case ( assignmentAnswer, answerFinished, assignment.state ) of
+                ( Nothing, Nothing, Data.Preparation ) ->
+                    Element.row [ Ui.s 10 ]
+                        [ Ui.secondary []
+                            { label = Element.text "[Modifier le devoir]"
+                            , action = Ui.Route <| Route.Assignment assignment.id
+                            }
+                        , Ui.primary []
+                            { label = Element.text "[Valider le devoir]"
+                            , action = Ui.Msg <| App.CoursesMsg <| Courses.ValidateAssignment assignment
+                            }
+                        ]
+
+                ( Nothing, Nothing, Data.Working ) ->
+                    assignment.answers
+                        |> List.filter (\x -> not x.finished)
+                        |> List.filterMap (\x -> Data.getCapsuleById x.capsule user)
+                        |> List.filterMap (\x -> List.filter (\y -> y.username /= user.username) x.collaborators |> List.head)
+                        |> List.map .username
+                        |> String.join ", "
+                        |> (\x -> "|En attente de " ++ x ++ "]")
+                        |> Element.text
+
+                ( Just a, Just False, _ ) ->
+                    Ui.primary []
+                        { label = Element.text "[Valider le devoir]"
+                        , action = Ui.Msg <| App.CoursesMsg <| Courses.ValidateAnswer a
+                        }
+
+                _ ->
+                    Element.none
             ]
         , subjectFirstSlideElement
         , answerFirstSlideElement

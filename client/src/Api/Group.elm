@@ -95,3 +95,14 @@ validateAssignment assignmentId toMsg =
         , body = Http.jsonBody <| Encode.object [ ( "assignment_id", Encode.int assignmentId ) ]
         , toMsg = toMsg
         }
+
+
+{-| Validates an answer.
+-}
+validateAnswer : Int -> (WebData () -> msg) -> Cmd msg
+validateAnswer answerId toMsg =
+    Api.post
+        { url = "/api/validate-answer"
+        , body = Http.jsonBody <| Encode.object [ ( "answer_id", Encode.int answerId ) ]
+        , toMsg = toMsg
+        }

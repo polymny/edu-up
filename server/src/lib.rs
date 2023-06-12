@@ -531,6 +531,7 @@ pub async fn rocket() -> StdResult<Rocket<Ignite>, rocket::Error> {
                 routes::group::new_assignment,
                 routes::group::delete_assignment,
                 routes::group::validate_assignment,
+                routes::group::validate_answer,
                 routes::admin::get_dashboard,
                 routes::admin::get_users,
                 routes::admin::get_search_users,

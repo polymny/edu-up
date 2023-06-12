@@ -30,6 +30,7 @@ type Msg
     | CreateAssignment
     | CreateAssignmentChanged (WebData Data.Assignment)
     | ValidateAssignment Data.Assignment
+    | ValidateAnswer Data.Answer
 
 
 {-| The model for the new course page.
