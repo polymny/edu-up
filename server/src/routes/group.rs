@@ -327,13 +327,16 @@ pub async fn validate_assignment(
         return Err(Error(Status::Forbidden));
     }
 
+    let subject = assignment.subject(&db).await?;
     let template = assignment.answer_template(&db).await?;
 
-    // Prepare answers for students
+    // Prepare answers and make subject read for students
     for (student, role) in participants {
         if role == ParticipantRole::Teacher {
             continue;
         }
+
+        subject.add_user(&student, Role::Read, &db).await?;
 
         let mut new = Capsule::new(
             &template.project,

@@ -24,10 +24,29 @@ import Ui.Utils as Ui
 import Utils
 
 
-{-| This function returns the view of the new course page.
+{-| The view function of the courses page.
 -}
 view : Config -> Data.User -> Courses.Model Data.Group -> ( Element App.Msg, Element App.Msg )
 view config user model =
+    -- Ugly but we do this for now:
+    -- if a user is teaching any course, they're registered as teacher and can create new courses.
+    let
+        isTeacher =
+            user.groups
+                |> List.concatMap .participants
+                |> List.any (\x -> x.username == user.username && x.role == Data.Teacher)
+    in
+    if isTeacher then
+        teacherView config user model
+
+    else
+        studentView config user model
+
+
+{-| This function returns the teacher view of the new course page.
+-}
+teacherView : Config -> Data.User -> Courses.Model Data.Group -> ( Element App.Msg, Element App.Msg )
+teacherView config user model =
     ( Element.column [ Ui.wf, Ui.p 20, Ui.s 20, Ui.hf ]
         [ Element.row [ Ui.wf, Ui.s 20 ]
             [ Ui.secondary []
@@ -69,6 +88,144 @@ view config user model =
         ]
     , popup config user model
     )
+
+
+{-| This function returns the student view of the new course page.
+-}
+studentView : Config -> Data.User -> Courses.Model Data.Group -> ( Element App.Msg, Element App.Msg )
+studentView config user model =
+    let
+        -- The current assignments of the student
+        assignments : List ( Data.Assignment, Maybe Data.Capsule )
+        assignments =
+            user.groups
+                |> List.concatMap .assignments
+                |> List.filter (\x -> x.state == Data.Working)
+                |> List.map (\x -> ( x, x.answers |> List.filterMap (\y -> Data.getCapsuleById y.capsule user) |> List.head ))
+    in
+    ( List.map (assignmentView config user) assignments |> Element.column [ Ui.s 10 ] |> Element.el [ Ui.p 10 ]
+    , Element.none
+    )
+
+
+{-| Assignment view.
+-}
+assignmentView : Config -> Data.User -> ( Data.Assignment, Maybe Data.Capsule ) -> Element App.Msg
+assignmentView config user ( assignment, answer ) =
+    let
+        subjectCapsule : Data.Capsule
+        subjectCapsule =
+            Data.getCapsuleById assignment.subject user
+                |> Maybe.withDefault emptyCapsule
+
+        subjectFirstSlide : Maybe Data.Slide
+        subjectFirstSlide =
+            subjectCapsule.structure
+                |> List.head
+                |> Maybe.map .slides
+                |> Maybe.andThen List.head
+
+        subjectFirstSlideElement : Element App.Msg
+        subjectFirstSlideElement =
+            case subjectFirstSlide of
+                Just s ->
+                    Element.image [ Ui.hpx 200 ]
+                        { src = Data.slidePath subjectCapsule s, description = "" }
+                        |> Ui.navigationElement (Ui.Route <| Route.Preparation <| subjectCapsule.id)
+                            [ Element.text "[Sujet]"
+                                |> Element.el [ Ui.p 5, Ui.at, Ui.al, Background.color Colors.greyBorder, Ui.rbr 5 ]
+                                |> Element.inFront
+                            , Ui.b 1
+                            , Border.color Colors.greyBorder
+                            ]
+
+                _ ->
+                    Element.none
+
+        answerCapsule : Data.Capsule
+        answerCapsule =
+            case answer of
+                Just c ->
+                    c
+
+                Nothing ->
+                    Data.getCapsuleById assignment.answerTemplate user |> Maybe.withDefault Data.emptyCapsule
+
+        answerFirstSlide : Maybe Data.Slide
+        answerFirstSlide =
+            answerCapsule.structure
+                |> List.head
+                |> Maybe.map .slides
+                |> Maybe.andThen List.head
+
+        answerFirstSlideElement : Element App.Msg
+        answerFirstSlideElement =
+            case answerFirstSlide of
+                Just s ->
+                    Element.image [ Ui.hpx 200 ]
+                        { src = Data.slidePath answerCapsule s, description = "" }
+                        |> Ui.navigationElement (Ui.Route <| Route.Preparation <| answerCapsule.id)
+                            [ Element.text (Utils.tern (answer == Nothing) "[Modèle]" "[Réponse]")
+                                |> Element.el [ Ui.p 5, Ui.at, Ui.al, Background.color Colors.greyBorder, Ui.rbr 5 ]
+                                |> Element.inFront
+                            , Ui.b 1
+                            , Border.color Colors.greyBorder
+                            ]
+
+                _ ->
+                    Element.none
+
+        ( statusLabel, statusColor ) =
+            case assignment.state of
+                Data.Preparation ->
+                    ( "[En préparation]", Colors.greyFont )
+
+                Data.Prepared ->
+                    ( "[Préparé]", Colors.blue )
+
+                Data.Working ->
+                    ( "[En cours]", Colors.blue )
+
+                Data.Evaluation ->
+                    ( "[En évaluation]", Colors.orange )
+
+                Data.Finished ->
+                    ( "[Terminé]", Colors.green2 )
+    in
+    Element.row
+        [ Ui.wf
+        , Ui.s 50
+        , Ui.b 1
+        , Border.color Colors.greyBorder
+        , Ui.r 10
+        , Element.paddingEach { left = 50, right = 10, top = 10, bottom = 10 }
+        , Background.color Colors.white
+        ]
+        [ Element.el
+            [ Ui.p 10
+            , Ui.b 1
+            , Ui.r 100
+            , Ui.wpx 200
+            , Border.color Colors.greyBorder
+            , Background.color statusColor
+            , Font.color Colors.greyBackground
+            ]
+            (Element.el [ Ui.cx ] <| Element.text statusLabel)
+        , Element.column [ Ui.s 10, Ui.wfp 3 ]
+            [ Element.row [ Ui.s 10 ]
+                [ Element.text "[Sujet:]"
+                , Element.text <| "[" ++ subjectCapsule.project ++ "]"
+                , Element.text subjectCapsule.name
+                ]
+            , Element.row [ Ui.s 10 ]
+                [ Element.text "[Answer:]"
+                , Element.text <| "[" ++ answerCapsule.project ++ "]"
+                , Element.text answerCapsule.name
+                ]
+            ]
+        , subjectFirstSlideElement
+        , answerFirstSlideElement
+        ]
 
 
 {-| This function returns the view of the popup.
@@ -523,120 +680,6 @@ assignmentManager config user model =
                 |> Maybe.map (List.filter (\a -> a.state == Data.Evaluation || a.state == Data.Finished))
                 |> Maybe.withDefault []
 
-        assignmentView : Data.Assignment -> Element App.Msg
-        assignmentView assignment =
-            let
-                subjectCapsule : Data.Capsule
-                subjectCapsule =
-                    Data.getCapsuleById assignment.subject user
-                        |> Maybe.withDefault emptyCapsule
-
-                subjectFirstSlide : Maybe Data.Slide
-                subjectFirstSlide =
-                    subjectCapsule.structure
-                        |> List.head
-                        |> Maybe.map .slides
-                        |> Maybe.andThen List.head
-
-                subjectFirstSlideElement : Element App.Msg
-                subjectFirstSlideElement =
-                    case subjectFirstSlide of
-                        Just s ->
-                            Element.image [ Ui.hpx 200 ]
-                                { src = Data.slidePath subjectCapsule s, description = "" }
-                                |> Element.el
-                                    [ Element.text "[Sujet]"
-                                        |> Element.el [ Ui.p 5, Ui.at, Ui.al, Background.color Colors.greyBorder, Ui.rbr 5 ]
-                                        |> Element.inFront
-                                    , Ui.b 1
-                                    , Border.color Colors.greyBorder
-                                    ]
-
-                        _ ->
-                            Element.none
-
-                templateCapsule : Data.Capsule
-                templateCapsule =
-                    Data.getCapsuleById assignment.answerTemplate user
-                        |> Maybe.withDefault emptyCapsule
-
-                templateFirstSlide : Maybe Data.Slide
-                templateFirstSlide =
-                    templateCapsule.structure
-                        |> List.head
-                        |> Maybe.map .slides
-                        |> Maybe.andThen List.head
-
-                templateFirstSlideElement : Element App.Msg
-                templateFirstSlideElement =
-                    case templateFirstSlide of
-                        Just s ->
-                            Element.image [ Ui.hpx 200 ]
-                                { src = Data.slidePath templateCapsule s, description = "" }
-                                |> Element.el
-                                    [ Element.text "[Modèle]"
-                                        |> Element.el [ Ui.p 5, Ui.at, Ui.al, Background.color Colors.greyBorder, Ui.rbr 5 ]
-                                        |> Element.inFront
-                                    , Ui.b 1
-                                    , Border.color Colors.greyBorder
-                                    ]
-
-                        _ ->
-                            Element.none
-
-                ( statusLabel, statusColor ) =
-                    case assignment.state of
-                        Data.Preparation ->
-                            ( "[En préparation]", Colors.greyFont )
-
-                        Data.Prepared ->
-                            ( "[Préparé]", Colors.blue )
-
-                        Data.Working ->
-                            ( "[En cours]", Colors.blue )
-
-                        Data.Evaluation ->
-                            ( "[En évaluation]", Colors.orange )
-
-                        Data.Finished ->
-                            ( "[Terminé]", Colors.green2 )
-            in
-            Ui.navigationElement (Ui.Route <| Route.Assignment assignment.id) [ Ui.wf ] <|
-                Element.row
-                    [ Ui.wf
-                    , Ui.s 50
-                    , Ui.b 1
-                    , Border.color Colors.greyBorder
-                    , Ui.r 10
-                    , Element.paddingEach { left = 50, right = 10, top = 10, bottom = 10 }
-                    , Background.color Colors.white
-                    ]
-                    [ Element.el
-                        [ Ui.p 10
-                        , Ui.b 1
-                        , Ui.r 100
-                        , Ui.wpx 200
-                        , Border.color Colors.greyBorder
-                        , Background.color statusColor
-                        , Font.color Colors.greyBackground
-                        ]
-                        (Element.el [ Ui.cx ] <| Element.text statusLabel)
-                    , Element.column [ Ui.s 10, Ui.wfp 3 ]
-                        [ Element.row [ Ui.s 10 ]
-                            [ Element.text "[Sujet:]"
-                            , Element.text <| "[" ++ subjectCapsule.project ++ "]"
-                            , Element.text subjectCapsule.name
-                            ]
-                        , Element.row [ Ui.s 10 ]
-                            [ Element.text "[Answer:]"
-                            , Element.text <| "[" ++ templateCapsule.project ++ "]"
-                            , Element.text templateCapsule.name
-                            ]
-                        ]
-                    , subjectFirstSlideElement
-                    , templateFirstSlideElement
-                    ]
-
         header : String -> Element App.Msg
         header string =
             Element.row [ Ui.wf, Ui.s 10 ]
@@ -651,7 +694,7 @@ assignmentManager config user model =
                 Element.none
 
             else
-                List.map assignmentView inPreparation
+                List.map (\x -> assignmentView config user ( x, Nothing )) workInProgress
                     -- |> (\x -> header "[In preparation]" :: x)
                     |> Element.column [ Ui.s 30, Ui.wf ]
 
@@ -661,27 +704,27 @@ assignmentManager config user model =
                 Element.none
 
             else
-                List.map assignmentView workInProgress
+                List.map (\x -> assignmentView config user ( x, Nothing )) workInProgress
                     -- |> (\x -> header "[Work in progress]" :: x)
                     |> Element.column [ Ui.s 30, Ui.wf ]
 
         finishedView : Element App.Msg
         finishedView =
-            if List.isEmpty finished then
-                Element.none
-
-            else
-                (Element.row [ Ui.wf ]
-                    [ Element.el [ Ui.wf, Ui.hpx 1, Background.color <| Colors.alpha 0.1, Ui.p 10 ] Element.none
-                    , Element.text "[Finished]"
-                    , Element.el [ Ui.wf, Ui.hpx 1, Background.color <| Colors.alpha 0.1, Ui.p 10 ] Element.none
-                    ]
-                    :: List.map
-                        assignmentView
-                        finished
-                )
-                    |> List.intersperse (Element.el [ Ui.wf, Ui.hpx 1, Background.color <| Colors.alpha 0.1, Ui.p 10 ] Element.none)
-                    |> Element.column []
+            -- if List.isEmpty finished then
+            --     Element.none
+            -- else
+            --     (Element.row [ Ui.wf ]
+            --         [ Element.el [ Ui.wf, Ui.hpx 1, Background.color <| Colors.alpha 0.1, Ui.p 10 ] Element.none
+            --         , Element.text "[Finished]"
+            --         , Element.el [ Ui.wf, Ui.hpx 1, Background.color <| Colors.alpha 0.1, Ui.p 10 ] Element.none
+            --         ]
+            --         :: List.map
+            --             assignmentView
+            --             finished
+            --     )
+            --         |> List.intersperse (Element.el [ Ui.wf, Ui.hpx 1, Background.color <| Colors.alpha 0.1, Ui.p 10 ] Element.none)
+            --         |> Element.column []
+            Element.none
 
         newAssignmentButton : Element App.Msg
         newAssignmentButton =
