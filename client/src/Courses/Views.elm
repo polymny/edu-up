@@ -694,7 +694,7 @@ assignmentManager config user model =
                 Element.none
 
             else
-                List.map (\x -> assignmentView config user ( x, Nothing )) workInProgress
+                List.map (\x -> assignmentView config user ( x, Nothing )) inPreparation
                     -- |> (\x -> header "[In preparation]" :: x)
                     |> Element.column [ Ui.s 30, Ui.wf ]
 
