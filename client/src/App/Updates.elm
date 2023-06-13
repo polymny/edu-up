@@ -590,7 +590,7 @@ webSocketMsgDecoder =
                     "capsule_production_progress" ->
                         Decode.map2 (\y z -> App.ProductionProgress y z False)
                             (Decode.field "id" Decode.string)
-                            (Decode.field "msg" Decode.float)
+                            (Decode.field "msg" decodePositiveFloat)
 
                     "capsule_production_finished" ->
                         Decode.map (\p -> App.ProductionProgress p 1.0 True)
@@ -604,7 +604,7 @@ webSocketMsgDecoder =
                         Decode.map3 (\y z t -> App.ExtraRecordProgress y z t False)
                             (Decode.field "slide_id" Decode.string)
                             (Decode.field "capsule_id" Decode.string)
-                            (Decode.field "msg" Decode.float)
+                            (Decode.field "msg" decodePositiveFloat)
 
                     "video_upload_finished" ->
                         Decode.map2 (\p q -> App.ExtraRecordProgress p q 1.0 True)
@@ -613,6 +613,21 @@ webSocketMsgDecoder =
 
                     _ ->
                         Decode.fail <| "Unknown websocket msg type " ++ x
+            )
+
+
+{-| Helper to decode a positif float.
+-}
+decodePositiveFloat : Decoder Float
+decodePositiveFloat =
+    Decode.float
+        |> Decode.andThen
+            (\x ->
+                if x < 0 then
+                    Decode.fail "Expected positive number, found negative number"
+
+                else
+                    Decode.succeed x
             )
 
 
