@@ -35,7 +35,7 @@ view config user model =
             -- user.groups
             --     |> List.concatMap .participants
             --     |> List.any (\x -> x.username == user.username && x.role == Data.Teacher)
-            user.username == "polymny"
+            user.username == "tforgione"
     in
     if isTeacher then
         teacherView config user model
