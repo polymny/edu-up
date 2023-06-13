@@ -32,9 +32,10 @@ view config user model =
     -- if a user is teaching any course, they're registered as teacher and can create new courses.
     let
         isTeacher =
-            user.groups
-                |> List.concatMap .participants
-                |> List.any (\x -> x.username == user.username && x.role == Data.Teacher)
+            -- user.groups
+            --     |> List.concatMap .participants
+            --     |> List.any (\x -> x.username == user.username && x.role == Data.Teacher)
+            user.username == "polymny"
     in
     if isTeacher then
         teacherView config user model
@@ -51,7 +52,7 @@ teacherView config user model =
         [ Element.row [ Ui.wf, Ui.s 20 ]
             [ Ui.secondary []
                 { action = Ui.Msg <| App.CoursesMsg <| Courses.NewGroup Utils.Request ""
-                , label = Ui.icon 18 Icons.add
+                , label = Element.text "[Créer un groupe]"
                 }
             , Element.el [ Ui.hf, Background.color <| Colors.alpha 0.1, Ui.wpx 1, Ui.ar ] Element.none
             , Element.el [ Ui.wf, Element.scrollbarX ] <|
@@ -239,12 +240,12 @@ assignmentView config user ( assignment, answer ) =
                 , Element.text subjectCapsule.name
                 ]
             , Element.row [ Ui.s 10 ]
-                [ Element.text "[Answer:]"
+                [ Element.text "[Réponse:]"
                 , Element.text <| "[" ++ answerCapsule.project ++ "]"
                 , Element.text answerCapsule.name
                 ]
-            , case ( assignmentAnswer, answerFinished, assignment.state ) of
-                ( Nothing, Nothing, Data.Preparation ) ->
+            , case ( ( assignmentAnswer, answerFinished ), ( assignment.state, assignment.showDetails ) ) of
+                ( ( Nothing, Nothing ), ( Data.Preparation, _ ) ) ->
                     Element.row [ Ui.s 10 ]
                         [ Ui.secondary []
                             { label = Element.text "[Modifier le devoir]"
@@ -256,7 +257,7 @@ assignmentView config user ( assignment, answer ) =
                             }
                         ]
 
-                ( Nothing, Nothing, Data.Working ) ->
+                ( ( Nothing, Nothing ), ( Data.Working, False ) ) ->
                     assignment.answers
                         |> List.filter (\x -> not x.finished)
                         |> List.filterMap (\x -> Data.getCapsuleById x.capsule user)
@@ -265,8 +266,46 @@ assignmentView config user ( assignment, answer ) =
                         |> String.join ", "
                         |> (\x -> "|En attente de " ++ x ++ "]")
                         |> Element.text
+                        |> Ui.navigationElement (Ui.Msg <| App.CoursesMsg <| Courses.ToggleDetails assignment) []
 
-                ( Just a, Just False, _ ) ->
+                ( ( Nothing, Nothing ), ( Data.Working, True ) ) ->
+                    let
+                        mapper : Data.Answer -> Element App.Msg
+                        mapper a =
+                            Element.row [ Ui.s 10 ]
+                                [ Data.getCapsuleById a.capsule user
+                                    |> Maybe.map .collaborators
+                                    |> Maybe.withDefault []
+                                    |> List.filter (\y -> y.username /= user.username)
+                                    |> List.head
+                                    |> Maybe.map .username
+                                    |> Maybe.withDefault ""
+                                    |> Element.text
+                                    |> Element.el [ Ui.wpx 100 ]
+                                , Element.el
+                                    [ Ui.p 10
+                                    , Ui.b 1
+                                    , Ui.r 100
+                                    , Ui.wpx 200
+                                    , Border.color Colors.greyBorder
+                                    , Background.color <| Utils.tern a.finished Colors.green2 Colors.blue
+                                    , Font.color Colors.greyBackground
+                                    ]
+                                    (Element.el [ Ui.cx ] <| Element.text <| Utils.tern a.finished "[Terminé]" "[En cours]")
+                                , case ( a.finished, Data.getCapsuleById a.capsule user |> Maybe.andThen (\x -> Data.videoPath x) ) of
+                                    ( True, Just url ) ->
+                                        Ui.link []
+                                            { action = Ui.NewTab url
+                                            , label = "[Voir la réponse]"
+                                            }
+
+                                    _ ->
+                                        Element.none
+                                ]
+                    in
+                    Element.column [ Ui.pt 20, Ui.s 10 ] (Ui.title "[Réponses des élèves]" :: List.map mapper assignment.answers)
+
+                ( ( Just a, Just False ), _ ) ->
                     Ui.primary []
                         { label = Element.text "[Valider le devoir]"
                         , action = Ui.Msg <| App.CoursesMsg <| Courses.ValidateAnswer a
@@ -601,7 +640,7 @@ participantLists user group selectorIndex =
                         , Font.bold
                         ]
                     <|
-                        Element.text "[Students:]"
+                        Element.text "[Élèves:]"
                 , Ui.navigationElement (Ui.Msg <| App.CoursesMsg <| Courses.ChangeSelectorIndex 1)
                     [ Ui.wpx buttonWidth
                     , Ui.hf
@@ -623,7 +662,7 @@ participantLists user group selectorIndex =
                         , Font.bold
                         ]
                     <|
-                        Element.text "[Teachers:]"
+                        Element.text "[Profs:]"
                 ]
             , Utils.tern
                 isTeacher
@@ -636,7 +675,7 @@ participantLists user group selectorIndex =
                     , Element.htmlAttribute <|
                         Transition.properties [ Transition.color 200 [ Transition.easeInOut ] ]
                     ]
-                    (Element.el [] <| Element.text "[Delete group]")
+                    (Element.el [] <| Element.text "[Supprimer le groupe]")
                 )
                 Element.none
             ]
@@ -692,7 +731,7 @@ participantLists user group selectorIndex =
                                 Ui.icon
                                     18
                                     Icons.add
-                            , Element.text <| "[Ajouter un " ++ Utils.tern (selectorIndex == 0) "étudiant" "professeur" ++ "]"
+                            , Element.text <| "[Ajouter un " ++ Utils.tern (selectorIndex == 0) "élève" "professeur" ++ "]"
                             ]
                     ]
                     []

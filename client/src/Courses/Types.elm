@@ -31,6 +31,7 @@ type Msg
     | CreateAssignmentChanged (WebData Data.Assignment)
     | ValidateAssignment Data.Assignment
     | ValidateAnswer Data.Answer
+    | ToggleDetails Data.Assignment
 
 
 {-| The model for the new course page.

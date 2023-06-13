@@ -443,6 +443,24 @@ update msg model =
                     , Api.validateAnswer answer.id (\_ -> App.Noop)
                     )
 
+                Courses.ToggleDetails assignment ->
+                    let
+                        assignmentMapper : Data.Assignment -> Data.Assignment
+                        assignmentMapper a =
+                            if a.id == assignment.id then
+                                { a | showDetails = not a.showDetails }
+
+                            else
+                                a
+
+                        groupMapper : Data.Group -> Data.Group
+                        groupMapper group =
+                            { group | assignments = List.map assignmentMapper group.assignments }
+                    in
+                    ( { model | user = { user | groups = List.map groupMapper user.groups } }
+                    , Cmd.none
+                    )
+
         _ ->
             ( model, Cmd.none )
 

@@ -54,6 +54,7 @@ type alias Assignment =
     , answers : List Answer
     , group : Int
     , state : AssignmentState
+    , showDetails : Bool
     }
 
 
@@ -61,7 +62,7 @@ type alias Assignment =
 -}
 decodeAssignment : Decoder Assignment
 decodeAssignment =
-    Decode.map7 Assignment
+    Decode.map8 Assignment
         (Decode.field "id" Decode.int)
         (Decode.field "criteria" (Decode.list Decode.string))
         (Decode.field "subject" Decode.string)
@@ -69,6 +70,7 @@ decodeAssignment =
         (Decode.field "answers" <| Decode.list decodeAnswer)
         (Decode.field "group" Decode.int)
         (Decode.field "state" decodeAssignmentState)
+        (Decode.succeed False)
 
 
 {-| This type represents the state of an assignment.
