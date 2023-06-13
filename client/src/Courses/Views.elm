@@ -139,7 +139,13 @@ assignmentView config user ( assignment, answer ) =
                 Just s ->
                     Element.image [ Ui.hpx 200 ]
                         { src = Data.slidePath subjectCapsule s, description = "" }
-                        |> Ui.navigationElement (Ui.Route <| Route.Preparation <| subjectCapsule.id)
+                        |> Ui.navigationElement
+                            (if answer == Nothing then
+                                Ui.Route <| Route.Preparation <| subjectCapsule.id
+
+                             else
+                                Ui.NewTab <| Maybe.withDefault "" <| Data.videoPath subjectCapsule
+                            )
                             [ Element.text "[Sujet]"
                                 |> Element.el [ Ui.p 5, Ui.at, Ui.al, Background.color Colors.greyBorder, Ui.rbr 5 ]
                                 |> Element.inFront
