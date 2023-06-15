@@ -233,7 +233,7 @@ pub async fn populate_db(db: &Db, config: &Config) -> Result<()> {
     polymny.save(&db).await?;
 
     // Create a bunch of students
-    let mut iguernon = User::new("iguernon","iguernon@example.com", "hashed", true, &None, &db, &config).await?;
+    let mut iguernon = User::new("nbertrand","nbertrand@example.com", "hashed", true, &None, &db, &config).await?;
     let mut tmarceau = User::new("tmarceau","tmarceau@example.com", "hashed", true, &None, &db, &config).await?;
     let mut cbabin = User::new("cbabin",  "cbabin@example.com", "hashed", true, &None, &db, &config).await?;
     let mut lgrignon = User::new("lgrignon","lgrignon@example.com", "hashed", true, &None, &db, &config).await?;
