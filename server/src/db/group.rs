@@ -225,21 +225,37 @@ pub struct Evaluation {
 /// Creates some users in the db.
 #[rustfmt::skip]
 pub async fn populate_db(db: &Db, config: &Config) -> Result<()> {
+    use crate::db::user::Plan;
+
     // Find the admin (teacher)
-    let polymny = User::get_by_username("polymny", &db).await.unwrap().unwrap();
+    let mut polymny = User::get_by_username("polymny", &db).await.unwrap().unwrap();
+    polymny.username = "tforgione".into();
+    polymny.save(&db).await?;
 
     // Create a bunch of students
-    let iguernon = User::new("iguernon","iguernon@example.com", "hashed", true, &None, &db, &config).await?;
-    let tmarceau = User::new("tmarceau","tmarceau@example.com", "hashed", true, &None, &db, &config).await?;
-    let cbabin = User::new("cbabin",  "cbabin@example.com", "hashed", true, &None, &db, &config).await?;
-    let lgrignon = User::new("lgrignon","lgrignon@example.com", "hashed", true, &None, &db, &config).await?;
-    let epaquin = User::new("epaquin", "epaquin@example.com", "hashed", true, &None, &db, &config).await?;
-    let dsalmons = User::new("dsalmons","dsalmons@example.com", "hashed", true, &None, &db, &config).await?;
-    let lsacre = User::new("lsacre",  "lsacre@example.com", "hashed", true, &None, &db, &config).await?;
-    let ysalois = User::new("ysalois", "ysalois@example.com", "hashed", true, &None, &db, &config).await?;
-    let rseguin = User::new("rseguin", "rseguin@example.com", "hashed", true, &None, &db, &config).await?;
-    let xbrodeur = User::new("xbrodeur","xbrodeur@example.com", "hashed", true, &None, &db, &config).await?;
+    let mut iguernon = User::new("iguernon","iguernon@example.com", "hashed", true, &None, &db, &config).await?;
+    let mut tmarceau = User::new("tmarceau","tmarceau@example.com", "hashed", true, &None, &db, &config).await?;
+    let mut cbabin = User::new("cbabin",  "cbabin@example.com", "hashed", true, &None, &db, &config).await?;
+    let mut lgrignon = User::new("lgrignon","lgrignon@example.com", "hashed", true, &None, &db, &config).await?;
+    let mut epaquin = User::new("epaquin", "epaquin@example.com", "hashed", true, &None, &db, &config).await?;
+    let mut dsalmons = User::new("dsalmons","dsalmons@example.com", "hashed", true, &None, &db, &config).await?;
+    let mut lsacre = User::new("lsacre",  "lsacre@example.com", "hashed", true, &None, &db, &config).await?;
+    let mut ysalois = User::new("ysalois", "ysalois@example.com", "hashed", true, &None, &db, &config).await?;
+    let mut rseguin = User::new("rseguin", "rseguin@example.com", "hashed", true, &None, &db, &config).await?;
+    let mut xbrodeur = User::new("xbrodeur","xbrodeur@example.com", "hashed", true, &None, &db, &config).await?;
 
+    iguernon.plan = Plan::PremiumLvl1; iguernon.save(&db).await?;
+    tmarceau.plan = Plan::PremiumLvl1; tmarceau.save(&db).await?;
+    cbabin.plan   = Plan::PremiumLvl1; cbabin.save(&db).await?;
+    lgrignon.plan = Plan::PremiumLvl1; lgrignon.save(&db).await?;
+    epaquin.plan  = Plan::PremiumLvl1; epaquin.save(&db).await?;
+    dsalmons.plan = Plan::PremiumLvl1; dsalmons.save(&db).await?;
+    lsacre.plan   = Plan::PremiumLvl1; lsacre.save(&db).await?;
+    ysalois.plan  = Plan::PremiumLvl1; ysalois.save(&db).await?;
+    rseguin.plan  = Plan::PremiumLvl1; rseguin.save(&db).await?;
+    xbrodeur.plan = Plan::PremiumLvl1; xbrodeur.save(&db).await?;
+
+    /*
     // Create a few groups
     let group1 = Group::create("Terminale 1").save(&db).await?;
     group1.add_participant(&polymny, ParticipantRole::Teacher, &db).await?;
@@ -317,6 +333,7 @@ pub async fn populate_db(db: &Db, config: &Config) -> Result<()> {
     answer_template.structure = EJson(gos);
     answer_template.set_changed();
     answer_template.save(&db).await?;
+    */
 
     Ok(())
 }
