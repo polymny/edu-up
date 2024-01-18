@@ -267,7 +267,7 @@ updateUser capsule user =
         capsuleMapper : Capsule -> ( Capsule, Bool )
         capsuleMapper c =
             if c.id == capsule.id then
-                fixPresign c capsule
+                ( fixPresign c capsule, True )
 
             else
                 ( c, False )

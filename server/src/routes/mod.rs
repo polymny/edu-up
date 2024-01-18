@@ -293,8 +293,9 @@ pub async fn courses(
     db: Db,
     user: Option<User>,
     lang: Lang,
+    storage: &S<Storage>,
 ) -> Either<Html<String>, Redirect> {
-    index_without_cors(config, db, user, lang).await
+    index_without_cors(config, db, user, lang, storage.inner().s3()).await
 }
 
 /// The route to the courses page.
@@ -305,8 +306,9 @@ pub async fn courses_with_group_id(
     user: Option<User>,
     lang: Lang,
     _id: u64,
+    storage: &S<Storage>,
 ) -> Either<Html<String>, Redirect> {
-    index_without_cors(config, db, user, lang).await
+    index_without_cors(config, db, user, lang, storage.inner().s3()).await
 }
 
 /// The route to the admin dashboard page.

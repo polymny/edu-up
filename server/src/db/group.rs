@@ -5,16 +5,12 @@ use futures::future::try_join_all;
 use serde::{Deserialize, Serialize};
 
 use ergol::prelude::*;
-use ergol::tokio_postgres::types::Json as EJson;
 
 use rocket::http::Status;
 use rocket::serde::json::{json, Value};
 
-use tokio::fs::create_dir_all;
-
-use crate::command::export_slides;
 use crate::config::Config;
-use crate::db::capsule::{Capsule, Fade, Gos, Role, Slide};
+use crate::db::capsule::{Capsule, Role};
 use crate::db::user::User;
 use crate::{Db, Error, Result, HARSH};
 
@@ -233,16 +229,16 @@ pub async fn populate_db(db: &Db, config: &Config) -> Result<()> {
     polymny.save(&db).await?;
 
     // Create a bunch of students
-    let mut iguernon = User::new("nbertrand","nbertrand@example.com", "hashed", true, &None, &db, &config).await?;
-    let mut tmarceau = User::new("tmarceau","tmarceau@example.com", "hashed", true, &None, &db, &config).await?;
-    let mut cbabin = User::new("cbabin",  "cbabin@example.com", "hashed", true, &None, &db, &config).await?;
-    let mut lgrignon = User::new("lgrignon","lgrignon@example.com", "hashed", true, &None, &db, &config).await?;
-    let mut epaquin = User::new("epaquin", "epaquin@example.com", "hashed", true, &None, &db, &config).await?;
-    let mut dsalmons = User::new("dsalmons","dsalmons@example.com", "hashed", true, &None, &db, &config).await?;
-    let mut lsacre = User::new("lsacre",  "lsacre@example.com", "hashed", true, &None, &db, &config).await?;
-    let mut ysalois = User::new("ysalois", "ysalois@example.com", "hashed", true, &None, &db, &config).await?;
-    let mut rseguin = User::new("rseguin", "rseguin@example.com", "hashed", true, &None, &db, &config).await?;
-    let mut xbrodeur = User::new("xbrodeur","xbrodeur@example.com", "hashed", true, &None, &db, &config).await?;
+    let mut iguernon = User::new("nbertrand","nbertrand@example.com", Some("hashed"), true, &None, &db, &config).await?;
+    let mut tmarceau = User::new("tmarceau","tmarceau@example.com", Some("hashed"), true, &None, &db, &config).await?;
+    let mut cbabin = User::new("cbabin",  "cbabin@example.com", Some("hashed"), true, &None, &db, &config).await?;
+    let mut lgrignon = User::new("lgrignon","lgrignon@example.com", Some("hashed"), true, &None, &db, &config).await?;
+    let mut epaquin = User::new("epaquin", "epaquin@example.com", Some("hashed"), true, &None, &db, &config).await?;
+    let mut dsalmons = User::new("dsalmons","dsalmons@example.com", Some("hashed"), true, &None, &db, &config).await?;
+    let mut lsacre = User::new("lsacre",  "lsacre@example.com", Some("hashed"), true, &None, &db, &config).await?;
+    let mut ysalois = User::new("ysalois", "ysalois@example.com", Some("hashed"), true, &None, &db, &config).await?;
+    let mut rseguin = User::new("rseguin", "rseguin@example.com", Some("hashed"), true, &None, &db, &config).await?;
+    let mut xbrodeur = User::new("xbrodeur","xbrodeur@example.com", Some("hashed"), true, &None, &db, &config).await?;
 
     iguernon.plan = Plan::PremiumLvl1; iguernon.save(&db).await?;
     tmarceau.plan = Plan::PremiumLvl1; tmarceau.save(&db).await?;

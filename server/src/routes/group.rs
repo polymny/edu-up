@@ -12,7 +12,8 @@ use crate::config::Config;
 use crate::db::capsule::{Capsule, Role};
 use crate::db::group::{Answer, Assignment, AssignmentState, Group, ParticipantRole};
 use crate::db::user::User;
-use crate::websockets::WebSockets;
+use crate::storage::Storage;
+use crate::websockets::Notifier;
 use crate::{Db, Error, HashId, Result};
 
 /// The data for the new group form.
@@ -303,8 +304,9 @@ pub async fn validate_assignment(
     user: User,
     db: Db,
     config: &S<Config>,
-    socks: &S<WebSockets>,
+    socks: &S<Notifier>,
     form: Json<ValidateAssignmentForm>,
+    storage: &S<Storage>,
 ) -> Result<()> {
     let form = form.into_inner();
 
@@ -353,7 +355,7 @@ pub async fn validate_assignment(
         new.sound_track = template.sound_track.clone();
         new.duration_ms = template.duration_ms;
 
-        for dir in ["assets", "tmp", "output"] {
+        for dir in ["assets", "produced", "published"] {
             let orig = config.data_path.join(&format!("{}/{}", template.id, dir));
             let dest = config.data_path.join(&format!("{}/{}", new.id, dir));
 
@@ -385,22 +387,11 @@ pub async fn validate_assignment(
             }
         }
 
-        let orig = config
-            .data_path
-            .join(&format!("{}/output.mp4", template.id));
-        let dest = config.data_path.join(&format!("{}/output.mp4", new.id));
-
-        if orig.is_file() {
-            copy(orig, dest)
-                .await
-                .map_err(|_| Error(Status::InternalServerError))?;
-        }
-
         new.add_user(&student, Role::Write, &db).await?;
 
         new.set_changed();
         new.save(&db).await?;
-        new.notify_change(&db, &socks).await?;
+        new.notify_change(&db, &socks, storage.s3()).await?;
 
         Answer::new(&assignment, &new).save(&db).await?;
     }

@@ -144,7 +144,7 @@ assignmentView config user ( assignment, answer ) =
                                 Ui.Route <| Route.Preparation <| subjectCapsule.id
 
                              else
-                                Ui.NewTab <| Maybe.withDefault "" <| Data.videoPath subjectCapsule
+                                Ui.NewTab <| Maybe.withDefault "" <| Data.capsuleVideoPath subjectCapsule
                             )
                             [ Element.text "[Sujet]"
                                 |> Element.el [ Ui.p 5, Ui.at, Ui.al, Background.color Colors.greyBorder, Ui.rbr 5 ]
@@ -298,7 +298,15 @@ assignmentView config user ( assignment, answer ) =
                                     , Font.color Colors.greyBackground
                                     ]
                                     (Element.el [ Ui.cx ] <| Element.text <| Utils.tern a.finished "[Terminé]" "[En cours]")
-                                , case ( a.finished, Data.getCapsuleById a.capsule user |> Maybe.andThen (\x -> Data.videoPath x) ) of
+                                , case
+                                    ( a.finished
+                                    , Data.getCapsuleById a.capsule user
+                                        |> Maybe.andThen
+                                            (\x ->
+                                                Data.capsuleVideoPath x
+                                            )
+                                    )
+                                  of
                                     ( True, Just url ) ->
                                         Ui.link []
                                             { action = Ui.NewTab url
