@@ -272,7 +272,7 @@ view model =
                     , only [ Unlogged.SignUp ] <|
                         Input.checkbox []
                             { label =
-                                Input.labelRight [ Ui.wf ] <|
+                                Input.labelRight [ Ui.wf, Ui.cy ] <|
                                     Element.paragraph [ Ui.wf ]
                                         [ Element.text <| Strings.loginAcceptTermsOfServiceBegining lang ++ " "
                                         , Ui.link []
@@ -280,15 +280,15 @@ view model =
                                             , action = Ui.NewTab "https://polymny.studio/cgu-consommateurs/"
                                             }
                                         ]
-                            , icon = Input.defaultCheckbox
+                            , icon = Ui.checkbox False
                             , onChange = Unlogged.AcceptTermsOfServiceChanged
                             , checked = model.acceptTermsOfService
                             }
                     , only [ Unlogged.SignUp ] acceptError
                     , only [ Unlogged.SignUp ] <|
                         Input.checkbox []
-                            { label = Input.labelRight [] <| Element.text <| Strings.loginSignUpForTheNewsletter lang
-                            , icon = Input.defaultCheckbox
+                            { label = Input.labelRight [ Ui.cy ] <| Element.text <| Strings.loginSignUpForTheNewsletter lang
+                            , icon = Ui.checkbox False
                             , onChange = Unlogged.SignUpForNewsletterChanged
                             , checked = model.signUpForNewsletter
                             }
@@ -332,15 +332,28 @@ view model =
                         ]
                 ]
     in
-    if model.hasCookie then
-        Element.el [ Ui.wf ] <|
-            Ui.primary [ Ui.cx ]
-                { label = Element.text <| Strings.uiOpenPolymny lang
-                , action = Ui.Route <| Route.Custom model.serverRoot
+    case ( model.hasCookie, model.openid ) of
+        ( _, Just ( root, client ) ) ->
+            Ui.link [ Ui.cx, Ui.p 10 ]
+                { label = "[Se connecter via OpenID]"
+                , action =
+                    root
+                        ++ "/protocol/openid-connect/auth?response_type=code&redirect_uri="
+                        ++ model.serverRoot
+                        ++ "/openid&client_id="
+                        ++ client
+                        |> Ui.NewTab
                 }
 
-    else
-        form
+        ( True, _ ) ->
+            Element.el [ Ui.wf ] <|
+                Ui.primary [ Ui.cx ]
+                    { label = Element.text <| Strings.uiOpenPolymny lang
+                    , action = Ui.Route <| Route.Custom model.serverRoot
+                    }
+
+        _ ->
+            form
 
 
 {-| Sup.

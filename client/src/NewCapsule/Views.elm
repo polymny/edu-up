@@ -13,6 +13,8 @@ import Data.User as Data exposing (User)
 import Element exposing (Element)
 import Element.Border as Border
 import Element.Input as Input
+import Html
+import Html.Attributes
 import NewCapsule.Types as NewCapsule
 import RemoteData
 import Strings
@@ -44,23 +46,9 @@ view config _ model =
                 , onChange = \x -> App.NewCapsuleMsg (NewCapsule.NameChanged x)
                 }
 
-        pageContent =
-            case ( model.slideUpload, model.capsuleUpdate ) of
-                ( RemoteData.Loading _, _ ) ->
-                    Ui.animatedEl Ui.spin [ Ui.cx ] (Ui.icon 60 Ui.spinner)
-
-                ( _, ( _, RemoteData.Loading _ ) ) ->
-                    Ui.animatedEl Ui.spin [ Ui.cx ] (Ui.icon 60 Ui.spinner)
-
-                ( RemoteData.Success ( capsule, slides ), _ ) ->
-                    slidesView capsule slides
-
-                _ ->
-                    Element.none
-
         bottomBar =
-            case ( model.slideUpload, model.capsuleUpdate ) of
-                ( RemoteData.Success _, ( _, RemoteData.NotAsked ) ) ->
+            case ( model.capsuleUpdate, model.renderFinished ) of
+                ( RemoteData.NotAsked, True ) ->
                     Element.row [ Ui.wf, Element.spacing 10 ]
                         [ Ui.secondary []
                             { action = Ui.Msg <| App.NewCapsuleMsg <| NewCapsule.Cancel
@@ -77,12 +65,12 @@ view config _ model =
                         ]
 
                 _ ->
-                    Element.none
+                    Ui.animatedEl Ui.spin [ Ui.cx ] (Ui.icon 60 Ui.spinner)
     in
     ( Element.row [ Ui.wf, Ui.hf, Ui.p 10 ]
         [ Element.el [ Ui.wfp 1 ] Element.none
         , Element.column [ Ui.wfp 6, Element.spacing 10, Element.alignTop ]
-            [ projectInput, nameInput, pageContent, bottomBar ]
+            [ projectInput, nameInput, slidesView model.structure, bottomBar ]
         , Element.el [ Ui.wfp 1 ] Element.none
         ]
     , Element.none
@@ -91,9 +79,9 @@ view config _ model =
 
 {-| Shows the slides with the delimiters.
 -}
-slidesView : Data.Capsule -> List NewCapsule.Slide -> Element App.Msg
-slidesView capsule slides =
-    makeView capsule slides
+slidesView : List Int -> Element App.Msg
+slidesView structure =
+    makeView structure
         |> Utils.regroupFixed 10
         |> List.map
             (List.indexedMap
@@ -110,22 +98,22 @@ slidesView capsule slides =
                 )
             )
         |> List.map (Element.row [ Ui.wf ])
-        |> Element.column [ Element.spacing 10, Ui.wf, Ui.hf ]
+        |> Element.column [ Element.spacing 10, Ui.wf, Ui.hf, Ui.id "pdf-viewer" ]
 
 
-makeView : Data.Capsule -> List NewCapsule.Slide -> List (Element App.Msg)
-makeView capsule input =
-    makeViewAux capsule [] input |> List.reverse
+makeView : List Int -> List (Element App.Msg)
+makeView input =
+    makeViewAux [] (List.indexedMap Tuple.pair input) |> List.reverse
 
 
-makeViewAux : Data.Capsule -> List (Element App.Msg) -> List NewCapsule.Slide -> List (Element App.Msg)
-makeViewAux capsule acc input =
-    case input of
-        h1 :: h2 :: t ->
-            makeViewAux capsule (delimiterView h1 h2 :: slideView capsule h1 :: acc) (h2 :: t)
+makeViewAux : List (Element App.Msg) -> List ( Int, Int ) -> List (Element App.Msg)
+makeViewAux acc structure =
+    case structure of
+        ( i1, h1 ) :: ( i2, h2 ) :: t ->
+            makeViewAux (delimiterView i1 h1 h2 :: slideView :: acc) (( i2, h2 ) :: t)
 
-        h1 :: [] ->
-            slideView capsule h1 :: acc
+        _ :: [] ->
+            slideView :: acc
 
         [] ->
             acc
@@ -133,14 +121,15 @@ makeViewAux capsule acc input =
 
 {-| Shows a slide of the capsule.
 -}
-slideView : Data.Capsule -> NewCapsule.Slide -> Element App.Msg
-slideView capsule ( i, _, s ) =
-    Element.el [ Ui.wf ]
-        (Element.image [ Border.color Colors.greyBorder, Ui.b 1, Ui.wf ]
-            { description = "Slide number " ++ String.fromInt i
-            , src = Data.assetPath capsule (s.uuid ++ ".png")
-            }
-        )
+slideView : Element App.Msg
+slideView =
+    Element.el [ Ui.wf ] <|
+        Element.html <|
+            Html.canvas
+                [ Html.Attributes.class "wf"
+                , Html.Attributes.class "hf"
+                ]
+                []
 
 
 {-| Show a vertical delimiter between two slides.
@@ -148,8 +137,8 @@ slideView capsule ( i, _, s ) =
 If the slides belong to the same grain, the delimiter will be dashed, otherwise, it will be solid.
 
 -}
-delimiterView : NewCapsule.Slide -> NewCapsule.Slide -> Element App.Msg
-delimiterView ( index1, grain1, _ ) ( _, grain2, _ ) =
+delimiterView : Int -> Int -> Int -> Element App.Msg
+delimiterView index1 grain1 grain2 =
     let
         border =
             if grain1 == grain2 then

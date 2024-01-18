@@ -1,8 +1,12 @@
-module Api.Capsule exposing (uploadSlideShow, updateCapsule, duplicateCapsule, addSlide, addGos, replaceSlide, produceCapsule, publishCapsule, unpublishCapsule, uploadTrack, deleteRecord, addCollaborator, removeCollaborator, changeCollaboratorRole)
+module Api.Capsule exposing
+    ( uploadSlideShow, getCapsule, updateCapsule, duplicateCapsule, addSlide, addGos, replaceSlide, produceCapsule
+    , produceGos, publishCapsule, unpublishCapsule, uploadTrack, deleteRecord, addCollaborator, removeCollaborator, changeCollaboratorRole
+    )
 
 {-| This module contains all the functions to deal with the API of capsules.
 
-@docs uploadSlideShow, updateCapsule, duplicateCapsule, addSlide, addGos, replaceSlide, produceCapsule, publishCapsule, unpublishCapsule, uploadTrack, deleteRecord, addCollaborator, removeCollaborator, changeCollaboratorRole
+@docs uploadSlideShow, getCapsule, updateCapsule, duplicateCapsule, addSlide, addGos, replaceSlide, produceCapsule
+@docs produceGos, publishCapsule, unpublishCapsule, uploadTrack, deleteRecord, addCollaborator, removeCollaborator, changeCollaboratorRole
 
 -}
 
@@ -40,6 +44,18 @@ uploadSlideShow { project, fileValue, file, toMsg } =
         }
 
 
+{-| Gets a capsule from the server.
+-}
+getCapsule : String -> (WebData Data.Capsule -> msg) -> Cmd msg
+getCapsule id toMsg =
+    Api.getJson
+        { url = "/api/capsule/" ++ id
+        , body = Http.emptyBody
+        , toMsg = toMsg
+        , decoder = Data.decodeCapsule
+        }
+
+
 {-| Updates a caspule on the server.
 -}
 updateCapsule : Data.Capsule -> (WebData () -> msg) -> Cmd msg
@@ -53,10 +69,18 @@ updateCapsule capsule toMsg =
 
 {-| Adds a slide to a gos.
 -}
-addSlide : Data.Capsule -> Int -> Int -> File -> Config.TaskId -> (WebData Data.Capsule -> msg) -> Cmd msg
-addSlide capsule gos page file taskId toMsg =
+addSlide : Data.Capsule -> Int -> List Int -> File -> Config.TaskId -> (WebData Data.Capsule -> msg) -> Cmd msg
+addSlide capsule gos pages file taskId toMsg =
+    let
+        pagesStr : String
+        pagesStr =
+            pages
+                |> List.map (\x -> x - 1)
+                |> List.map String.fromInt
+                |> String.join ","
+    in
     Api.postWithTrackerJson ("task-track-" ++ String.fromInt taskId)
-        { url = "/api/add-slide/" ++ capsule.id ++ "/" ++ String.fromInt gos ++ "/" ++ String.fromInt (page - 1)
+        { url = "/api/add-slide/" ++ capsule.id ++ "/" ++ String.fromInt gos ++ "/" ++ pagesStr
         , body = Http.fileBody file
         , decoder = Data.decodeCapsule
         , toMsg = toMsg
@@ -65,10 +89,18 @@ addSlide capsule gos page file taskId toMsg =
 
 {-| Adds a gos to a structure.
 -}
-addGos : Data.Capsule -> Int -> Int -> File -> Config.TaskId -> (WebData Data.Capsule -> msg) -> Cmd msg
-addGos capsule gos page file taskId toMsg =
+addGos : Data.Capsule -> Int -> List Int -> File -> Config.TaskId -> (WebData Data.Capsule -> msg) -> Cmd msg
+addGos capsule gos pages file taskId toMsg =
+    let
+        pagesStr : String
+        pagesStr =
+            pages
+                |> List.map (\x -> x - 1)
+                |> List.map String.fromInt
+                |> String.join ","
+    in
     Api.postWithTrackerJson ("task-track-" ++ String.fromInt taskId)
-        { url = "/api/add-gos/" ++ capsule.id ++ "/" ++ String.fromInt gos ++ "/" ++ String.fromInt (page - 1)
+        { url = "/api/add-gos/" ++ capsule.id ++ "/" ++ String.fromInt gos ++ "/" ++ pagesStr
         , body = Http.fileBody file
         , decoder = Data.decodeCapsule
         , toMsg = toMsg
@@ -77,12 +109,32 @@ addGos capsule gos page file taskId toMsg =
 
 {-| Replaces a slide.
 -}
-replaceSlide : Data.Capsule -> Data.Slide -> Int -> File -> Config.TaskId -> (WebData Data.Capsule -> msg) -> Cmd msg
-replaceSlide capsule slide page file taskId toMsg =
+replaceSlide : Data.Capsule -> Data.Slide -> List Int -> File -> Config.TaskId -> (WebData Data.Capsule -> msg) -> Cmd msg
+replaceSlide capsule slide pages file taskId toMsg =
+    let
+        page : String
+        page =
+            pages
+                |> List.head
+                |> Maybe.withDefault 0
+                |> (\x -> x - 1)
+                |> String.fromInt
+    in
     Api.postWithTrackerJson ("task-track-" ++ String.fromInt taskId)
-        { url = "/api/replace-slide/" ++ capsule.id ++ "/" ++ slide.uuid ++ "/" ++ String.fromInt (page - 1)
+        { url = "/api/replace-slide/" ++ capsule.id ++ "/" ++ slide.uuid ++ "/" ++ page
         , body = Http.fileBody file
         , decoder = Data.decodeCapsule
+        , toMsg = toMsg
+        }
+
+
+{-| Triggers the production of a grain.
+-}
+produceGos : Data.Capsule -> Int -> (WebData () -> msg) -> Cmd msg
+produceGos capsule gosId toMsg =
+    Api.post
+        { url = "/api/produce-gos/" ++ capsule.id ++ "/" ++ String.fromInt gosId
+        , body = Http.emptyBody
         , toMsg = toMsg
         }
 

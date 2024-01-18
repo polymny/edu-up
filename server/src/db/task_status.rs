@@ -27,3 +27,8 @@ pub enum TaskStatus {
     /// Finished with failure
     Failed,
 }
+
+/// Helper for serde default value.
+pub fn idle() -> TaskStatus {
+    TaskStatus::Idle
+}

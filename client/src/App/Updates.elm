@@ -8,6 +8,8 @@ port module App.Updates exposing (update, updateModel, subs)
 
 import Acquisition.Types as Acquisition
 import Acquisition.Updates as Acquisition
+import Admin.Types as Admin
+import Admin.Updates as Admin
 import Api.User as Api
 import App.Types as App
 import App.Utils as App
@@ -20,6 +22,7 @@ import Data.Capsule as Data
 import Data.Types as Data
 import Data.User as Data
 import Device
+import Home.Types as Home
 import Home.Updates as Home
 import Json.Decode as Decode exposing (Decoder)
 import NewCapsule.Types as NewCapsule
@@ -213,11 +216,11 @@ updateModel msg model =
                         ( True, { model | page = App.Acquisition { m1 | warnLeaving = Just <| Route.Acquisition m2.capsule m2.gos } } )
 
                     else
-                        ( False, finalModel )
+                        ( False, updatedModel )
 
                 -- We should not warn if you're ending in acqusition page otherwise
                 ( _, App.Acquisition _ ) ->
-                    ( False, finalModel )
+                    ( False, updatedModel )
 
                 -- However, we should warn if you're leaving the acquisition page
                 ( App.Acquisition m, newPage ) ->
@@ -226,36 +229,10 @@ updateModel msg model =
                         ( True, { model | page = App.Acquisition { m | warnLeaving = Just <| App.routeFromPage newPage } } )
 
                     else
-                        ( False, finalModel )
+                        ( False, updatedModel )
 
                 _ ->
-                    ( False, finalModel )
-
-        -- We check if the user exited the new capsule page,
-        -- in which case we should concidered they canceled.
-        ( finalModel, cancelNewCapsCmd ) =
-            case ( model.page, updatedModel.page, App.capsuleAndGos updatedModel.user updatedModel.page ) of
-                ( _, App.NewCapsule _, _ ) ->
-                    ( updatedModel, Cmd.none )
-
-                ( App.NewCapsule m, _, ( c2, _ ) ) ->
-                    case m.slideUpload of
-                        RemoteData.Success ( c, _ ) ->
-                            if Just c.id /= Maybe.map .id c2 then
-                                ( { updatedModel
-                                    | user = Data.deleteCapsule c updatedModel.user
-                                  }
-                                , Api.deleteCapsule c (\_ -> App.Noop)
-                                )
-
-                            else
-                                ( updatedModel, Cmd.none )
-
-                        _ ->
-                            ( updatedModel, Cmd.none )
-
-                _ ->
-                    ( updatedModel, Cmd.none )
+                    ( False, updatedModel )
 
         -- Check if we need to change the before unload value
         clientTasksRemaining =
@@ -332,14 +309,25 @@ updateModel msg model =
                 App.CoursesMsg sMsg ->
                     Courses.update sMsg model
 
+                App.AdminMsg aMsg ->
+                    Admin.update aMsg model
+
                 App.WebSocketMsg (App.CapsuleUpdated c) ->
                     let
                         newPage =
                             case model.page of
                                 App.Preparation m ->
                                     let
+                                        newCapsule =
+                                            case Data.getCapsuleById m.capsule model.user of
+                                                Just capsule ->
+                                                    Data.fixPresign capsule c
+
+                                                _ ->
+                                                    c
+
                                         newModel =
-                                            Preparation.init c
+                                            Preparation.init newCapsule
 
                                         final =
                                             { newModel | popupType = m.popupType, displayPopup = m.displayPopup }
@@ -351,11 +339,11 @@ updateModel msg model =
                     in
                     ( { model | user = Data.updateUser c model.user, page = newPage }, Cmd.none )
 
-                App.WebSocketMsg (App.ProductionProgress id progress finished) ->
+                App.WebSocketMsg (App.CapsuleProductionProgress id progress finished) ->
                     let
                         task : Config.TaskStatus
                         task =
-                            { task = Config.Production -1 id
+                            { task = Config.CapsuleProduction -1 id
                             , progress = Just progress
                             , finished = finished
                             , aborted = False
@@ -386,8 +374,68 @@ updateModel msg model =
                                                     finished
                                                     Data.Done
                                                     (Data.Running (Just progress))
+                                            , structure =
+                                                if finished then
+                                                    capsule.structure
+                                                        |> List.map (\x -> { x | produced = Data.Done })
+
+                                                else
+                                                    capsule.structure
                                         }
                                         model.user
+                            }
+                    in
+                    ( newModel, Cmd.none )
+
+                App.WebSocketMsg (App.GosProductionProgress id gosId progress finished) ->
+                    let
+                        task : Config.TaskStatus
+                        task =
+                            { task = Config.GosProduction -1 id gosId
+                            , progress = Just progress
+                            , finished = finished
+                            , aborted = False
+                            , global = True
+                            }
+
+                        newConfig : Config.Config
+                        newConfig =
+                            Tuple.first <| Config.update (Config.UpdateTaskStatus task) model.config
+
+                        capsule : Data.Capsule
+                        capsule =
+                            model.user.projects
+                                |> List.concatMap .capsules
+                                |> List.filter (\x -> x.id == id)
+                                |> List.head
+                                |> Maybe.withDefault Data.emptyCapsule
+
+                        gos : Data.Gos
+                        gos =
+                            capsule.structure
+                                |> List.drop gosId
+                                |> List.head
+                                |> Maybe.withDefault Data.emptyGos
+
+                        newGos : Data.Gos
+                        newGos =
+                            { gos
+                                | produced =
+                                    Utils.tern
+                                        finished
+                                        Data.Done
+                                        (Data.Running (Just progress))
+                            }
+
+                        newCapsule : Data.Capsule
+                        newCapsule =
+                            Data.updateGos gosId newGos capsule
+
+                        newModel : App.Model
+                        newModel =
+                            { model
+                                | config = newConfig
+                                , user = Data.updateUser newCapsule model.user
                             }
                     in
                     ( newModel, Cmd.none )
@@ -464,6 +512,9 @@ updateModel msg model =
                     in
                     if route == App.routeFromPage model.page then
                         case model.page of
+                            App.NewCapsule _ ->
+                                ( { model | page = App.Home Home.init }, Cmd.none )
+
                             App.Acquisition m ->
                                 -- This is ugly but I don't know how to do it otherwise.
                                 -- When the user has non validated records, but try to leave the acquisition page, a
@@ -496,6 +547,16 @@ updateModel msg model =
                 App.ExternalUrl url ->
                     ( model, Browser.Navigation.load url )
 
+                App.AddExternalCapsule capsule route ->
+                    let
+                        newUser =
+                            Data.addCapsule { capsule | hidden = True } model.user
+
+                        ( newPage, newCmd ) =
+                            App.pageFromRoute model.config newUser route
+                    in
+                    ( { model | page = newPage, user = newUser }, newCmd )
+
                 App.Logout ->
                     ( model, Api.logout App.LoggedOut )
 
@@ -511,11 +572,10 @@ updateModel msg model =
         leavingModel
 
       else
-        finalModel
+        updatedModel
     , Cmd.batch
         [ updatedCmd
         , stopSoundtrackCmd
-        , cancelNewCapsCmd
         , unbindDevice
         , beforeUnloadCmd
         , clearPointerAndCallbacksCmd
@@ -548,7 +608,7 @@ subs m =
                         Home.subs
 
                     ( App.NewCapsule _, _, _ ) ->
-                        Sub.none
+                        NewCapsule.subs
 
                     ( App.Preparation x, _, _ ) ->
                         Preparation.subs x
@@ -570,6 +630,9 @@ subs m =
 
                     ( App.Courses _, _, _ ) ->
                         Courses.subs
+
+                    ( App.Admin a, _, _ ) ->
+                        Admin.subs a
 
                     _ ->
                         Sub.none
@@ -595,13 +658,29 @@ webSocketMsgDecoder =
                         Decode.map App.CapsuleUpdated Data.decodeCapsule
 
                     "capsule_production_progress" ->
-                        Decode.map2 (\y z -> App.ProductionProgress y z False)
+                        Decode.map2 (\y z -> App.CapsuleProductionProgress y z False)
                             (Decode.field "id" Decode.string)
                             (Decode.field "msg" decodePositiveFloat)
 
-                    "capsule_production_finished" ->
-                        Decode.map (\p -> App.ProductionProgress p 1.0 True)
+                    "gos_production_progress" ->
+                        Decode.map3 (\y z t -> App.GosProductionProgress y z t False)
                             (Decode.field "id" Decode.string)
+                            (Decode.field "gos_id" Decode.int)
+                            (Decode.field "msg" decodePositiveFloat)
+
+                    "capsule_production_finished" ->
+                        Decode.map (\p -> App.CapsuleProductionProgress p 1.0 True)
+                            (Decode.field "id" Decode.string)
+
+                    "gos_production_finished" ->
+                        Decode.map2 (\p t -> App.GosProductionProgress p t 1.0 True)
+                            (Decode.field "id" Decode.string)
+                            (Decode.field "gos_id" Decode.int)
+
+                    "capsule_publication_progress" ->
+                        Decode.map2 (\y z -> App.PublicationProgress y z False)
+                            (Decode.field "id" Decode.string)
+                            (Decode.field "msg" decodePositiveFloat)
 
                     "capsule_publication_finished" ->
                         Decode.map (\p -> App.PublicationProgress p 1.0 True)
@@ -610,13 +689,13 @@ webSocketMsgDecoder =
                     "video_upload_progress" ->
                         Decode.map3 (\y z t -> App.ExtraRecordProgress y z t False)
                             (Decode.field "slide_id" Decode.string)
-                            (Decode.field "capsule_id" Decode.string)
+                            (Decode.field "id" Decode.string)
                             (Decode.field "msg" decodePositiveFloat)
 
                     "video_upload_finished" ->
                         Decode.map2 (\p q -> App.ExtraRecordProgress p q 1.0 True)
                             (Decode.field "slide_id" Decode.string)
-                            (Decode.field "capsule_id" Decode.string)
+                            (Decode.field "id" Decode.string)
 
                     _ ->
                         Decode.fail <| "Unknown websocket msg type " ++ x

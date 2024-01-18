@@ -6,6 +6,7 @@ module Ui.Navbar exposing (navbar, bottombar, leftColumn, addLeftColumn, addLeft
 
 -}
 
+import Admin.Types as Admin
 import App.Types as App
 import App.Utils as App
 import Config exposing (ClientState, Config)
@@ -16,6 +17,7 @@ import Element exposing (Element)
 import Element.Background as Background
 import Element.Border as Border
 import Element.Font as Font
+import Element.Keyed
 import Html
 import Html.Attributes
 import Lang exposing (Lang)
@@ -59,7 +61,7 @@ navbar config page user =
                 Nothing ->
                     ( "", "" )
 
-        title : String
+        title : Maybe String
         title =
             case ( capsule2, user ) of
                 ( Just _, Just u ) ->
@@ -67,10 +69,10 @@ navbar config page user =
                         ( proj, caps ) =
                             getNamesFromPage u
                     in
-                    "[" ++ proj ++ "] " ++ caps
+                    Just <| "[" ++ proj ++ "] " ++ caps
 
                 _ ->
-                    ""
+                    Nothing
 
         logo =
             case Maybe.map .plan user of
@@ -153,10 +155,15 @@ navbar config page user =
     Element.row
         [ Ui.wf ]
         [ Ui.navigationElement (Ui.Route Route.Home) [ Ui.pl 10, Ui.pr 30 ] (logo 46)
-        , Ui.longText [ Ui.pr 30, Ui.wfp 1, Font.bold, Font.color Colors.greyBackground ] title
-        , case ( capsule2, page ) of
-            ( Just c, Just p ) ->
-                navButtons lang c p
+        , case title of
+            Just t ->
+                Ui.longText [ Ui.pr 30, Ui.wfp 1, Font.bold, Font.color Colors.greyBackground ] t
+
+            _ ->
+                Element.none
+        , case page of
+            Just p ->
+                navButtons lang capsule2 p
 
             _ ->
                 Element.none
@@ -194,6 +201,22 @@ navbar config page user =
                     [ Element.el [ Ui.wf ] Element.none
                     , errorMsg
                     , webSocketStatus
+                    , if Maybe.map .plan user == Just Data.Admin then
+                        Ui.navigationElement (Ui.Route <| Route.Admin <| Route.Users 0)
+                            [ Font.color Colors.white
+                            , Ui.r 100
+                            , Ui.p 4
+                            , Element.mouseOver [ Background.color <| Colors.alpha 0.1 ]
+                            , Transition.properties
+                                [ Transition.backgroundColor 200 []
+                                ]
+                                |> Element.htmlAttribute
+                            ]
+                        <|
+                            Ui.icon 25 Icons.settings
+
+                      else
+                        Element.none
                     , Element.el
                         [ Ui.hf
                         , Ui.id "task-panel"
@@ -369,12 +392,24 @@ taskPanel clientState =
                         Config.ImportCapsule _ ->
                             Strings.tasksImportCapsule lang
 
-                        Config.Production _ capsuleId ->
+                        Config.CapsuleProduction _ capsuleId ->
                             Strings.tasksProductionCapsule lang
                                 ++ "\n ("
                                 ++ Strings.dataCapsuleCapsule lang 1
                                 ++ ": "
                                 ++ capsuleId
+                                ++ ")"
+
+                        Config.GosProduction _ capsuleId gosId ->
+                            Strings.tasksProductionGos lang
+                                ++ "\n ("
+                                ++ Strings.dataCapsuleCapsule lang 1
+                                ++ ": "
+                                ++ capsuleId
+                                ++ ", "
+                                ++ Strings.dataCapsuleGrain lang 1
+                                ++ ": "
+                                ++ String.fromInt (gosId + 1)
                                 ++ ")"
 
                         Config.Publication _ capsuleId ->
@@ -577,7 +612,7 @@ taskPanel clientState =
 
 {-| This function creates a row with the navigation buttons of the different tabs of a capsule.
 -}
-navButtons : Lang -> String -> App.Page -> Element msg
+navButtons : Lang -> Maybe String -> App.Page -> Element msg
 navButtons lang capsuleId page =
     let
         buttonWidth : Int
@@ -635,8 +670,23 @@ navButtons lang capsuleId page =
                 App.Collaboration _ ->
                     5
 
+                App.Admin (Admin.Users _ _ _) ->
+                    0
+
+                App.Admin (Admin.Capsules _ _ _) ->
+                    1
+
                 _ ->
                     -1
+
+        isAdminPage : Bool
+        isAdminPage =
+            case page of
+                App.Admin _ ->
+                    True
+
+                _ ->
+                    False
 
         selectorMove : Float
         selectorMove =
@@ -711,58 +761,43 @@ navButtons lang capsuleId page =
                         ]
                     ]
     in
-    Element.row [ Ui.hf ]
-        [ selector selectorIndex
-        , makeButton (Route.Preparation capsuleId) (Strings.stepsPreparationPrepare lang) (selectorIndex /= 0)
-        , separator
-        , makeButton (Route.Acquisition capsuleId 0) (Strings.stepsAcquisitionRecord lang) (selectorIndex /= 1)
-        , separator
-        , makeButton (Route.Production capsuleId 0) (Strings.stepsProductionProduce lang) (selectorIndex /= 2)
-        , separator
-        , makeButton (Route.Publication capsuleId) (Strings.stepsPublicationPublish lang) (selectorIndex /= 3)
-        , separator
-        , makeButton (Route.Options capsuleId) (Strings.stepsOptionsOptions lang) (selectorIndex /= 4)
-        , separator
-        , makeButton (Route.Collaboration capsuleId) (Strings.stepsCollaborationCollaboration lang) (selectorIndex /= 5)
-        ]
+    case ( capsuleId, isAdminPage ) of
+        ( Just c, False ) ->
+            Element.row [ Ui.hf ]
+                [ selector selectorIndex
+                , makeButton (Route.Preparation c) (Strings.stepsPreparationPrepare lang) (selectorIndex /= 0)
+                , separator
+                , makeButton (Route.Acquisition c 0) (Strings.stepsAcquisitionRecord lang) (selectorIndex /= 1)
+                , separator
+                , makeButton (Route.Production c 0) (Strings.stepsProductionProduce lang) (selectorIndex /= 2)
+                , separator
+                , makeButton (Route.Publication c) (Strings.stepsPublicationPublish lang) (selectorIndex /= 3)
+                , separator
+                , makeButton (Route.Options c) (Strings.stepsOptionsOptions lang) (selectorIndex /= 4)
+                , separator
+                , makeButton (Route.Collaboration c) (Strings.stepsCollaborationCollaboration lang) (selectorIndex /= 5)
+                ]
+
+        ( _, True ) ->
+            Element.row [ Ui.hf ]
+                [ selector selectorIndex
+                , makeButton (Route.Admin (Route.Users 0)) "Users" (selectorIndex /= 0)
+                , separator
+                , makeButton (Route.Admin (Route.Capsules 0)) "Capsules" (selectorIndex /= 1)
+                ]
+
+        _ ->
+            -- Should be unreachable
+            Element.none
 
 
 {-| This function creates the bottom bar of the application.
 -}
 bottombar : Maybe Config -> Maybe App.Page -> Element App.MaybeMsg
-bottombar config page =
+bottombar config _ =
     let
         lang =
             Maybe.map (\x -> x.clientState.lang) config |> Maybe.withDefault Lang.default
-
-        pagePath =
-            case page of
-                Just (App.Preparation s) ->
-                    "/o/capsule/preparation/" ++ s.capsule
-
-                Just (App.Acquisition s) ->
-                    "/o/capsule/acquisition/" ++ s.capsule ++ "/" ++ String.fromInt (s.gos + 1)
-
-                Just (App.Production s) ->
-                    "/o/capsule/production/" ++ s.capsule ++ "/" ++ String.fromInt (s.gos + 1)
-
-                Just (App.Publication s) ->
-                    "/o/capsule/publication/" ++ s.capsule
-
-                Just (App.Options s) ->
-                    "/o/capsule/preparation/" ++ s.capsule
-
-                Just (App.Collaboration s) ->
-                    "/o/capsule/settings/" ++ s.capsule
-
-                Just (App.Profile _) ->
-                    "/o/settings/"
-
-                _ ->
-                    "/o/"
-
-        serverUrl =
-            Maybe.map (\x -> x.serverConfig.root) config
     in
     Element.row
         [ Background.color (Colors.grey 3)
@@ -778,16 +813,6 @@ bottombar config page =
             { label = "contacter@polymny.studio"
             , action = Ui.NewTab "mailto:contacter@polymny.studio"
             }
-        , Maybe.map
-            (\x ->
-                Ui.link
-                    [ Ui.ar, Element.mouseOver [ Font.color Colors.greyBackground ] ]
-                    { label = Strings.uiGoBackToOldClient lang
-                    , action = Ui.Route <| Route.Custom <| x ++ pagePath
-                    }
-            )
-            serverUrl
-            |> Maybe.withDefault Element.none
         , Ui.link
             [ Ui.ar
             , Element.mouseOver [ Font.color Colors.greyBackground ]
@@ -892,12 +917,12 @@ leftColumn lang page capsule selectedGos =
                     , Element.inFront inFrontButtons
                     ]
             in
-            case Maybe.andThen .extra (List.head gos.slides) of
+            case Maybe.andThen (Data.extraPath capsule) (List.head gos.slides) of
                 Just extra ->
-                    [ Html.source [ Html.Attributes.src <| Data.assetPath capsule extra ++ ".mp4" ] [] ]
+                    [ Html.source [ Html.Attributes.src extra ] [] ]
                         |> Html.video [ Html.Attributes.class "wf" ]
                         |> Element.html
-                        |> Element.el elementAttr
+                        |> (\x -> Element.Keyed.el elementAttr ( extra, x ))
 
                 _ ->
                     Element.image elementAttr

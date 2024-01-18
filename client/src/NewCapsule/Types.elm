@@ -7,7 +7,10 @@ module NewCapsule.Types exposing (Model, NextPage(..), Msg(..), Slide, init, pre
 -}
 
 import Data.Capsule as Data
+import FileValue
 import Lang exposing (Lang)
+import List.Extra
+import Ports
 import RemoteData exposing (WebData)
 import Strings
 import Triplet
@@ -17,11 +20,15 @@ import Utils
 {-| The model of the new capsule page.
 -}
 type alias Model =
-    { slideUpload : WebData ( Data.Capsule, List Slide )
-    , capsuleUpdate : ( NextPage, WebData () )
+    { structure : List Int
+    , capsuleUpdate : WebData ()
     , projectName : String
     , capsuleName : String
     , showProject : Bool
+    , pdfFile : FileValue.File
+    , numPages : Int
+    , nextPage : NextPage
+    , renderFinished : Bool
     }
 
 
@@ -43,14 +50,20 @@ type alias Slide =
 
 {-| An init function to easily create a model for the new capsule page.
 -}
-init : Lang -> Maybe String -> String -> WebData ( Data.Capsule, List Slide ) -> Model
-init lang projectName capsuleName slideUpload =
-    { slideUpload = slideUpload
-    , projectName = projectName |> Maybe.withDefault (Strings.stepsPreparationNewProject lang)
-    , capsuleName = capsuleName
-    , showProject = projectName /= Nothing
-    , capsuleUpdate = ( Preparation, RemoteData.NotAsked )
-    }
+init : Lang -> Maybe String -> String -> FileValue.File -> Int -> ( Model, Cmd Msg )
+init lang projectName capsuleName pdfFile numPages =
+    ( { projectName = projectName |> Maybe.withDefault (Strings.stepsPreparationNewProject lang)
+      , capsuleName = capsuleName
+      , showProject = projectName /= Nothing
+      , capsuleUpdate = RemoteData.NotAsked
+      , pdfFile = pdfFile
+      , numPages = numPages
+      , structure = List.indexedMap (\i _ -> i) <| List.repeat numPages ()
+      , nextPage = Preparation
+      , renderFinished = False
+      }
+    , Ports.renderPdfForm pdfFile
+    )
 
 
 {-| Prepares the capsule for easily accessing the first step of preparation.
@@ -74,7 +87,7 @@ The boolean attribute must be true if the two slides belong to the same grain an
 The integer attribute is the index of the delimiter (an index of 0 means a delimiter between slides 0 and 1).
 
 -}
-toggle : Bool -> Int -> List Slide -> List Slide
+toggle : Bool -> Int -> List Int -> List Int
 toggle split delimiter input =
     toggleAux [] split delimiter input |> List.reverse
 
@@ -84,86 +97,56 @@ toggle split delimiter input =
 Delimiter being -1 means that the index has been reached and that the gos indices must be updated.
 
 -}
-toggleAux : List Slide -> Bool -> Int -> List Slide -> List Slide
+toggleAux : List Int -> Bool -> Int -> List Int -> List Int
 toggleAux acc split delimiter input =
     case input of
-        ( i1, g1, s1 ) :: ( i2, g2, s2 ) :: t ->
+        h1 :: h2 :: t ->
             if delimiter == -1 then
                 -- If split is true, it means that the two slides belong to the same grain, and must be separated. We do
                 -- that by adding 1 to every gos index after have reached the delimiter index.
                 -- Otherwise, it means that the two slides belong to different grain, and must be regrouped
                 -- together. It means that we need to remove 1 from all gos indices after having reached the delimiter
                 -- index.
-                toggleAux (( i1, g1 + Utils.tern split 1 -1, s1 ) :: acc) split delimiter (( i2, g2, s2 ) :: t)
+                toggleAux ((h1 + Utils.tern split 1 -1) :: acc) split delimiter (h2 :: t)
 
             else
                 -- We haven't find the delimiter yet, so we keep searching.
-                toggleAux (( i1, g1, s1 ) :: acc) split (delimiter - 1) (( i2, g2, s2 ) :: t)
+                toggleAux (h1 :: acc) split (delimiter - 1) (h2 :: t)
 
-        ( i1, g1, s1 ) :: [] ->
+        h :: [] ->
             if delimiter == -1 then
-                ( i1, g1 + Utils.tern split 1 -1, s1 ) :: acc
+                h + Utils.tern split 1 -1 :: acc
 
             else
-                ( i1, g1, s1 ) :: acc
+                h :: acc
 
-        [] ->
-            acc
+        _ ->
+            []
 
 
 {-| Creates the list of gos from the list of slides.
 
-The caspule contains the structure, which is a List of Data.Gos. In the model of this page, we keep the capsule (because
-we need it update things), but also the List (Int, Int, Data.Slide) which contains the index of the gos and slide,
-because it makes it really easier for both the view and the update.
+The caspule contains the structure, which is a List of Data.Gos. In the model of this page, we only have the List Int
+which contains the index of the gos of each slide, because it makes it really easier for both the view and the update.
 
-This function allows to retrieve the structure of the capsule for the List (Int, Int, Data.Slide).
-
--}
-structureFromUi : List Slide -> List Data.Gos
-structureFromUi slides =
-    structureFromUiAux [] slides
-        |> List.map Tuple.second
-        |> List.map List.reverse
-        |> List.reverse
-        |> List.map (List.map Triplet.third)
-        |> List.map Data.gosFromSlides
-
-
-{-| Auxilary function used as a helper for structureFromUiAux.
-
-In this function, the `List (Int, List Slide)` is a simplified version of `Data.Gos`, because we only deal with slides.
-We also keep the Int which is the index of the gos, that we keep so we can easily check if the next slides belong to the
-same gos of if we have to create another gos.
+This function allows to retrieve the structure of the capsule from the List Int and List Data.Slide.
 
 -}
-structureFromUiAux : List ( Int, List Slide ) -> List Slide -> List ( Int, List Slide )
-structureFromUiAux acc slides =
-    case ( slides, acc ) of
-        ( [], _ ) ->
-            acc
-
-        ( h :: t, [] ) ->
-            structureFromUiAux [ ( Triplet.second h, [ h ] ) ] t
-
-        ( h :: t, ( currentGosId, currentGos ) :: t2 ) ->
-            -- If the next slide from the input belongs to the same gos as the previous one
-            if Triplet.second h == currentGosId then
-                -- We add it into the list and keep going
-                structureFromUiAux (( currentGosId, h :: currentGos ) :: t2) t
-
-            else
-                -- Otherwise, we create its own gos
-                structureFromUiAux (( Triplet.second h, [ h ] ) :: ( currentGosId, currentGos ) :: t2) t
+structureFromUi : List Int -> List Data.Slide -> List Data.Gos
+structureFromUi structure slides =
+    List.map2 (\x y -> ( x, y )) structure slides
+        |> List.Extra.groupWhile (\x y -> Tuple.first x == Tuple.first y)
+        |> List.map (\( h, t ) -> Data.gosFromSlides <| List.map Tuple.second (h :: t))
 
 
 {-| The message type for the new capsule page.
 -}
 type Msg
-    = SlideUpload (WebData Data.Capsule)
-    | CapsuleUpdate ( NextPage, WebData () )
-    | NameChanged String
+    = NameChanged String
     | ProjectChanged String
     | DelimiterClicked Bool Int
     | Submit NextPage
     | Cancel
+    | PdfSent (WebData Data.Capsule)
+    | Finished Data.Capsule
+    | RenderFinished

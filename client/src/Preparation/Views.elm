@@ -16,6 +16,8 @@ import Element.Background as Background
 import Element.Border as Border
 import Element.Font as Font
 import Element.Input as Input
+import Element.Keyed
+import FileValue
 import Html
 import Html.Attributes
 import Lang exposing (Lang)
@@ -84,6 +86,9 @@ view config user model =
                     Preparation.ConfirmAddSlide gos ->
                         confirmAddSlidePopup lang gos
 
+                    Preparation.ConfirmUploadExtraVideo file slide ->
+                        confirmUploadExtraVideoPopup lang file slide
+
         groupedSlides : List (NeList Preparation.Slide)
         groupedSlides =
             model.slides
@@ -141,7 +146,7 @@ gosView config user model ( head, gos ) gosIndex =
                     -- Virtual gos, the button will create a new gos
                     Ui.primaryIcon [ Ui.cy ]
                         { icon = Icons.add
-                        , action = mkUiExtra (Preparation.Select Utils.Confirm (Preparation.AddGos (head.totalGosId // 2)))
+                        , action = mkUiExtra (Preparation.SelectAddGos Utils.Request (head.totalGosId // 2))
                         , tooltip = Strings.stepsPreparationCreateGrain config.clientState.lang
                         }
 
@@ -149,7 +154,7 @@ gosView config user model ( head, gos ) gosIndex =
                     -- Real gos, the button will add a slide at the end of the gos
                     Ui.primaryIcon [ Ui.cy ]
                         { icon = Icons.add
-                        , action = mkUiExtra (Preparation.Select Utils.Request (Preparation.AddSlide head.gosId))
+                        , action = mkUiExtra (Preparation.SelectAddSlides Utils.Request head.gosId)
                         , tooltip = Strings.stepsPreparationAddSlide config.clientState.lang
                         }
 
@@ -229,7 +234,7 @@ slideView config _ model ghost default s =
                             , Ui.primaryIcon []
                                 { icon = Icons.image
                                 , tooltip = Strings.stepsPreparationReplaceSlideOrAddExternalResource lang
-                                , action = mkUiExtra (Preparation.Select Utils.Confirm (Preparation.ReplaceSlide dataSlide))
+                                , action = mkUiExtra (Preparation.SelectReplaceSlide Utils.Request dataSlide)
                                 }
                             , Ui.primaryIcon []
                                 { icon = Icons.delete
@@ -262,9 +267,9 @@ slideView config _ model ghost default s =
                         |> Maybe.withDefault Element.none
 
                 slideElement =
-                    case Maybe.andThen .extra slide.slide of
-                        Just v ->
-                            Element.el
+                    case Maybe.andThen (Data.extraPath model.capsule) slide.slide of
+                        Just path ->
+                            Element.Keyed.el
                                 (Ui.wf
                                     :: Ui.b 1
                                     :: Border.color Colors.greyBorder
@@ -275,18 +280,20 @@ slideView config _ model ghost default s =
                                     ++ Utils.tern ghost (slideStyle model.slideModel slide.totalSlideId Ghost) []
                                 )
                             <|
-                                Element.html
+                                ( path
+                                , Element.html
                                     (Html.video
                                         [ Html.Attributes.class "wf"
                                         , Html.Attributes.controls True
                                         ]
                                         [ Html.source
-                                            [ Html.Attributes.src <| Data.assetPath model.capsule v ++ ".mp4"
+                                            [ Html.Attributes.src path
                                             , Html.Attributes.controls True
                                             ]
                                             []
                                         ]
                                     )
+                                )
 
                         _ ->
                             Element.image
@@ -427,7 +434,7 @@ promptPopup lang model slide =
                     ]
                 , Ui.secondaryIcon [ Ui.ar ]
                     { icon = Icons.arrow_forward
-                    , action = Utils.tern (slideIndex >= slidesLength - 1) Ui.None <| Ui.Msg <| App.PreparationMsg <| Preparation.GoToNextSlide slideIndex slide
+                    , action = Utils.tern (slideIndex >= slidesLength) Ui.None <| Ui.Msg <| App.PreparationMsg <| Preparation.GoToNextSlide slideIndex slide
                     , tooltip = Strings.stepsPreparationGoToNextSlide lang
                     }
                 ]
@@ -488,11 +495,31 @@ confirmAddSlidePopup lang gos =
         , Element.row [ Ui.ab, Ui.ar, Ui.s 10 ]
             [ Ui.secondary []
                 { label = Element.text <| Strings.uiCancel lang
-                , action = mkUiMsg <| Preparation.Extra <| Preparation.Select Utils.Cancel <| Preparation.AddSlide gos
+                , action = mkUiMsg <| Preparation.Resource <| Preparation.SelectAddSlides Utils.Cancel gos
                 }
             , Ui.primary []
                 { label = Element.text <| Strings.uiConfirm lang
-                , action = mkUiMsg <| Preparation.Extra <| Preparation.Select Utils.Confirm <| Preparation.AddSlide gos
+                , action = mkUiMsg <| Preparation.Resource <| Preparation.SelectAddSlides Utils.Confirm gos
+                }
+            ]
+        ]
+        |> Ui.popup (Strings.uiWarning lang)
+
+
+{-| Popup to confirm upload extra video that will destroy records.
+-}
+confirmUploadExtraVideoPopup : Lang -> FileValue.File -> Data.Slide -> Element App.Msg
+confirmUploadExtraVideoPopup lang file _ =
+    Element.column [ Ui.wf, Ui.hf, Ui.s 10 ]
+        [ Ui.paragraph [ Ui.cx, Ui.cy, Font.center ] (Strings.stepsPreparationAddExtraResourceWillBreak lang ++ ".")
+        , Element.row [ Ui.ab, Ui.ar, Ui.s 10 ]
+            [ Ui.secondary []
+                { label = Element.text <| Strings.uiCancel lang
+                , action = mkUiMsg <| Preparation.Resource <| Preparation.SelectedFileReceived Utils.Cancel file
+                }
+            , Ui.primary []
+                { label = Element.text <| Strings.uiConfirm lang
+                , action = mkUiMsg <| Preparation.Resource <| Preparation.SelectedFileReceived Utils.Confirm file
                 }
             ]
         ]
@@ -501,23 +528,15 @@ confirmAddSlidePopup lang gos =
 
 {-| Popup to select the page number when uploading a slide.
 -}
-selectPageNumberPopup : Lang -> Preparation.Model Capsule -> Preparation.ChangeSlideForm -> Element App.Msg
+selectPageNumberPopup : Lang -> Preparation.Model Capsule -> Preparation.ChangeSlide -> Element App.Msg
 selectPageNumberPopup lang model f =
     let
-        page =
-            case String.toInt f.page of
-                Just x ->
-                    if x > 0 then
-                        Just x
-
-                    else
-                        Nothing
-
-                _ ->
-                    Nothing
-
         title =
-            case f.slide of
+            case f of
+                Preparation.NewCapsule _ _ ->
+                    -- This will never happen : new capsule is only used in the NewCapsule route
+                    \_ -> ""
+
                 Preparation.ReplaceSlide _ ->
                     Strings.stepsPreparationReplaceSlideOrAddExternalResource
 
@@ -527,30 +546,21 @@ selectPageNumberPopup lang model f =
                 Preparation.AddGos _ ->
                     Strings.stepsPreparationCreateGrain
 
+        nbPages =
+            model.resource.nbPages
+
+        textLabel : Element App.Msg
         textLabel =
-            Lang.question Strings.stepsPreparationWhichPage lang
-
-        textInput =
-            Input.text [ Ui.wf, Ui.cy ]
-                { label = Input.labelAbove [] (Element.text textLabel)
-                , onChange = \x -> mkExtra (Preparation.PageChanged x)
-                , placeholder = Nothing
-                , text = f.page
-                }
-
-        errorMsg =
-            case model.changeSlide of
-                RemoteData.Failure _ ->
-                    Element.paragraph [ Ui.wf, Ui.cy ]
-                        [ Element.text (Lang.question Strings.stepsPreparationMaybePageNumberIsIncorrect lang) ]
-
-                _ ->
-                    Element.none
+            Element.text <|
+                Lang.question Strings.stepsPreparationWhichPage lang
 
         buttonBar =
             Element.row [ Ui.ab, Ui.ar, Ui.s 10 ]
-                (case model.changeSlide of
-                    RemoteData.Loading _ ->
+                (case ( model.resource.status, model.resource.renderFinished ) of
+                    ( RemoteData.Loading _, _ ) ->
+                        [ Ui.primary [] { action = Ui.None, label = Ui.spinningSpinner [] 24 } ]
+
+                    ( _, False ) ->
                         [ Ui.primary [] { action = Ui.None, label = Ui.spinningSpinner [] 24 } ]
 
                     _ ->
@@ -558,24 +568,156 @@ selectPageNumberPopup lang model f =
                             { action = mkUiExtra Preparation.PageCancel
                             , label = Element.text <| Strings.uiCancel lang
                             }
-                        , case page of
-                            Just p ->
-                                Ui.primary []
-                                    { action = mkUiExtra (Preparation.Selected f.slide f.file (Just p))
-                                    , label = Element.text <| Strings.uiConfirm lang
-                                    }
+                        , if List.isEmpty model.resource.selectedPages then
+                            Ui.primary []
+                                { action = Ui.None
+                                , label = Element.text <| Strings.uiConfirm lang
+                                }
 
-                            _ ->
-                                Element.text (Strings.stepsPreparationInsertNumberGreaterThanZero lang)
+                          else
+                            Ui.primary []
+                                { action = mkUiExtra Preparation.AddSlides
+                                , label = Element.text <| Strings.uiConfirm lang
+                                }
                         ]
                 )
+
+        -- PDF viewer.
+        maxCol : Int
+        maxCol =
+            4
+
+        visibleRow : Int
+        visibleRow =
+            3
+
+        nbCol : Int
+        nbCol =
+            min maxCol ((nbPages + 1) // visibleRow + 1)
+
+        nbRow : Int
+        nbRow =
+            ceiling (toFloat nbPages / toFloat nbCol)
+
+        range : List Int
+        range =
+            List.range 1 nbPages ++ List.repeat (nbCol * nbRow - nbPages) 0
+
+        pageElement : Int -> Element App.Msg
+        pageElement pageId =
+            if pageId > 0 then
+                let
+                    action : Ui.Action App.Msg
+                    action =
+                        Ui.Msg <| App.PreparationMsg <| Preparation.PageClicked pageId
+
+                    selectionAttributes : List (Html.Attribute App.Msg)
+                    selectionAttributes =
+                        if List.member pageId model.resource.selectedPages then
+                            [ Html.Attributes.style "border" ("3px solid " ++ Colors.colorToString Colors.green1) ]
+
+                        else
+                            [ Html.Attributes.style "border" "1px solid #ddd"
+                            , Html.Attributes.style "margin" "2px"
+                            ]
+
+                    positionIndex : Maybe Int
+                    positionIndex =
+                        List.indexedMap (\i x -> ( i, x )) model.resource.selectedPages
+                            |> List.filter (\( _, x ) -> x == pageId)
+                            |> List.head
+                            |> Maybe.map Tuple.first
+
+                    numberElement : Element App.Msg
+                    numberElement =
+                        if List.member pageId model.resource.selectedPages && not model.resource.onlyOnePage then
+                            Element.el
+                                [ Font.color Colors.green1
+                                , Element.htmlAttribute <| Html.Attributes.style "margin" "20px"
+                                , Element.htmlAttribute <| Html.Attributes.style "width" "1em"
+                                , Element.htmlAttribute <| Html.Attributes.style "height" "1em"
+                                , Background.color <| Colors.alphaColor 0.4 Colors.white
+                                , Border.rounded 1000
+                                , Border.shadow
+                                    { offset = ( 0.0, 0.0 )
+                                    , size = 5.0
+                                    , blur = 4.0
+                                    , color = Colors.alphaColor 0.4 Colors.white
+                                    }
+                                ]
+                            <|
+                                Element.el [ Ui.cx, Ui.cy ] <|
+                                    Element.text <|
+                                        String.fromInt <|
+                                            Maybe.withDefault 0 positionIndex
+                                                + 1
+
+                        else
+                            Element.none
+                in
+                Ui.navigationElement action [ Ui.wf, Element.inFront numberElement ] <|
+                    Element.html <|
+                        Html.canvas
+                            (Html.Attributes.class "wf"
+                                :: Html.Attributes.class "hf"
+                                :: selectionAttributes
+                            )
+                            []
+
+            else
+                Element.el [ Ui.wf ] Element.none
+
+        pagesElement : List (Element App.Msg)
+        pagesElement =
+            List.map pageElement range
+
+        split : Int -> List a -> List (List a)
+        split i list =
+            case List.take i list of
+                [] ->
+                    []
+
+                listHead ->
+                    listHead :: split i (List.drop i list)
+
+        pagesMatrix : List (List (Element App.Msg))
+        pagesMatrix =
+            split nbCol pagesElement
+
+        pageLine : List (Element App.Msg) -> Element App.Msg
+        pageLine pages =
+            Element.row
+                [ Ui.wf
+                , Ui.hf
+                , Element.spacing 10
+                ]
+                pages
+
+        pageColumn : List (List (Element App.Msg)) -> Element App.Msg
+        pageColumn pages =
+            Element.column
+                [ Ui.wf
+                , Ui.hf
+                , Element.spacing 20
+                , Element.htmlAttribute <| Html.Attributes.id "pdf-viewer"
+                , Element.scrollbarY
+                , Ui.b 1
+                , Border.color Colors.greyBorder
+                , Ui.p 10
+                ]
+            <|
+                List.map pageLine pages
+
+        canvases : Element App.Msg
+        canvases =
+            pageColumn pagesMatrix
     in
-    Element.column [ Ui.wf, Ui.hf ]
-        [ textInput
-        , errorMsg
+    Element.column [ Ui.wf, Ui.hf, Element.spacing 10, Element.scrollbarY ]
+        [ textLabel
+        , canvases
         , buttonBar
         ]
-        |> Ui.popup (title lang)
+        |> Ui.fixedPopup 5 (title lang)
 
 
 {-| Finds whether a slide is being dragged.
@@ -679,9 +821,9 @@ mkDnD msg =
 
 {-| Easily creates a extra msg.
 -}
-mkExtra : Preparation.ExtraMsg -> App.Msg
+mkExtra : Preparation.ResourceMsg -> App.Msg
 mkExtra msg =
-    App.PreparationMsg (Preparation.Extra msg)
+    App.PreparationMsg (Preparation.Resource msg)
 
 
 {-| Easily creates the Ui.Msg for preparation msg.
@@ -693,6 +835,6 @@ mkUiMsg msg =
 
 {-| Easily creates the Ui.Msg for extra msg.
 -}
-mkUiExtra : Preparation.ExtraMsg -> Ui.Action App.Msg
+mkUiExtra : Preparation.ResourceMsg -> Ui.Action App.Msg
 mkUiExtra msg =
     mkExtra msg |> Ui.Msg

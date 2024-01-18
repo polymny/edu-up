@@ -1,4 +1,4 @@
-module Preparation.Updates exposing (update, subs)
+port module Preparation.Updates exposing (update, subs)
 
 {-| This module contains the update function for the preparation page.
 
@@ -13,10 +13,13 @@ import Config exposing (Config)
 import Data.Capsule as Data
 import Data.User as Data exposing (User)
 import Dict exposing (Dict)
-import File
-import File.Select as Select
+import File exposing (File)
+import FileValue
+import Json.Decode as Decode
+import Json.Encode as Encode
 import Keyboard
 import List.Extra
+import Ports
 import Preparation.Types as Preparation
 import RemoteData
 import Utils
@@ -116,7 +119,7 @@ update msg model =
                     , sync
                     )
 
-                Preparation.Extra sMsg ->
+                Preparation.Resource sMsg ->
                     let
                         ( newM, cmd, newConfig ) =
                             updateExtra model.user sMsg m model.config
@@ -268,34 +271,31 @@ update msg model =
                                 update Preparation.ConfirmUpdateCapsule model
 
                             Preparation.ChangeSlidePopup f ->
-                                update
-                                    (Preparation.Extra <|
-                                        Preparation.Selected
-                                            f.slide
-                                            f.file
-                                            (case String.toInt f.page of
-                                                Just x ->
-                                                    if x > 0 then
-                                                        Just x
-
-                                                    else
-                                                        Nothing
-
-                                                _ ->
-                                                    Nothing
-                                            )
-                                    )
-                                    model
+                                -- TODO fix this
+                                -- update
+                                --     (Preparation.Resource <|
+                                --         Preparation.Selected
+                                --             f.slide
+                                --             f.file
+                                --             (Just 0)
+                                --     )
+                                --     model
+                                ( model, Cmd.none )
 
                             Preparation.ConfirmAddSlide gos ->
-                                let
-                                    ( newModel, newCmd, newConfig ) =
-                                        updateExtra model.user
-                                            (Preparation.Select Utils.Confirm (Preparation.AddSlide gos))
-                                            m
-                                            model.config
-                                in
-                                ( { model | config = newConfig, page = App.Preparation newModel }, newCmd )
+                                -- TODO fix this
+                                -- let
+                                --     ( newModel, newCmd, newConfig ) =
+                                --         updateExtra model.user
+                                --             (Preparation.Select Utils.Confirm (Preparation.AddSlide gos))
+                                --             m
+                                --             model.config
+                                -- in
+                                -- ( { model | config = newConfig, page = App.Preparation newModel }, newCmd )
+                                ( model, Cmd.none )
+
+                            Preparation.ConfirmUploadExtraVideo file slide ->
+                                ( model, Cmd.none )
 
                     else
                         ( model, Cmd.none )
@@ -320,84 +320,133 @@ update msg model =
                 Preparation.CancelUpdateCapsule ->
                     ( { model | page = App.Preparation <| Preparation.init capsule }, Cmd.none )
 
+                Preparation.PageClicked pageId ->
+                    let
+                        modelResource : Preparation.ResourceModel
+                        modelResource =
+                            m.resource
+
+                        selectedPages : List Int
+                        selectedPages =
+                            m.resource.selectedPages
+
+                        --  m.selectedPages
+                        newSelectedPages : List Int
+                        newSelectedPages =
+                            if m.resource.onlyOnePage then
+                                if List.member pageId selectedPages then
+                                    []
+
+                                else
+                                    [ pageId ]
+
+                            else if List.member pageId selectedPages then
+                                List.filter ((/=) pageId) selectedPages
+
+                            else
+                                selectedPages ++ [ pageId ]
+                    in
+                    ( { model | page = App.Preparation { m | resource = { modelResource | selectedPages = newSelectedPages } } }
+                    , Cmd.none
+                    )
+
         _ ->
             ( model, Cmd.none )
 
 
 {-| The update function that deals with extra resources.
 -}
-updateExtra : User -> Preparation.ExtraMsg -> Preparation.Model String -> Config.Config -> ( Preparation.Model String, Cmd App.Msg, Config.Config )
+updateExtra : User -> Preparation.ResourceMsg -> Preparation.Model String -> Config.Config -> ( Preparation.Model String, Cmd App.Msg, Config.Config )
 updateExtra user msg model config =
     let
         maybeCapsule =
             Data.getCapsuleById model.capsule user
+
+        modelResource =
+            model.resource
     in
     case ( msg, maybeCapsule ) of
-        ( Preparation.Select Utils.Request (Preparation.AddSlide gos), Just capsule ) ->
-            -- We need to check that the slide is not added to a gos with a record, otherwise, we need to delete the
-            -- record.
+        ( Preparation.SelectAddSlides confirmation gosId, Just capsule ) ->
             let
-                canChange =
-                    List.drop gos capsule.structure
+                gosHasRecord =
+                    capsule.structure
+                        |> List.drop gosId
                         |> List.head
-                        |> Maybe.map (\x -> x.record == Nothing)
-                        |> Maybe.withDefault True
+                        |> Maybe.andThen .record
+                        |> (\x -> x /= Nothing)
             in
-            if canChange then
-                updateExtra user (Preparation.Select Utils.Confirm (Preparation.AddSlide gos)) model config
+            case ( gosHasRecord, confirmation ) of
+                ( _, Utils.Cancel ) ->
+                    ( { model | displayPopup = False }
+                    , Cmd.none
+                    , config
+                    )
 
-            else
-                ( { model | popupType = Preparation.ConfirmAddSlide gos, displayPopup = True }, Cmd.none, config )
-
-        ( Preparation.Select Utils.Cancel (Preparation.AddSlide _), Just _ ) ->
-            ( { model | displayPopup = False }, Cmd.none, config )
-
-        ( Preparation.Select Utils.Confirm changeSlide, Just _ ) ->
-            let
-                mimes =
-                    case changeSlide of
-                        Preparation.ReplaceSlide _ ->
-                            [ "image/*", "application/pdf", "video/*" ]
-
-                        _ ->
-                            [ "image/*", "application/pdf" ]
-
-                cmd =
-                    Select.file mimes (\x -> App.PreparationMsg (Preparation.Extra (Preparation.Selected changeSlide x Nothing)))
-            in
-            ( model, cmd, config )
-
-        ( Preparation.Selected changeSlide file page, Just capsule ) ->
-            case ( File.mime file, page ) of
-                ( "application/pdf", Nothing ) ->
-                    ( { model
-                        | popupType = Preparation.ChangeSlidePopup { slide = changeSlide, file = file, page = "1" }
-                        , displayPopup = True
-                      }
+                ( True, Utils.Request ) ->
+                    ( { model | popupType = Preparation.ConfirmAddSlide gosId, displayPopup = True }
                     , Cmd.none
                     , config
                     )
 
                 _ ->
+                    ( { model
+                        | resource = Preparation.initResource False (Preparation.AddSlide gosId)
+                        , displayPopup = False
+                      }
+                    , selectFilePort [ "image/*", "application/pdf" ]
+                    , config
+                    )
+
+        ( Preparation.SelectAddGos Utils.Request gosId, Just _ ) ->
+            ( { model
+                | resource = Preparation.initResource False (Preparation.AddGos gosId)
+                , popupType = Preparation.ChangeSlidePopup <| Preparation.AddGos gosId
+              }
+            , selectFilePort [ "image/*", "application/pdf" ]
+            , config
+            )
+
+        ( Preparation.SelectReplaceSlide Utils.Request slide, Just _ ) ->
+            ( { model
+                | resource = Preparation.initResource True (Preparation.ReplaceSlide slide)
+                , popupType = Preparation.ChangeSlidePopup <| Preparation.ReplaceSlide slide
+              }
+            , selectFilePort [ "image/*", "application/pdf", "video/*" ]
+            , config
+            )
+
+        ( Preparation.SelectedFileReceived Utils.Confirm file, Just capsule ) ->
+            case ( String.split "/" file.mime, modelResource.changeSlide ) of
+                ( [ "application", "pdf" ], _ ) ->
+                    ( { model | resource = { modelResource | file = Just file } }
+                    , requestNbPages file
+                    , config
+                    )
+
+                ( [ "image", _ ], _ ) ->
+                    ( model, Ports.sendPdf modelResource.changeSlide file [] capsule, config )
+
+                ( [ "video", _ ], Preparation.ReplaceSlide slide ) ->
                     let
-                        p =
-                            Maybe.withDefault 0 page
+                        elmFile : Maybe File
+                        elmFile =
+                            Decode.decodeValue File.decoder file.value |> Result.toMaybe
+
+                        cmd : Cmd App.Msg
+                        cmd =
+                            case elmFile of
+                                Just f ->
+                                    Api.replaceSlide capsule slide [] f config.clientState.taskId (App.orError mkMsg)
+
+                                _ ->
+                                    Cmd.none
 
                         mkMsg x =
-                            App.PreparationMsg <| Preparation.Extra <| Preparation.ChangeSlideUpdated x
+                            App.PreparationMsg <| Preparation.Resource <| Preparation.ChangeSlideUpdated x
 
                         task : Config.TaskStatus
                         task =
-                            { task =
-                                case changeSlide of
-                                    Preparation.AddSlide _ ->
-                                        Config.AddSlide config.clientState.taskId capsule.id p
-
-                                    Preparation.AddGos _ ->
-                                        Config.AddGos config.clientState.taskId capsule.id
-
-                                    Preparation.ReplaceSlide _ ->
-                                        Config.ReplaceSlide config.clientState.taskId capsule.id p
+                            { task = Config.TranscodeExtra config.clientState.taskId slide.uuid capsule.id
                             , progress = Just 0.0
                             , finished = False
                             , aborted = False
@@ -407,43 +456,69 @@ updateExtra user msg model config =
                         ( newConfig, _ ) =
                             Config.update (Config.UpdateTaskStatus task) config
                     in
-                    case changeSlide of
-                        Preparation.AddSlide gos ->
-                            ( { model | changeSlide = RemoteData.Loading Nothing }
-                            , Api.addSlide capsule gos p file config.clientState.taskId (App.orError mkMsg)
-                            , Config.incrementTaskId newConfig
-                            )
+                    ( model
+                    , cmd
+                    , newConfig
+                    )
 
-                        Preparation.AddGos gos ->
-                            ( { model | changeSlide = RemoteData.Loading Nothing }
-                            , Api.addGos capsule gos p file config.clientState.taskId (App.orError mkMsg)
-                            , Config.incrementTaskId newConfig
-                            )
+                _ ->
+                    ( model, Cmd.none, config )
 
-                        Preparation.ReplaceSlide slide ->
-                            ( { model | changeSlide = RemoteData.Loading Nothing }
-                            , Api.replaceSlide capsule slide p file config.clientState.taskId (App.orError mkMsg)
-                            , Config.incrementTaskId newConfig
-                            )
-
-        ( Preparation.PageChanged page, Just _ ) ->
-            let
-                newModel =
-                    if model.displayPopup then
-                        case model.popupType of
-                            Preparation.ChangeSlidePopup c ->
-                                { model
-                                    | popupType = Preparation.ChangeSlidePopup { c | page = page }
-                                    , displayPopup = True
-                                }
-
-                            _ ->
-                                { model | displayPopup = False }
+        ( Preparation.SelectedFileReceived Utils.Request file, Just capsule ) ->
+            case ( String.split "/" file.mime, modelResource.changeSlide ) of
+                ( [ "video", _ ], Preparation.ReplaceSlide slide ) ->
+                    -- Check if there is a record in the gos with the slide
+                    let
+                        hasRecord =
+                            capsule.structure
+                                |> List.filter (\x -> List.any (\y -> y.uuid == slide.uuid) x.slides)
+                                |> List.head
+                                |> Maybe.andThen .record
+                                |> (/=) Nothing
+                    in
+                    if hasRecord then
+                        -- Show popup
+                        ( { model | popupType = Preparation.ConfirmUploadExtraVideo file slide, displayPopup = True }, Cmd.none, config )
 
                     else
-                        { model | displayPopup = False }
-            in
-            ( newModel, Cmd.none, config )
+                        -- Directly confirm upload
+                        updateExtra user (Preparation.SelectedFileReceived Utils.Confirm file) model config
+
+                _ ->
+                    ( model, Cmd.none, config )
+
+        ( Preparation.SelectedFileReceived Utils.Cancel _, Just _ ) ->
+            ( { model | displayPopup = False }, Cmd.none, config )
+
+        ( Preparation.NbPagesReceived pages, Just _ ) ->
+            ( { model
+                | resource = { modelResource | nbPages = pages }
+                , displayPopup = True
+                , popupType = Preparation.ChangeSlidePopup modelResource.changeSlide
+              }
+            , Maybe.map Ports.renderPdfForm model.resource.file |> Maybe.withDefault Cmd.none
+            , config
+            )
+
+        ( Preparation.AddSlides, Just capsule ) ->
+            case ( model.resource.file, model.popupType ) of
+                ( Just f, Preparation.ChangeSlidePopup c ) ->
+                    ( { model | resource = { modelResource | status = RemoteData.Loading Nothing } }
+                    , Ports.sendPdf c f model.resource.selectedPages capsule
+                    , config
+                    )
+
+                _ ->
+                    ( model, Cmd.none, config )
+
+        ( Preparation.PdfSent, Just _ ) ->
+            ( { model
+                | resource = { modelResource | file = Nothing }
+                , displayPopup = False
+              }
+            , Cmd.none
+            , config
+            )
 
         ( Preparation.PageCancel, Just _ ) ->
             ( { model | displayPopup = False, changeSlide = RemoteData.NotAsked }, Cmd.none, config )
@@ -461,6 +536,9 @@ updateExtra user msg model config =
 
         ( Preparation.ChangeSlideUpdated d, Just _ ) ->
             ( { model | changeSlide = d }, Cmd.none, config )
+
+        ( Preparation.RenderFinished, Just _ ) ->
+            ( { model | resource = { modelResource | renderFinished = True } }, Cmd.none, config )
 
         _ ->
             ( model, Cmd.none, config )
@@ -627,6 +705,33 @@ shortcuts msg =
             App.Noop
 
 
+{-| Select a file.
+-}
+port selectFilePort : List String -> Cmd msg
+
+
+{-| Receives a file that has been selected.
+-}
+port receiveSelectedFile : (( Encode.Value, Encode.Value ) -> msg) -> Sub msg
+
+
+{-| Helper to request the number of pages of a PDF file.
+-}
+requestNbPages : FileValue.File -> Cmd msg
+requestNbPages file =
+    requestNbPagesPort (FileValue.encode file)
+
+
+{-| Request the number of pages of a PDF File.
+-}
+port requestNbPagesPort : Encode.Value -> Cmd msg
+
+
+{-| Sub to get the number of pages of a PDF file.
+-}
+port receivedNbPages : (Int -> msg) -> Sub msg
+
+
 {-| Subscriptions for the prepration view.
 -}
 subs : Preparation.Model String -> Sub App.Msg
@@ -639,4 +744,17 @@ subs model =
             |> Sub.map Preparation.DnD
             |> Sub.map App.PreparationMsg
         , Keyboard.ups shortcuts
+        , receivedNbPages (\x -> App.PreparationMsg <| Preparation.Resource <| Preparation.NbPagesReceived x)
+        , receiveSelectedFile
+            (\( confirm, file ) ->
+                case ( Decode.decodeValue Utils.decodeConfirm confirm, Decode.decodeValue FileValue.decoder file ) of
+                    ( Ok x, Ok y ) ->
+                        App.PreparationMsg <| Preparation.Resource <| Preparation.SelectedFileReceived x y
+
+                    _ ->
+                        App.Noop
+            )
+        , Sub.map (Maybe.withDefault App.Noop) <|
+            Ports.pdfSent (\_ -> App.PreparationMsg <| Preparation.Resource <| Preparation.PdfSent)
+        , Ports.renderFinished (App.PreparationMsg <| Preparation.Resource <| Preparation.RenderFinished)
         ]

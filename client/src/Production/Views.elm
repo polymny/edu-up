@@ -14,10 +14,12 @@ import Element.Background as Background
 import Element.Border as Border
 import Element.Font as Font
 import Element.Input as Input
+import Element.Keyed
+import Html
 import Html.Attributes
 import Html.Events
 import Json.Decode as Decode
-import Material.Icons
+import Material.Icons as Icons
 import Production.Types as Production exposing (getHeight, getWebcamSettings)
 import Simple.Animation as Animation exposing (Animation)
 import Simple.Animation.Animated as Animated
@@ -34,7 +36,8 @@ import Utils
 -}
 view : Config -> User -> Production.Model Data.Capsule Data.Gos -> ( Element App.Msg, Element App.Msg, Element App.Msg )
 view config user model =
-    ( leftColumn config
+    ( leftColumn
+        config
         user
         model.capsule
         model.gos
@@ -56,10 +59,10 @@ leftColumn config user capsule gos webcamSettings webcamSize =
             config.clientState.lang
 
         -- Helper to create section titles
-        title : Bool -> String -> Element App.Msg
-        title disabled input =
+        title : String -> Element App.Msg
+        title input =
             Element.text input
-                |> Element.el (disableAttrIf disabled ++ [ Font.size 22, Font.bold ])
+                |> Element.el [ Font.size 22, Font.bold ]
 
         -- Video width if pip
         width : Maybe Int
@@ -107,7 +110,9 @@ leftColumn config user capsule gos webcamSettings webcamSize =
         -- Attributes to show things as disabled
         disableAttr : List (Element.Attribute App.Msg)
         disableAttr =
-            [ Font.color Colors.greyFontDisabled ]
+            [ Font.color Colors.greyFontDisabled
+            , Element.htmlAttribute (Html.Attributes.style "cursor" "not-allowed")
+            ]
 
         -- Gives disable attributes if element is disabled
         disableAttrIf : Bool -> List (Element.Attribute App.Msg)
@@ -131,6 +136,36 @@ leftColumn config user capsule gos webcamSettings webcamSize =
 
             else
                 constructor attributes parameters
+
+        -- Helper to make foldable sections.
+        foldable : String -> Element App.Msg -> Element App.Msg -> Element App.Msg
+        foldable id sectionTitle content =
+            Element.column
+                [ Ui.s 10, Ui.wf ]
+                [ Ui.navigationElement (Ui.Msg <| App.ProductionMsg <| Production.ToggleFoldable id) [] <|
+                    Element.row []
+                        [ Element.el
+                            [ Element.rotate <| degrees -90
+                            , Element.htmlAttribute <| Html.Attributes.id ("foldable-icon-" ++ id)
+                            , Element.htmlAttribute <| Html.Attributes.style "transition" "rotate 0.1s ease-out"
+                            ]
+                            (Ui.icon 24 Icons.expand_more)
+                        , sectionTitle
+                        ]
+                , Element.el [ Ui.wf, Ui.pl 12 ] <|
+                    Element.el
+                        [ Ui.wf
+                        , Border.color Colors.greyBorder
+                        , Ui.bl 1
+                        , Ui.pl 10
+                        , Ui.ab
+                        , Element.htmlAttribute <| Html.Attributes.id ("foldable-" ++ id)
+                        , Element.htmlAttribute <| Html.Attributes.style "overflow" "hidden"
+                        , Element.htmlAttribute <| Html.Attributes.style "transition" "height 0.3s ease-in-out"
+                        , Element.htmlAttribute <| Html.Attributes.style "height" "0"
+                        ]
+                        content
+                ]
 
         --- UI ELEMENTS ---
         -- Reset to default options button
@@ -169,8 +204,8 @@ leftColumn config user capsule gos webcamSettings webcamSize =
                 Input.checkbox
                 []
                 { checked = gos.record /= Nothing && webcamSettings /= Just Data.Disabled
-                , icon = Input.defaultCheckbox
-                , label = Input.labelRight [] <| Element.text <| Strings.stepsProductionUseVideo lang
+                , icon = Ui.checkbox (gos.record == Nothing || audioOnly)
+                , label = Input.labelRight [ Ui.cy ] <| Element.text <| Strings.stepsProductionUseVideo lang
                 , onChange = \_ -> App.ProductionMsg <| Production.WebcamSettingsMsg <| Production.ToggleVideo
                 }
 
@@ -192,8 +227,7 @@ leftColumn config user capsule gos webcamSettings webcamSize =
 
         -- Title to introduce webcam size settings.
         webcamSizeTitle =
-            Strings.stepsProductionWebcamSize lang
-                |> title webcamSizeDisabled
+            title <| Strings.stepsProductionWebcamSize lang
 
         -- Helper to set the width of the webcam.
         mkSetWidth disabled x =
@@ -246,11 +280,11 @@ leftColumn config user capsule gos webcamSettings webcamSize =
                     [ Ui.navigationElement
                         (mkSetWidth webcamSizeDisabled <| Just <| incrementWidth 1)
                         []
-                        (Ui.icon 25 Material.Icons.expand_less)
+                        (Ui.icon 25 Icons.expand_less)
                     , Ui.navigationElement
                         (mkSetWidth webcamSizeDisabled <| Just <| incrementWidth -1)
                         []
-                        (Ui.icon 25 Material.Icons.expand_more)
+                        (Ui.icon 25 Icons.expand_more)
                     ]
                 ]
 
@@ -268,11 +302,11 @@ leftColumn config user capsule gos webcamSettings webcamSize =
                         else
                             App.ProductionMsg <| Production.WebcamSettingsMsg <| Production.SetWidth <| x
                 , options =
-                    [ Input.option (Just 200) <| Element.text <| Strings.stepsProductionSmall lang
-                    , Input.option (Just 400) <| Element.text <| Strings.stepsProductionMedium lang
-                    , Input.option (Just 800) <| Element.text <| Strings.stepsProductionLarge lang
-                    , Input.option Nothing <| Element.text <| Strings.stepsProductionFullscreen lang
-                    , Input.option (Just 533) <| Element.text <| Strings.stepsProductionCustom lang
+                    [ Input.optionWith (Just 200) <| Ui.option (gos.record == Nothing || audioOnly || webcamSettings == Just Data.Disabled) <| Element.text <| Strings.stepsProductionSmall lang
+                    , Input.optionWith (Just 400) <| Ui.option (gos.record == Nothing || audioOnly || webcamSettings == Just Data.Disabled) <| Element.text <| Strings.stepsProductionMedium lang
+                    , Input.optionWith (Just 800) <| Ui.option (gos.record == Nothing || audioOnly || webcamSettings == Just Data.Disabled) <| Element.text <| Strings.stepsProductionLarge lang
+                    , Input.optionWith Nothing <| Ui.option (gos.record == Nothing || audioOnly || webcamSettings == Just Data.Disabled) <| Element.text <| Strings.stepsProductionFullscreen lang
+                    , Input.optionWith (Just 533) <| Ui.option (gos.record == Nothing || audioOnly || webcamSettings == Just Data.Disabled) <| Element.text <| Strings.stepsProductionCustom lang
                     ]
                 , selected =
                     case getWebcamSettings capsule gos of
@@ -296,8 +330,7 @@ leftColumn config user capsule gos webcamSettings webcamSize =
 
         -- Title to introduce webcam position settings
         webcamPositionTitle =
-            Strings.stepsProductionWebcamPosition lang
-                |> title webcamPositionDisabled
+            title <| Strings.stepsProductionWebcamPosition lang
 
         -- Element to choose the webcam position among the four corners
         webcamPositionRadio =
@@ -307,13 +340,18 @@ leftColumn config user capsule gos webcamSettings webcamSize =
                 { label = Input.labelHidden <| Strings.stepsProductionWebcamPosition lang
                 , onChange = \x -> App.ProductionMsg <| Production.WebcamSettingsMsg <| Production.SetAnchor x
                 , options =
-                    [ Input.option Data.TopLeft <| Element.text <| Strings.stepsProductionTopLeft lang
-                    , Input.option Data.TopRight <| Element.text <| Strings.stepsProductionTopRight lang
-                    , Input.option Data.BottomLeft <| Element.text <| Strings.stepsProductionBottomLeft lang
-                    , Input.option Data.BottomRight <| Element.text <| Strings.stepsProductionBottomRight lang
+                    [ Input.optionWith Data.TopLeft <| Ui.option (gos.record == Nothing || audioOnly || webcamSettings == Just Data.Disabled) <| Element.text <| Strings.stepsProductionTopLeft lang
+                    , Input.optionWith Data.TopRight <| Ui.option (gos.record == Nothing || audioOnly || webcamSettings == Just Data.Disabled) <| Element.text <| Strings.stepsProductionTopRight lang
+                    , Input.optionWith Data.BottomLeft <| Ui.option (gos.record == Nothing || audioOnly || webcamSettings == Just Data.Disabled) <| Element.text <| Strings.stepsProductionBottomLeft lang
+                    , Input.optionWith Data.BottomRight <| Ui.option (gos.record == Nothing || audioOnly || webcamSettings == Just Data.Disabled) <| Element.text <| Strings.stepsProductionBottomRight lang
                     ]
                 , selected = anchor
                 }
+
+        -- Title other settings.
+        moreTitle : Element App.Msg
+        moreTitle =
+            title <| Strings.stepsProductionMoreSettings lang
 
         -- Whether the user can control the opacity
         opacityDisabled =
@@ -321,8 +359,9 @@ leftColumn config user capsule gos webcamSettings webcamSize =
 
         -- Title to introduce webcam opacity settings
         opacityTitle =
-            Strings.stepsProductionOpacity lang
-                |> title opacityDisabled
+            Element.el (disableAttrIf opacityDisabled) <|
+                Element.text <|
+                    Strings.stepsProductionOpacity lang
 
         -- Slider to control opacity
         opacitySlider =
@@ -337,7 +376,7 @@ leftColumn config user capsule gos webcamSettings webcamSize =
                     , max = 1
                     , min = 0
                     , step = Just 0.1
-                    , thumb = Input.defaultThumb
+                    , thumb = Ui.sliderThumb opacityDisabled
                     , value = opacity
                     }
                 , -- Text label of the opacity value
@@ -350,7 +389,7 @@ leftColumn config user capsule gos webcamSettings webcamSize =
                     |> Element.el (Ui.wfp 1 :: Ui.ab :: disableAttrIf opacityDisabled)
                 ]
     in
-    Element.column [ Ui.wf, Ui.s 30, Ui.at, Element.scrollbarY, Ui.p 10 ]
+    Element.column [ Ui.wf, Ui.hf, Ui.s 30, Ui.at, Ui.p 10 ]
         [ Element.column [ Ui.s 10 ]
             [ resetButton
             , resetElement
@@ -359,19 +398,34 @@ leftColumn config user capsule gos webcamSettings webcamSize =
             [ useVideo
             , useVideoInfo
             ]
-        , Element.column [ Ui.s 10 ]
-            [ webcamSizeTitle
-            , webcamSizeRadio
-            , webcamSizeText
-            ]
-        , Element.column [ Ui.s 10 ]
-            [ webcamPositionTitle
-            , webcamPositionRadio
-            ]
-        , Element.column [ Ui.wf, Ui.s 10 ]
-            [ opacityTitle
-            , opacitySlider
-            ]
+        , foldable
+            "f1"
+            webcamSizeTitle
+          <|
+            Element.column
+                [ Ui.s 10, Ui.wf ]
+                [ webcamSizeRadio
+                , webcamSizeText
+                ]
+        , foldable
+            "f2"
+            webcamPositionTitle
+          <|
+            Element.column
+                [ Ui.s 10, Ui.wf ]
+                [ webcamPositionRadio
+                ]
+        , foldable
+            "f3"
+            moreTitle
+          <|
+            Element.column
+                [ Ui.s 10, Ui.wf ]
+                [ Element.column [ Ui.s 10, Ui.wf ]
+                    [ opacityTitle
+                    , opacitySlider
+                    ]
+                ]
         ]
 
 
@@ -383,10 +437,13 @@ rightColumn config user model =
         lang =
             config.clientState.lang
 
+        miniatureUrl =
+            Maybe.andThen (Data.miniaturePath model.capsule) model.gos.record
+
         -- overlay to show a frame of the record on the slide (if any)
         overlay =
-            case ( getWebcamSettings model.capsule model.gos, model.gos.record ) of
-                ( Data.Pip s, Just r ) ->
+            case ( getWebcamSettings model.capsule model.gos, model.gos.record, miniatureUrl ) of
+                ( Data.Pip s, Just r, Just url ) ->
                     let
                         ( ( marginX, marginY ), ( w, h ) ) =
                             ( model.webcamPosition
@@ -454,18 +511,18 @@ rightColumn config user model =
                                     )
                                 )
                             ]
-                            { src = Data.assetPath model.capsule (r.uuid ++ ".png")
+                            { src = url
                             , description = ""
                             }
                         )
 
-                ( Data.Fullscreen { opacity }, Just r ) ->
+                ( Data.Fullscreen { opacity }, Just r, Just url ) ->
                     Element.el
                         [ Element.alpha opacity
                         , Ui.hf
                         , Ui.wf
                         , ("center / contain content-box no-repeat url('"
-                            ++ Data.assetPath model.capsule (r.uuid ++ ".png")
+                            ++ url
                             ++ "')"
                           )
                             |> Html.Attributes.style "background"
@@ -480,16 +537,24 @@ rightColumn config user model =
         slide =
             case model.gos.slides of
                 h :: _ ->
-                    Element.image [ Ui.wf, Ui.b 1, Border.color Colors.greyBorder ]
-                        { src = Data.slidePath model.capsule h
-                        , description = ""
-                        }
+                    case Data.extraPath model.capsule h of
+                        Just extra ->
+                            [ Html.source [ Html.Attributes.src extra ] [] ]
+                                |> Html.video [ Html.Attributes.class "wf" ]
+                                |> Element.html
+                                |> (\x -> Element.Keyed.el [ Ui.wf, Ui.b 1, Border.color Colors.greyBorder ] ( extra, x ))
+
+                        _ ->
+                            Element.image [ Ui.wf, Ui.b 1, Border.color Colors.greyBorder ]
+                                { src = Data.slidePath model.capsule h
+                                , description = ""
+                                }
 
                 _ ->
                     Element.none
 
         -- The button to produce the video
-        produceButton =
+        ( produceButton, produceGosButton ) =
             let
                 ready2Product : Bool
                 ready2Product =
@@ -497,14 +562,38 @@ rightColumn config user model =
                         Data.Running _ ->
                             False
 
+                        Data.Waiting ->
+                            False
+
                         _ ->
-                            True
+                            model.capsule.structure
+                                |> List.map .produced
+                                |> List.map
+                                    (\x ->
+                                        case x of
+                                            Data.Running _ ->
+                                                False
+
+                                            Data.Waiting ->
+                                                False
+
+                                            _ ->
+                                                True
+                                    )
+                                |> List.all (\x -> x)
 
                 action : App.Msg
                 action =
                     Utils.tern
                         ready2Product
                         (App.ProductionMsg Production.Produce)
+                        App.Noop
+
+                gosAction : App.Msg
+                gosAction =
+                    Utils.tern
+                        ready2Product
+                        (App.ProductionMsg <| Production.ProduceGos)
                         App.Noop
 
                 spinnerElement : Element App.Msg
@@ -526,56 +615,45 @@ rightColumn config user model =
                     <|
                         Element.text <|
                             Strings.stepsProductionProduceVideo lang
+
+                gosLabel : Element App.Msg
+                gosLabel =
+                    Element.el
+                        [ Font.color <| Utils.tern ready2Product Colors.white Colors.transparent
+                        , Element.inFront spinnerElement
+                        ]
+                    <|
+                        Element.text <|
+                            Strings.stepsProductionProduceGrain lang
             in
-            Ui.primary [ Ui.ar ]
+            ( Ui.primary [ Ui.ar ]
                 { action = Ui.Msg <| action
                 , label = label
                 }
+            , Ui.primary [ Ui.ar ]
+                { action = Ui.Msg <| gosAction
+                , label = gosLabel
+                }
+            )
 
         -- The production progress bar
         progressBar : Element App.Msg
         progressBar =
-            case model.capsule.produced of
-                Data.Running a ->
-                    let
-                        loadingAnimation : Animation
-                        loadingAnimation =
-                            Animation.steps
-                                { startAt = [ P.x -300 ]
-                                , options = [ Animation.loop ]
-                                }
-                                [ Animation.step 1000 [ P.x 300 ]
-                                , Animation.wait 100
-                                , Animation.step 1000 [ P.x -300 ]
-                                , Animation.wait 100
-                                ]
+            let
+                loadingAnimation : Animation
+                loadingAnimation =
+                    Animation.steps
+                        { startAt = [ P.x -300 ]
+                        , options = [ Animation.loop ]
+                        }
+                        [ Animation.step 1000 [ P.x 300 ]
+                        , Animation.wait 100
+                        , Animation.step 1000 [ P.x -300 ]
+                        , Animation.wait 100
+                        ]
 
-                        bar : Element App.Msg
-                        bar =
-                            case a of
-                                Just progress ->
-                                    Element.el
-                                        [ Ui.wf
-                                        , Ui.hf
-                                        , Ui.r 5
-                                        , Element.moveLeft (300.0 * (1.0 - progress))
-                                        , Background.color Colors.green2
-                                        , Element.htmlAttribute <|
-                                            Transition.properties [ Transition.transform 200 [ Transition.easeInOut ] ]
-                                        ]
-                                        Element.none
-
-                                Nothing ->
-                                    Animated.ui
-                                        { behindContent = Element.behindContent
-                                        , htmlAttribute = Element.htmlAttribute
-                                        , html = Element.html
-                                        }
-                                        (\attr el -> Element.el attr el)
-                                        loadingAnimation
-                                        [ Ui.wf, Ui.hf, Ui.r 5, Background.color Colors.green2 ]
-                                        Element.none
-                    in
+                bar : Maybe Float -> Element App.Msg
+                bar progress =
                     Element.el
                         [ Ui.p 5
                         , Ui.wpx 300
@@ -597,22 +675,62 @@ rightColumn config user model =
                             , Ui.r 100
                             , Ui.hf
                             ]
-                            bar
+                        <|
+                            case progress of
+                                Just p ->
+                                    Element.el
+                                        [ Ui.wf
+                                        , Ui.hf
+                                        , Ui.r 5
+                                        , Element.moveLeft (300.0 * (1.0 - p))
+                                        , Background.color Colors.green2
+                                        , Element.htmlAttribute <|
+                                            Transition.properties [ Transition.transform 200 [ Transition.easeInOut ] ]
+                                        ]
+                                        Element.none
+
+                                Nothing ->
+                                    Animated.ui
+                                        { behindContent = Element.behindContent
+                                        , htmlAttribute = Element.htmlAttribute
+                                        , html = Element.html
+                                        }
+                                        (\attr el -> Element.el attr el)
+                                        loadingAnimation
+                                        [ Ui.wf, Ui.hf, Ui.r 5, Background.color Colors.green2 ]
+                                        Element.none
+            in
+            case ( model.capsule.produced, model.gos.produced ) of
+                ( Data.Running progress, _ ) ->
+                    bar progress
+
+                ( _, Data.Running progress ) ->
+                    bar progress
 
                 _ ->
                     Element.none
 
-        -- Link to watch the video
-        videoLink =
-            case Data.videoPath model.capsule of
+        -- Link to watch the capsule
+        capsuleLink =
+            case Data.capsuleVideoPath model.capsule of
                 Just path ->
                     Ui.link [] { label = Strings.stepsProductionWatchVideo lang, action = Ui.NewTab path }
+
+                _ ->
+                    Element.none
+
+        -- Link to watch the GOS.
+        gosLink =
+            case Data.gosVideoPath model.capsule model.gos of
+                Just path ->
+                    Ui.link [] { label = Strings.stepsProductionWatchGrain lang, action = Ui.NewTab path }
 
                 _ ->
                     Element.none
     in
     Element.column [ Ui.at, Ui.wf, Element.scrollbarY, Ui.s 10, Ui.p 10 ]
         [ Element.el [ Ui.wf, Ui.cy, Element.inFront overlay, Element.clip ] slide
-        , Element.row [ Ui.ar, Ui.s 10 ] [ videoLink, produceButton ]
+        , Element.row [ Ui.ar, Ui.s 10 ] [ gosLink, produceGosButton ]
+        , Element.row [ Ui.ar, Ui.s 10 ] [ capsuleLink, produceButton ]
         , progressBar
         ]

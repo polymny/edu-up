@@ -20,25 +20,31 @@ use rocket::http::{ContentType, Status};
 use rocket::serde::json::{json, Json, Value};
 use rocket::{Data, State as S};
 
-use crate::command::{export_slides, run_command};
+use crate::command::{export_slides_from_zip, run_command};
 use crate::config::Config;
 use crate::db::capsule::{
     Capsule, Fade, Gos, Privacy, Record, Role, Slide, SoundTrack, WebcamSettings,
 };
-use crate::db::stats::{TaskStat, TaskStatType};
 use crate::db::task_status::TaskStatus;
 use crate::db::user::{Plan, User};
-use crate::websockets::WebSockets;
+use crate::storage::Storage;
+use crate::tasks::{Task, TaskRunner};
+use crate::websockets::Notifier;
 use crate::{Db, Error, HashId, Result};
 
 /// The route that gives the capsule information.
 #[get("/capsule/<capsule_id>")]
-pub async fn get_capsule(user: User, capsule_id: HashId, db: Db) -> Result<Value> {
+pub async fn get_capsule(
+    user: User,
+    capsule_id: HashId,
+    db: Db,
+    storage: &S<Storage>,
+) -> Result<Value> {
     let (capsule, role) = user
         .get_capsule_with_permission(*capsule_id, Role::Read, &db)
         .await?;
 
-    capsule.to_json(role, &db).await
+    capsule.to_json(role, &db, storage.inner().s3()).await
 }
 
 /// The route that creates an empty capsule.
@@ -49,6 +55,7 @@ pub async fn empty_capsule(
     capsule_name: String,
     config: &S<Config>,
     db: Db,
+    storage: &S<Storage>,
 ) -> Result<Value> {
     let capsule = Capsule::new(project_name, capsule_name, &user, &db).await?;
 
@@ -59,7 +66,9 @@ pub async fn empty_capsule(
 
     create_dir_all(&path).await?;
 
-    Ok(capsule.to_json(Role::Owner, &db).await?)
+    Ok(capsule
+        .to_json(Role::Owner, &db, storage.inner().s3())
+        .await?)
 }
 
 /// The route that creates a capsule from PDF slides.
@@ -71,6 +80,8 @@ pub async fn new_capsule(
     db: Db,
     config: &S<Config>,
     data: Data<'_>,
+    content_type: &ContentType,
+    storage: &S<Storage>,
 ) -> Result<Value> {
     let mut capsule = Capsule::new(project_name, &capsule_name, &user, &db).await?;
 
@@ -81,30 +92,95 @@ pub async fn new_capsule(
 
     create_dir_all(&path).await?;
 
-    let tmp = path.join(format!("{}.pdf", Uuid::new_v4()));
+    let uuids = if content_type.media_type().top() == "image" {
+        let tmp = path.join(format!("{}.webp", Uuid::new_v4()));
+        data.open(1_i32.gibibytes()).into_file(&tmp).await?;
 
-    data.open(1_i32.gibibytes()).into_file(&tmp).await?;
+        // Not very clean but working
+        let output_uuid = Uuid::new_v4();
+        let output = config
+            .data_path
+            .join(format!("{}", capsule.id))
+            .join("assets")
+            .join(format!("{}", output_uuid));
 
-    let gos = export_slides(&config, tmp, path, None)?
-        .into_iter()
+        let output = output.to_str().ok_or(Error(Status::InternalServerError))?;
+
+        run_command(&vec![
+            "../scripts/popy.py",
+            "convert",
+            "pdf2webp",
+            "-i",
+            &tmp.to_str().ok_or(Error(Status::InternalServerError))?,
+            "-o",
+            &format!("{}.webp", output),
+            "-d",
+            &config.pdf_target_density,
+            "-s",
+            &config.pdf_target_size,
+        ])?;
+
+        if let Some(s3) = storage.inner().s3() {
+            s3.upload(
+                &format!("{}.webp", output),
+                &format!("{}/assets/{}.webp", capsule.id, output_uuid),
+                ContentType::WEBP,
+            )
+            .await?;
+
+            remove_file(format!("{}.webp", output)).await?;
+        }
+
+        vec![output_uuid]
+    } else if *content_type == ContentType::ZIP {
+        // Save the zip file.
+        let tmp = path.join(format!("{}.zip", Uuid::new_v4()));
+        data.open(1_i32.gibibytes()).into_file(&tmp).await?;
+
+        // Export the slides from the zip file.
+        let uuids = export_slides_from_zip(&config, &tmp, &path)?;
+
+        remove_file(&tmp).await?;
+
+        uuids
+    } else {
+        return Err(Error(Status::UnsupportedMediaType));
+    };
+
+    // Create the gosses.
+    let gos = uuids
+        .iter()
         .map(|x| Gos {
             record: None,
             slides: vec![Slide {
-                uuid: x,
+                uuid: *x,
                 extra: None,
                 prompt: String::new(),
             }],
             events: vec![],
             webcam_settings: None,
             fade: Fade::none(),
+            produced_hash: None,
+            produced: TaskStatus::Idle,
         })
         .collect::<Vec<_>>();
+
+    if let Some(s3) = storage.inner().s3() {
+        for uuid in uuids {
+            let source = path.join(format!("{}.webp", uuid));
+            let dest = format!("{}/assets/{}.webp", capsule.id, uuid);
+            s3.upload(&source, &dest, ContentType::WEBP).await?;
+            remove_file(&source).await?;
+        }
+    }
 
     capsule.structure = EJson(gos);
     capsule.set_changed();
     capsule.save(&db).await?;
 
-    Ok(capsule.to_json(Role::Owner, &db).await?)
+    Ok(capsule
+        .to_json(Role::Owner, &db, storage.inner().s3())
+        .await?)
 }
 
 /// The json format to edit the content of a capsule.
@@ -141,7 +217,9 @@ pub async fn edit_capsule(
     user: User,
     db: Db,
     data: Json<CapsuleEdit>,
-    socks: &S<WebSockets>,
+    config: &S<Config>,
+    socks: &S<Notifier>,
+    storage: &S<Storage>,
 ) -> Result<()> {
     let CapsuleEdit {
         id,
@@ -168,27 +246,52 @@ pub async fn edit_capsule(
     capsule.set_changed();
     capsule.save(&db).await?;
 
-    capsule.notify_change(&db, &socks).await?;
+    if let Some(s3) = storage.inner().s3() {
+        capsule.garbage_collect_s3(s3).await?;
+    } else {
+        capsule.garbage_collect(&config.data_path).await?;
+    }
+
+    capsule
+        .notify_change(&db, &socks, storage.inner().s3())
+        .await?;
 
     Ok(())
 }
 
 /// The route that deletes a capsule by id.
 #[delete("/capsule/<id>")]
-pub async fn delete_capsule(user: User, db: Db, id: HashId, config: &S<Config>) -> Result<()> {
+pub async fn delete_capsule(
+    user: User,
+    db: Db,
+    id: HashId,
+    config: &S<Config>,
+    storage: &S<Storage>,
+) -> Result<()> {
     let (capsule, _) = user
         .get_capsule_with_permission(*id, Role::Owner, &db)
         .await?;
 
     capsule.delete(&db).await?;
     let dir = config.data_path.join(format!("{}", *id));
-    remove_dir_all(dir).await?;
+    remove_dir_all(dir).await.ok();
+
+    if let Some(s3) = storage.s3() {
+        s3.remove_dir(&format!("{}", *id)).await?;
+    }
+
     Ok(())
 }
 
 /// The route that deletes a whole project.
 #[delete("/project/<name>")]
-pub async fn delete_project(user: User, db: Db, config: &S<Config>, name: String) -> Result<()> {
+pub async fn delete_project(
+    user: User,
+    db: Db,
+    config: &S<Config>,
+    name: String,
+    storage: &S<Storage>,
+) -> Result<()> {
     let capsules = user.capsules(&db).await?;
 
     for (capsule, role) in capsules {
@@ -201,9 +304,14 @@ pub async fn delete_project(user: User, db: Db, config: &S<Config>, name: String
         }
 
         // Delete the capsule
-        let dir = config.data_path.join(format!("{}", capsule.id));
-        remove_dir_all(dir).await?;
+        let id = capsule.id;
+        let dir = config.data_path.join(format!("{}", id));
+        remove_dir_all(dir).await.ok();
         capsule.delete(&db).await?;
+
+        if let Some(s3) = storage.s3() {
+            s3.remove_dir(&format!("{}", id)).await?;
+        }
     }
 
     Ok(())
@@ -218,11 +326,19 @@ pub async fn upload_record(
     id: HashId,
     gos: i32,
     data: Data<'_>,
+    storage: &S<Storage>,
 ) -> Result<Value> {
     // Check that the user has write access to the capsule.
     let (mut capsule, role) = user
         .get_capsule_with_permission(*id, Role::Write, &db)
         .await?;
+
+    let path = config
+        .data_path
+        .join(format!("{}", capsule.id))
+        .join("assets");
+
+    create_dir_all(&path).await?;
 
     let gos = capsule
         .structure
@@ -237,12 +353,15 @@ pub async fn upload_record(
         .join("assets")
         .join(format!("{}.webm", uuid));
 
-    data.open(1_i32.gibibytes()).into_file(output).await?;
+    data.open(1_i32.gibibytes()).into_file(&output).await?;
 
     let res = run_command(&vec![
-        "../scripts/psh",
-        "on-record",
+        "../scripts/popy.py",
+        "convert",
+        "record",
+        "-c",
         &format!("{}", capsule.id),
+        "-u",
         &format!("{}", uuid),
     ])?;
 
@@ -267,42 +386,46 @@ pub async fn upload_record(
     if size.is_none() {
         gos.webcam_settings = Some(WebcamSettings::Disabled);
     }
+
+    if let Some(s3) = storage.inner().s3() {
+        s3.upload(
+            &output,
+            &format!("{}/assets/{}.webm", capsule.id, uuid),
+            ContentType::WEBM,
+        )
+        .await?;
+
+        remove_file(&output).await?;
+
+        if size.is_some() {
+            let output_miniature = output.with_extension("webp");
+
+            s3.upload(
+                &output_miniature,
+                &format!("{}/assets/{}.webp", capsule.id, uuid),
+                ContentType::WEBP,
+            )
+            .await?;
+
+            remove_file(&output_miniature).await?;
+        }
+    }
+
     capsule.set_changed();
     capsule.save(&db).await?;
 
-    Ok(capsule.to_json(role, &db).await?)
+    Ok(capsule.to_json(role, &db, storage.inner().s3()).await?)
 }
 
 /// The route that deletes a record from a capsule for a specific gos.
 #[delete("/delete-record/<id>/<gos>")]
-pub async fn delete_record(user: User, db: Db, id: HashId, gos: i32) -> Result<Value> {
-    // Check that the user has write access to the capsule.
-    let (mut capsule, role) = user
-        .get_capsule_with_permission(*id, Role::Write, &db)
-        .await?;
-
-    let gos = capsule
-        .structure
-        .0
-        .get_mut(gos as usize)
-        .ok_or(Error(Status::BadRequest))?;
-
-    gos.record = None;
-    capsule.set_changed();
-    capsule.save(&db).await?;
-
-    Ok(capsule.to_json(role, &db).await?)
-}
-
-/// The route that uploads a pointer to a capsule for a specific gos.
-#[post("/upload-pointer/<id>/<gos>", data = "<data>")]
-pub async fn upload_pointer(
+pub async fn delete_record(
     user: User,
     db: Db,
-    config: &S<Config>,
     id: HashId,
     gos: i32,
-    data: Data<'_>,
+    config: &S<Config>,
+    storage: &S<Storage>,
 ) -> Result<Value> {
     // Check that the user has write access to the capsule.
     let (mut capsule, role) = user
@@ -315,25 +438,82 @@ pub async fn upload_pointer(
         .get_mut(gos as usize)
         .ok_or(Error(Status::BadRequest))?;
 
+    if let Some(record) = gos.record.as_ref() {
+        let record_key = format!("{}/assets/{}.webm", *id, record.uuid);
+        let record_path = config.data_path.join(&record_key);
+
+        remove_file(&record_path).await?;
+        remove_file(record_path.with_extension("webp")).await?;
+
+        if let Some(s3) = storage.s3() {
+            let miniature_key = format!("{}/assets/{}.webp", *id, record.uuid);
+            s3.remove(&record_key).await?;
+            s3.remove(&miniature_key).await?;
+        }
+    }
+
+    gos.record = None;
+    capsule.set_changed();
+    capsule.save(&db).await?;
+
+    Ok(capsule.to_json(role, &db, storage.inner().s3()).await?)
+}
+
+/// The route that uploads a pointer to a capsule for a specific gos.
+#[post("/upload-pointer/<id>/<gos>", data = "<data>")]
+pub async fn upload_pointer(
+    user: User,
+    db: Db,
+    config: &S<Config>,
+    id: HashId,
+    gos: i32,
+    data: Data<'_>,
+    storage: &S<Storage>,
+) -> Result<Value> {
+    // Check that the user has write access to the capsule.
+    let (mut capsule, role) = user
+        .get_capsule_with_permission(*id, Role::Write, &db)
+        .await?;
+
+    let path = config
+        .data_path
+        .join(format!("{}", capsule.id))
+        .join("assets");
+
+    create_dir_all(&path).await?;
+
+    let gos = capsule
+        .structure
+        .0
+        .get_mut(gos as usize)
+        .ok_or(Error(Status::BadRequest))?;
+
     if gos.record.is_none() {
         return Err(Error(Status::BadRequest));
     }
 
     let pointer_uuid = Uuid::new_v4();
-    let output = config
-        .data_path
-        .join(format!("{}", *id))
-        .join("assets")
-        .join(format!("{}.webm", pointer_uuid));
+    let output = dbg!(path.join(format!("{}.webm", pointer_uuid)));
 
-    data.open(1_i32.gibibytes()).into_file(output).await?;
+    data.open(1_i32.gibibytes()).into_file(&output).await?;
 
     gos.record.as_mut().unwrap().pointer_uuid = Some(pointer_uuid);
+
+    if let Some(s3) = storage.inner().s3() {
+        s3.upload(
+            &output,
+            &format!("{}/assets/{}.webm", capsule.id, pointer_uuid),
+            ContentType::WEBM,
+        )
+        .await?;
+
+        remove_file(&output).await?;
+    }
 
     capsule.set_changed();
     capsule.save(&db).await?;
 
-    Ok(capsule.to_json(role, &db).await?)
+    Ok(capsule.to_json(role, &db, storage.inner().s3()).await?)
 }
 
 /// The route that replaces a slide with another slide or an extra resource.
@@ -347,9 +527,12 @@ pub async fn replace_slide(
     page: i32,
     data: Data<'_>,
     content_type: &ContentType,
-    socks: &S<WebSockets>,
+    socks: &S<Notifier>,
     sem: &S<Arc<Semaphore>>,
+    storage: &S<Storage>,
 ) -> Result<Value> {
+    let s3 = storage.s3();
+
     let (mut capsule, role) = user
         .get_capsule_with_permission(*id, Role::Write, &db)
         .await?;
@@ -369,8 +552,11 @@ pub async fn replace_slide(
     let path = config
         .data_path
         .join(format!("{}", capsule.id))
-        .join("assets")
-        .join(format!("{}", Uuid::new_v4()));
+        .join("assets");
+
+    create_dir_all(&path).await?;
+
+    let path = path.join(format!("{}", Uuid::new_v4()));
 
     data.open(1_i32.gibibytes()).into_file(&path).await?;
 
@@ -398,43 +584,81 @@ pub async fn replace_slide(
     let res = if content_type.media_type().top() == "image" {
         // Not very clean but working
         run_command(&vec![
-            "../scripts/psh",
-            "pdf-to-png",
+            "../scripts/popy.py",
+            "convert",
+            "pdf2webp",
+            "-i",
             &path,
-            &format!("{}.png", output),
+            "-o",
+            &format!("{}.webp", output),
+            "-d",
             &config.pdf_target_density,
+            "-s",
             &config.pdf_target_size,
         ])?;
 
+        if let Some(s3) = s3 {
+            s3.upload(
+                &format!("{}.webp", output),
+                &format!("{}/assets/{}.webp", capsule.id, output_uuid),
+                ContentType::WEBP,
+            )
+            .await?;
+
+            remove_file(format!("{}.webp", output)).await?;
+        }
+
         capsule.set_changed();
         capsule.save(&db).await?;
-        capsule.to_json(role, &db).await?
+        capsule.notify_change(&db, &socks, s3).await.ok();
+        capsule.to_json(role, &db, s3).await?
     } else if *content_type == ContentType::PDF {
         // Not very clean either, but should work too
         run_command(&vec![
-            "../scripts/psh",
-            "pdf-to-png",
+            "../scripts/popy.py",
+            "convert",
+            "pdf2webp",
+            "-i",
             &format!("{}[{}]", path, page),
-            &format!("{}.png", output),
+            "-o",
+            &format!("{}.webp", output),
+            "-d",
             &config.pdf_target_density,
+            "-s",
             &config.pdf_target_size,
         ])?;
 
+        if let Some(s3) = s3 {
+            s3.upload(
+                &format!("{}.webp", output),
+                &format!("{}/assets/{}.webp", capsule.id, output_uuid),
+                ContentType::WEBP,
+            )
+            .await?;
+
+            remove_file(format!("{}.webp", output)).await?;
+        }
+
         capsule.set_changed();
         capsule.save(&db).await?;
-        capsule.to_json(role, &db).await?
+        capsule.notify_change(&db, &socks, s3).await.ok();
+        capsule.to_json(role, &db, s3).await?
     } else if content_type.media_type().top() == "video" {
         capsule.set_changed();
         capsule.save(&db).await?;
-        let res = capsule.to_json(role, &db).await?;
+        let res = capsule.to_json(role, &db, s3).await?;
 
         let socks = socks.inner().clone();
         let sem = sem.inner().clone();
+        let s3 = storage.inner().s3().cloned();
 
         tokio::spawn(async move {
-            let child = Command::new("../scripts/psh")
-                .arg("on-video-upload")
+            let child = Command::new("../scripts/popy.py")
+                .arg("convert")
+                .arg("video")
+                .arg("-i")
                 .arg(&path)
+                .arg("-o")
                 .arg(&format!("{}.mp4", output))
                 .stdin(Stdio::piped())
                 .stdout(Stdio::piped())
@@ -493,6 +717,20 @@ pub async fn replace_slide(
             };
 
             capsule.video_uploaded = if succeed {
+                if let Some(s3) = s3.as_ref() {
+                    println!("{}.webp", output);
+                    println!("{}/assets/{}.mp4", capsule.id, output_uuid);
+                    s3.upload(
+                        &format!("{}.mp4", output),
+                        &format!("{}/assets/{}.mp4", capsule.id, output_uuid),
+                        ContentType::WEBP,
+                    )
+                    .await
+                    .unwrap();
+
+                    remove_file(format!("{}.mp4", output)).await.unwrap();
+                }
+
                 TaskStatus::Done
             } else {
                 TaskStatus::Idle
@@ -504,6 +742,7 @@ pub async fn replace_slide(
             for gos in &mut capsule.structure.0 {
                 for slide in &mut gos.slides {
                     if format!("{}", slide.uuid) == old_uuid {
+                        gos.record = None;
                         slide_found = Some(slide);
                     }
                 }
@@ -519,7 +758,7 @@ pub async fn replace_slide(
 
             capsule.set_changed();
             capsule.save(&db).await.ok();
-            capsule.notify_change(&db, &socks).await.ok();
+            capsule.notify_change(&db, &socks, s3.as_ref()).await.ok();
 
             capsule
                 .notify_video_upload(&old_uuid, &id.hash(), &db, &socks)
@@ -569,7 +808,11 @@ pub async fn add_slide(
     data: Data<'_>,
     config: &S<Config>,
     content_type: &ContentType,
+    storage: &S<Storage>,
+    socks: &S<Notifier>,
 ) -> Result<Value> {
+    let s3 = storage.s3();
+
     let (mut capsule, role) = user
         .get_capsule_with_permission(*id, Role::Write, &db)
         .await?;
@@ -589,78 +832,127 @@ pub async fn add_slide(
             .ok_or(Error(Status::InternalServerError))?
     };
 
-    let path = config
+    let asset_path = config
         .data_path
         .join(format!("{}", capsule.id))
-        .join("assets")
-        .join(format!("{}", Uuid::new_v4()));
+        .join("assets");
+
+    create_dir_all(&asset_path).await?;
+
+    let path = asset_path.join(format!("{}", Uuid::new_v4()));
 
     data.open(1_i32.gibibytes()).into_file(&path).await?;
 
     let path = path.to_str().ok_or(Error(Status::InternalServerError))?;
 
-    let output_uuid = Uuid::new_v4();
-    let output = config
-        .data_path
-        .join(format!("{}", *id))
-        .join("assets")
-        .join(format!("{}", output_uuid));
-
-    let output = output.to_str().ok_or(Error(Status::InternalServerError))?;
-
-    let _extra = if content_type.media_type().top() == "image" {
+    let uuids = if content_type.media_type().top() == "image" {
         // Not very clean but working
+        let output_uuid = Uuid::new_v4();
+        let output = config
+            .data_path
+            .join(format!("{}", *id))
+            .join("assets")
+            .join(format!("{}", output_uuid));
 
+        let output = output.to_str().ok_or(Error(Status::InternalServerError))?;
         run_command(&vec![
-            "../scripts/psh",
-            "pdf-to-png",
+            "../scripts/popy.py",
+            "convert",
+            "pdf2webp",
+            "-i",
             &path,
-            &format!("{}.png", output),
+            "-o",
+            &format!("{}.webp", output),
+            "-d",
             &config.pdf_target_density,
+            "-s",
             &config.pdf_target_size,
         ])?;
 
-        false
+        if let Some(s3) = storage.inner().s3() {
+            s3.upload(
+                &format!("{}.webpp", output),
+                &format!("{}/assets/{}.webp", capsule.id, output_uuid),
+                ContentType::WEBP,
+            )
+            .await?;
+
+            remove_file(format!("{}.webp", output)).await?;
+        }
+
+        vec![output_uuid]
     } else if *content_type == ContentType::PDF {
         // Not very clean either, but should work too
+        let output_uuid = Uuid::new_v4();
+        let output = config
+            .data_path
+            .join(format!("{}", *id))
+            .join("assets")
+            .join(format!("{}", output_uuid));
+
+        let output = output.to_str().ok_or(Error(Status::InternalServerError))?;
 
         run_command(&vec![
-            "../scripts/psh",
-            "pdf-to-png",
+            "../scripts/popy.py",
+            "convert",
+            "pdf2webp",
+            "-i",
             &format!("{}[{}]", path, page),
-            &format!("{}.png", output),
+            "-o",
+            &format!("{}.webp", output),
+            "-d",
             &config.pdf_target_density,
+            "-s",
             &config.pdf_target_size,
         ])?;
 
-        false
+        if let Some(s3) = storage.inner().s3() {
+            s3.upload(
+                &format!("{}.webp", output),
+                &format!("{}/assets/{}.webp", capsule.id, output_uuid),
+                ContentType::WEBP,
+            )
+            .await?;
+
+            remove_file(format!("{}.webp", output)).await?;
+        }
+
+        vec![output_uuid]
     } else if content_type.media_type().top() == "video" {
         return Err(Error(Status::UnsupportedMediaType));
 
-        // run_command_with_output(&vec![
-        //     "../scripts/psh",
-        //     "on-video-upload",
-        //     &path,
-        //     &format!("{}.mp4", output),
-        // ])?;
+    // run_command_with_output(&vec![
+    //     "../scripts/psh",
+    //     "on-video-upload",
+    //     &path,
+    //     &format!("{}.mp4", output),
+    // ])?;
 
-        // true
+    // true
+    } else if *content_type == ContentType::ZIP {
+        // Export the slides from the zip file.
+        export_slides_from_zip(&config, &path, &asset_path)?
     } else {
         return Err(Error(Status::UnsupportedMediaType));
     };
 
-    gos.slides.push(Slide {
-        uuid: output_uuid,
-        extra: None,
-        prompt: String::new(),
-    });
+    for uuid in uuids {
+        gos.slides.push(Slide {
+            uuid,
+            extra: None,
+            prompt: String::new(),
+        });
+    }
 
     gos.record = None;
 
+    remove_file(path).await?;
+
     capsule.set_changed();
     capsule.save(&db).await?;
+    capsule.notify_change(&db, &socks, s3).await.ok();
 
-    Ok(capsule.to_json(role, &db).await?)
+    Ok(capsule.to_json(role, &db, storage.inner().s3()).await?)
 }
 
 /// Route to create a gos at a specific place in the capsule.
@@ -674,7 +966,11 @@ pub async fn add_gos(
     data: Data<'_>,
     config: &S<Config>,
     content_type: &ContentType,
+    storage: &S<Storage>,
+    socks: &S<Notifier>,
 ) -> Result<Value> {
+    let s3 = storage.s3();
+
     let (mut capsule, role) = user
         .get_capsule_with_permission(*id, Role::Write, &db)
         .await?;
@@ -690,51 +986,92 @@ pub async fn add_gos(
         .get_mut(gos as usize)
         .ok_or(Error(Status::BadRequest))?;
 
-    let path = config
+    let asset_path = config
         .data_path
         .join(format!("{}", capsule.id))
-        .join("assets")
-        .join(format!("{}", Uuid::new_v4()));
+        .join("assets");
+
+    create_dir_all(&asset_path).await?;
+
+    let path = asset_path.join(format!("{}", Uuid::new_v4()));
 
     data.open(1_i32.gibibytes()).into_file(&path).await?;
 
     let path = path.to_str().ok_or(Error(Status::InternalServerError))?;
 
-    let output_uuid = Uuid::new_v4();
-    let output = config
-        .data_path
-        .join(format!("{}", *id))
-        .join("assets")
-        .join(format!("{}", output_uuid));
-
-    let output = output.to_str().ok_or(Error(Status::InternalServerError))?;
-
-    let _extra = if content_type.media_type().top() == "image" {
+    let uuids = if content_type.media_type().top() == "image" {
         // Not very clean but working
+        let output_uuid = Uuid::new_v4();
+        let output = config
+            .data_path
+            .join(format!("{}", *id))
+            .join("assets")
+            .join(format!("{}", output_uuid));
+
+        let output = output.to_str().ok_or(Error(Status::InternalServerError))?;
 
         run_command(&vec![
-            "../scripts/psh",
-            "pdf-to-png",
+            "../scripts/popy.py",
+            "convert",
+            "pdf2webp",
+            "-i",
             &path,
-            &format!("{}.png", output),
+            "-o",
+            &format!("{}.webp", output),
+            "-d",
             &config.pdf_target_density,
+            "-s",
             &config.pdf_target_size,
         ])?;
 
-        false
+        if let Some(s3) = storage.inner().s3() {
+            s3.upload(
+                &format!("{}.webp", output),
+                &format!("{}/assets/{}.webp", capsule.id, output_uuid),
+                ContentType::WEBP,
+            )
+            .await?;
+
+            remove_file(format!("{}.webp", output)).await?;
+        }
+
+        vec![output_uuid]
     } else if *content_type == ContentType::PDF {
         // Not very clean either, but should work too
+        let output_uuid = Uuid::new_v4();
+        let output = config
+            .data_path
+            .join(format!("{}", *id))
+            .join("assets")
+            .join(format!("{}", output_uuid));
 
+        let output = output.to_str().ok_or(Error(Status::InternalServerError))?;
         run_command(&vec![
-            "../scripts/psh",
-            "pdf-to-png",
+            "../scripts/popy.py",
+            "convert",
+            "pdf2webp",
+            "-i",
             &format!("{}[{}]", path, page),
-            &format!("{}.png", output),
+            "-o",
+            &format!("{}.webp", output),
+            "-d",
             &config.pdf_target_density,
+            "-s",
             &config.pdf_target_size,
         ])?;
 
-        false
+        if let Some(s3) = storage.inner().s3() {
+            s3.upload(
+                &format!("{}.webp", output),
+                &format!("{}/assets/{}.webp", capsule.id, output_uuid),
+                ContentType::WEBP,
+            )
+            .await?;
+
+            remove_file(format!("{}.webp", output)).await?;
+        }
+
+        vec![output_uuid]
     } else if content_type.media_type().top() == "video" {
         return Err(Error(Status::UnsupportedMediaType));
 
@@ -746,32 +1083,33 @@ pub async fn add_gos(
         // ])?;
 
         // true
+    } else if *content_type == ContentType::ZIP {
+        // Export the slides from the zip file.
+        export_slides_from_zip(&config, &path, &asset_path)?
     } else {
         return Err(Error(Status::UnsupportedMediaType));
     };
 
-    gos.slides.push(Slide {
-        uuid: output_uuid,
-        extra: None,
-        prompt: String::new(),
-    });
+    for uuid in uuids {
+        gos.slides.push(Slide {
+            uuid,
+            extra: None,
+            prompt: String::new(),
+        });
+    }
+
+    remove_file(path).await?;
 
     capsule.set_changed();
     capsule.save(&db).await?;
+    capsule.notify_change(&db, &socks, s3).await.ok();
 
-    Ok(capsule.to_json(role, &db).await?)
+    Ok(capsule.to_json(role, &db, storage.inner().s3()).await?)
 }
 
 /// The route that triggers the production of a capsule.
 #[post("/produce/<id>")]
-pub async fn produce(
-    user: User,
-    id: HashId,
-    socks: &S<WebSockets>,
-    sem: &S<Arc<Semaphore>>,
-    config: &S<Config>,
-    db: Db,
-) -> Result<()> {
+pub async fn produce(user: User, id: HashId, db: Db, task_runner: &S<TaskRunner>) -> Result<()> {
     let (mut capsule, _) = user
         .get_capsule_with_permission(*id, Role::Write, &db)
         .await?;
@@ -779,139 +1117,20 @@ pub async fn produce(
     if capsule.produced == TaskStatus::Running {
         return Err(Error(Status::Conflict));
     }
+    if capsule
+        .structure
+        .0
+        .iter()
+        .any(|x| x.produced == TaskStatus::Running)
+    {
+        return Err(Error(Status::Conflict));
+    }
 
-    let mut stat = TaskStat::new(TaskStatType::Production, &db).await?;
+    capsule.produced = TaskStatus::Running;
+    capsule.published = TaskStatus::Idle;
+    capsule.save(&db).await?;
 
-    let socks = socks.inner().clone();
-    let sem = sem.inner().clone();
-
-    let output_path = config.data_path.join(format!("{}", *id)).join("output.mp4");
-
-    tokio::spawn(async move {
-        let sound_track_info = if let Some(sound_track) = &capsule.sound_track {
-            format!("{}:{}", sound_track.0.uuid, sound_track.0.volume)
-        } else {
-            "null".to_string()
-        };
-
-        stat.start(&db).await.unwrap();
-        let child = Command::new("../scripts/psh")
-            .arg("on-produce")
-            .arg(format!("{}", capsule.id))
-            .arg("-1")
-            .arg(sound_track_info)
-            .stdin(Stdio::piped())
-            .stdout(Stdio::piped())
-            .spawn();
-
-        let succeed = if let Ok(mut child) = child {
-            capsule.produced = TaskStatus::Running;
-            capsule.published = TaskStatus::Idle;
-            capsule.production_pid = child.id().map(|x| x as i32);
-            capsule.save(&db).await.ok();
-
-            if let Some(stdin) = child.stdin.as_mut() {
-                // replace null webcamsteeings with default webcam settings
-                let mut capsule_clone = capsule.clone();
-                for gos in &mut capsule_clone.structure.0 {
-                    if gos.webcam_settings.is_none() {
-                        gos.webcam_settings = Some(capsule_clone.webcam_settings.0.clone());
-                    }
-                }
-                stdin
-                    .write_all(json!(capsule_clone.structure.0).to_string().as_bytes())
-                    .await
-                    .unwrap();
-
-                if let Ok(_) = sem.acquire().await {
-                    child.stdin.unwrap();
-                    let stdout = child.stdout.take().unwrap();
-                    let reader = BufReader::new(stdout);
-
-                    let mut lines = reader.lines();
-                    while let Some(line) = lines.next_line().await.unwrap() {
-                        capsule
-                            .notify_production_progress(
-                                &id.hash(),
-                                &format!("{}", line),
-                                &db,
-                                &socks,
-                            )
-                            .await
-                            .ok();
-                    }
-                    true
-                } else {
-                    false
-                }
-            } else {
-                false
-            }
-        } else {
-            false
-        };
-
-        stat.end(&db).await.unwrap();
-
-        capsule.produced = if succeed {
-            TaskStatus::Done
-        } else {
-            TaskStatus::Idle
-        };
-
-        let output = run_command(&vec![
-            "../scripts/psh",
-            "duration",
-            output_path.to_str().unwrap(),
-        ]);
-
-        match &output {
-            Ok(o) => {
-                let line = ((std::str::from_utf8(&o.stdout)
-                    .map_err(|_| Error(Status::InternalServerError))
-                    .unwrap()
-                    .trim()
-                    .parse::<f32>()
-                    .unwrap())
-                    * 1000.) as i32;
-
-                capsule.duration_ms = line;
-                capsule.save(&db).await.ok();
-            }
-            Err(_) => error!("Impossible to get duration"),
-        };
-
-        capsule.production_pid = None;
-        capsule.save(&db).await.ok();
-
-        if succeed {
-            capsule
-                .notify_production(&id.hash(), &db, &socks)
-                .await
-                .ok();
-
-            user.notify(
-                &socks,
-                "Production terminée",
-                &format!(
-                    "La capsule \"{}\" a été correctement produite.",
-                    capsule.name
-                ),
-                &db,
-            )
-            .await
-            .ok();
-        } else {
-            user.notify(
-                &socks,
-                "Production terminée",
-                &format!("La production de la capsule \"{}\" a échoué.", capsule.name),
-                &db,
-            )
-            .await
-            .ok();
-        };
-    });
+    task_runner.trigger(Task::ProduceCapsule(*id)).await?;
 
     Ok(())
 }
@@ -922,107 +1141,24 @@ pub async fn produce_gos(
     user: User,
     id: HashId,
     gos: i32,
-    socks: &S<WebSockets>,
-    sem: &S<Arc<Semaphore>>,
     db: Db,
+    task_runner: &S<TaskRunner>,
 ) -> Result<()> {
     let (mut capsule, _) = user
         .get_capsule_with_permission(*id, Role::Write, &db)
         .await?;
 
-    if capsule.produced == TaskStatus::Running {
+    if capsule.structure.0.len() <= gos as usize {
+        return Err(Error(Status::BadRequest));
+    }
+    if capsule.structure.0[gos as usize].produced == TaskStatus::Running {
         return Err(Error(Status::Conflict));
     }
 
-    let socks = socks.inner().clone();
-    let sem = sem.inner().clone();
+    capsule.structure.0[gos as usize].produced = TaskStatus::Running;
+    capsule.save(&db).await?;
 
-    tokio::spawn(async move {
-        let child = Command::new("../scripts/psh")
-            .arg("on-produce")
-            .arg(format!("{}", capsule.id))
-            .arg(format!("{}", gos))
-            .stdin(Stdio::piped())
-            .stdout(Stdio::piped())
-            .spawn();
-
-        let succeed = if let Ok(mut child) = child {
-            capsule.produced = TaskStatus::Running;
-            capsule.published = TaskStatus::Idle;
-            capsule.production_pid = child.id().map(|x| x as i32);
-            capsule.save(&db).await.ok();
-
-            if let Some(stdin) = child.stdin.as_mut() {
-                stdin
-                    .write_all(json!(capsule.structure.0).to_string().as_bytes())
-                    .await
-                    .unwrap();
-
-                if let Ok(_) = sem.acquire().await {
-                    child.stdin.unwrap();
-                    let stdout = child.stdout.take().unwrap();
-                    let reader = BufReader::new(stdout);
-
-                    let mut lines = reader.lines();
-                    while let Some(line) = lines.next_line().await.unwrap() {
-                        capsule
-                            .notify_production_progress(
-                                &id.hash(),
-                                &format!("{}", line),
-                                &db,
-                                &socks,
-                            )
-                            .await
-                            .ok();
-                    }
-                    true
-                } else {
-                    false
-                }
-            } else {
-                false
-            }
-        } else {
-            false
-        };
-
-        capsule.produced = if succeed {
-            TaskStatus::Done
-        } else {
-            TaskStatus::Idle
-        };
-
-        capsule.production_pid = None;
-        capsule.save(&db).await.ok();
-
-        if succeed {
-            capsule
-                .notify_production(&id.hash(), &db, &socks)
-                .await
-                .ok();
-
-            user.notify(
-                &socks,
-                "Production terminée",
-                &format!(
-                    "La capsule \"{}\" a été correctement produite.",
-                    capsule.name
-                ),
-                &db,
-            )
-            .await
-            .ok();
-        } else {
-            user.notify(
-                &socks,
-                "Production terminée",
-                &format!("La production de la capsule \"{}\" a échoué.", capsule.name),
-                &db,
-            )
-            .await
-            .ok();
-        };
-    });
+    task_runner.trigger(Task::ProduceGos(*id, gos)).await?;
 
     Ok(())
 }
@@ -1054,14 +1190,7 @@ pub async fn cancel_production(user: User, id: HashId, db: Db) -> Result<()> {
 
 /// The route that publishes a capsule.
 #[post("/publish/<id>")]
-pub async fn publish(
-    user: User,
-    id: HashId,
-    config: &S<Config>,
-    db: Db,
-    socks: &S<WebSockets>,
-    sem: &S<Arc<Semaphore>>,
-) -> Result<()> {
+pub async fn publish(user: User, id: HashId, db: Db, task_runner: &S<TaskRunner>) -> Result<()> {
     let (mut capsule, _) = user
         .get_capsule_with_permission(*id, Role::Write, &db)
         .await?;
@@ -1070,92 +1199,9 @@ pub async fn publish(
         return Err(Error(Status::Conflict));
     }
 
-    let mut stat = TaskStat::new(TaskStatType::Publication, &db).await?;
-
-    let input = config.data_path.join(format!("{}", *id)).join("output.mp4");
-    let output = config.data_path.join(format!("{}", *id)).join("output");
-
-    let socks = socks.inner().clone();
-    let sem = sem.inner().clone();
-
-    tokio::spawn(async move {
-        remove_dir_all(&output).await.ok();
-
-        let child = Command::new("../scripts/psh")
-            .arg("on-publish")
-            .arg(input)
-            .arg(output)
-            .arg(format!("{}", capsule.prompt_subtitles))
-            .stdin(Stdio::piped())
-            .spawn();
-
-        let succeed = if let Ok(mut child) = child {
-            if let Some(stdin) = child.stdin.as_mut() {
-                stdin
-                    .write_all(json!(capsule.structure.0).to_string().as_bytes())
-                    .await
-                    .unwrap();
-
-                capsule.published = TaskStatus::Running;
-                capsule.publication_pid = child.id().map(|x| x as i32);
-                capsule.save(&db).await.ok();
-
-                if let Ok(_) = sem.acquire().await {
-                    stat.start(&db).await.unwrap();
-                    let res = child.wait().await;
-                    res.map(|x| x.success()).unwrap_or_else(|_| false)
-                } else {
-                    false
-                }
-            } else {
-                false
-            }
-        } else {
-            false
-        };
-
-        stat.end(&db).await.unwrap();
-
-        capsule.published = if succeed {
-            TaskStatus::Done
-        } else {
-            TaskStatus::Idle
-        };
-
-        capsule.publication_pid = None;
-        capsule.save(&db).await.ok();
-
-        if succeed {
-            capsule
-                .notify_publication(&id.hash(), &db, &socks)
-                .await
-                .ok();
-
-            user.notify(
-                &socks,
-                "Publication terminée",
-                &format!(
-                    "La capsule \"{}\" a été correctement publiée.",
-                    capsule.name
-                ),
-                &db,
-            )
-            .await
-            .ok();
-        } else {
-            user.notify(
-                &socks,
-                "Publication échouée",
-                &format!(
-                    "La publication de la capsule \"{}\" a échoué.",
-                    capsule.name
-                ),
-                &db,
-            )
-            .await
-            .ok();
-        }
-    });
+    capsule.published = TaskStatus::Running;
+    capsule.save(&db).await?;
+    task_runner.trigger(Task::PublishCapsule(*id)).await?;
 
     Ok(())
 }
@@ -1188,7 +1234,13 @@ pub async fn cancel_publication(user: User, id: HashId, db: Db) -> Result<()> {
 
 /// The route that unpublishes a capsule.
 #[post("/unpublish/<id>")]
-pub async fn unpublish(user: User, id: HashId, db: Db, config: &S<Config>) -> Result<()> {
+pub async fn unpublish(
+    user: User,
+    id: HashId,
+    db: Db,
+    config: &S<Config>,
+    storage: &S<Storage>,
+) -> Result<()> {
     let (mut capsule, _) = user
         .get_capsule_with_permission(*id, Role::Write, &db)
         .await?;
@@ -1202,6 +1254,15 @@ pub async fn unpublish(user: User, id: HashId, db: Db, config: &S<Config>) -> Re
 
     let output = config.data_path.join(format!("{}", *id)).join("output");
     remove_dir_all(output).await?;
+
+    if let Some(s3) = storage.inner().s3() {
+        let dir = s3.read_dir(&format!("{}/output/", *id)).await?;
+
+        for object in dir.contents().ok_or(Error(Status::InternalServerError))? {
+            let key = object.key().ok_or(Error(Status::InternalServerError))?;
+            s3.remove(key).await?;
+        }
+    }
 
     Ok(())
 }
@@ -1234,7 +1295,13 @@ pub async fn cancel_video_upload(user: User, id: HashId, db: Db) -> Result<()> {
 
 /// Duplicates a capsule.
 #[post("/duplicate/<id>")]
-pub async fn duplicate(user: User, id: HashId, config: &S<Config>, db: Db) -> Result<Value> {
+pub async fn duplicate(
+    user: User,
+    id: HashId,
+    config: &S<Config>,
+    db: Db,
+    storage: &S<Storage>,
+) -> Result<Value> {
     let (capsule, _) = user
         .get_capsule_with_permission(*id, Role::Read, &db)
         .await?;
@@ -1248,56 +1315,53 @@ pub async fn duplicate(user: User, id: HashId, config: &S<Config>, db: Db) -> Re
     .await?;
     new.privacy = capsule.privacy;
     new.produced = capsule.produced;
+    new.published = capsule.published;
     new.structure = capsule.structure;
     new.webcam_settings = capsule.webcam_settings;
     new.sound_track = capsule.sound_track;
     new.duration_ms = capsule.duration_ms;
 
-    for dir in ["assets", "tmp", "output"] {
-        let orig = config.data_path.join(&format!("{}/{}", capsule.id, dir));
-        let dest = config.data_path.join(&format!("{}/{}", new.id, dir));
+    if let Some(s3) = storage.s3() {
+        s3.copy_dir(&format!("{}", capsule.id), &format!("{}", new.id))
+            .await?;
+    } else {
+        for dir in ["assets", "produced", "published"] {
+            let orig = config.data_path.join(&format!("{}/{}", capsule.id, dir));
+            let dest = config.data_path.join(&format!("{}/{}", new.id, dir));
 
-        if orig.is_dir() {
-            create_dir_all(&dest).await?;
+            if orig.is_dir() {
+                create_dir_all(&dest).await?;
 
-            let mut iter = read_dir(&orig)
-                .await
-                .map_err(|_| Error(Status::InternalServerError))?;
-
-            loop {
-                let next = iter
-                    .next_entry()
+                let mut iter = read_dir(&orig)
                     .await
                     .map_err(|_| Error(Status::InternalServerError))?;
 
-                let next = match next {
-                    Some(x) => x,
-                    None => break,
-                };
+                loop {
+                    let next = iter
+                        .next_entry()
+                        .await
+                        .map_err(|_| Error(Status::InternalServerError))?;
 
-                let path = next.path();
-                let file_name = path.file_name().ok_or(Error(Status::InternalServerError))?;
+                    let next = match next {
+                        Some(x) => x,
+                        None => break,
+                    };
 
-                copy(orig.join(&file_name), dest.join(&file_name))
-                    .await
-                    .map_err(|_| Error(Status::InternalServerError))?;
+                    let path = next.path();
+                    let file_name = path.file_name().ok_or(Error(Status::InternalServerError))?;
+
+                    copy(orig.join(&file_name), dest.join(&file_name))
+                        .await
+                        .map_err(|_| Error(Status::InternalServerError))?;
+                }
             }
         }
-    }
-
-    let orig = config.data_path.join(&format!("{}/output.mp4", capsule.id));
-    let dest = config.data_path.join(&format!("{}/output.mp4", new.id));
-
-    if orig.is_file() {
-        copy(orig, dest)
-            .await
-            .map_err(|_| Error(Status::InternalServerError))?;
     }
 
     new.set_changed();
     new.save(&db).await?;
 
-    Ok(new.to_json(Role::Owner, &db).await?)
+    Ok(new.to_json(Role::Owner, &db, storage.inner().s3()).await?)
 }
 
 /// The invitation data.
@@ -1418,6 +1482,7 @@ pub async fn sound_track(
     db: Db,
     data: Data<'_>,
     config: &S<Config>,
+    storage: &S<Storage>,
 ) -> Result<Value> {
     // User must have write access to the capsule.
     let (mut capsule, role) = user
@@ -1436,9 +1501,15 @@ pub async fn sound_track(
         volume = old_track.0.volume;
         let old_path = path.join(format!("{}", old_uuid)).with_extension("m4a");
         remove_file(&old_path).await.ok();
+
+        if let Some(s3) = storage.inner().s3() {
+            let s3_path = format!("{}/assets/{}.m4a", *id, old_uuid);
+            s3.remove(&s3_path).await?;
+        }
     }
 
     // Create paths.
+    create_dir_all(&path).await?;
     let path = path.join(format!("{}", uuid));
     let tmp_path = path.with_extension("tmp.mp3");
     let m4a_path = path.with_extension("m4a");
@@ -1450,12 +1521,15 @@ pub async fn sound_track(
 
     // Convert file to expected format.
     let _res = run_command(&vec![
-        "../scripts/psh",
-        "transcode-audio",
+        "../scripts/popy.py",
+        "convert",
+        "audio",
+        "-i",
         &tmp_path
             .to_str()
             .ok_or(Error(Status::InternalServerError))?
             .to_string(),
+        "-o",
         &m4a_path
             .to_str()
             .ok_or(Error(Status::InternalServerError))?
@@ -1465,14 +1539,26 @@ pub async fn sound_track(
     // Remove the temporary file.
     remove_file(&tmp_path).await.ok();
 
+    if let Some(s3) = storage.inner().s3() {
+        s3.upload(
+            &m4a_path,
+            &format!("{}/assets/{}.m4a", *id, uuid),
+            ContentType::new("audio", "x-m4a"),
+        )
+        .await?;
+
+        remove_file(&m4a_path).await?;
+    }
+
     // Save the track in the database.
     let sound_track = SoundTrack {
         uuid,
         name: name.to_string(),
         volume,
     };
+
     capsule.sound_track = Some(EJson(sound_track));
     capsule.save(&db).await?;
 
-    Ok(capsule.to_json(role, &db).await?)
+    Ok(capsule.to_json(role, &db, storage.inner().s3()).await?)
 }

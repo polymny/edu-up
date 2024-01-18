@@ -320,6 +320,10 @@ msgstr ""
 msgid "Steps.Preparation.addSlideWillBreak"
 msgstr ""
 
+#. A sentence that explains that adding an extra video will destroy the record.
+msgid "Steps.Preparation.addExtraResourceWillBreak"
+msgstr ""
+
 #. A sentence that explains that deleting a slide will destroy the record.
 msgid "Steps.Preparation.deleteSlideWillBreak"
 msgstr ""
@@ -386,6 +390,10 @@ msgstr ""
 
 #. When editing the prompt, go the the previous slide.
 msgid "Steps.Preparation.goToPreviousSlide"
+msgstr ""
+
+#. Pointer
+msgid "Steps.Acquisition.pointer"
 msgstr ""
 
 #. Step of video and audio acquisition.
@@ -633,6 +641,10 @@ msgstr ""
 msgid "Steps.Production.downloadVideo"
 msgstr ""
 
+#. More settings.
+msgid "Steps.Production.moreSettings"
+msgstr ""
+
 #. This grain uses the default production options.
 msgid "Steps.Production.grainUsesDefaultProductionOptions"
 msgstr ""
@@ -655,6 +667,10 @@ msgstr ""
 
 #. Currently publishing video.
 msgid "Steps.Publication.publishingVideo"
+msgstr ""
+
+#. Premium feature.
+msgid "Steps.Production.premiumFeature"
 msgstr ""
 
 #. Setence to describe the publication of the video.
@@ -747,6 +763,14 @@ msgstr ""
 
 #. Admin can invite a user.
 msgid "Admin.inviteUser"
+msgstr ""
+
+#. Registration date.
+msgid "Admin.registrationDate"
+msgstr ""
+
+#. Last visit.
+msgid "Admin.lastVisit"
 msgstr ""
 
 #. An error to the user.
@@ -967,6 +991,10 @@ msgstr ""
 
 #. The shorthand for the license of the code.
 msgid "Config.licenseShort"
+msgstr ""
+
+#. Display the record circle.
+msgid "Ui.recordCircle"
 msgstr ""
 
 #. Welcome on Polymny.
@@ -1258,6 +1286,10 @@ msgstr ""
 
 #. Capsule production task.
 msgid "Tasks.productionCapsule"
+msgstr ""
+
+#. GOS production task.
+msgid "Tasks.productionGos"
 msgstr ""
 
 #. Capsule publication task.

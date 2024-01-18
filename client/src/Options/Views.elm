@@ -75,10 +75,10 @@ defaultProd config user model =
             config.clientState.lang
 
         -- Helper to create section titles
-        title : Bool -> String -> Element App.Msg
-        title disabled input =
+        title : String -> Element App.Msg
+        title input =
             Element.text input
-                |> Element.el (disableAttrIf disabled ++ [ Font.size 22, Font.bold ])
+                |> Element.el [ Font.size 22, Font.bold ]
 
         -- Video width if pip
         width : Maybe Int
@@ -147,8 +147,8 @@ defaultProd config user model =
             Input.checkbox
                 []
                 { checked = model.capsule.defaultWebcamSettings /= Data.Disabled
-                , icon = Input.defaultCheckbox
-                , label = Input.labelRight [] <| Element.text <| Strings.stepsProductionUseVideo lang
+                , icon = Ui.checkbox False
+                , label = Input.labelRight [ Ui.cy ] <| Element.text <| Strings.stepsProductionUseVideo lang
                 , onChange = \_ -> App.OptionsMsg <| Options.WebcamSettingsMsg <| Production.ToggleVideo
                 }
 
@@ -158,8 +158,7 @@ defaultProd config user model =
 
         --  Title to introduce webcam size settings
         webcamSizeTitle =
-            Strings.stepsProductionWebcamSize lang
-                |> title webcamSizeDisabled
+            title <| Strings.stepsProductionWebcamSize lang
 
         mkSetWidth disabled x =
             if disabled then
@@ -225,11 +224,11 @@ defaultProd config user model =
                         else
                             App.OptionsMsg <| Options.WebcamSettingsMsg <| Production.SetWidth x
                 , options =
-                    [ Input.option (Just 200) <| Element.text <| Strings.stepsProductionSmall lang
-                    , Input.option (Just 400) <| Element.text <| Strings.stepsProductionMedium lang
-                    , Input.option (Just 800) <| Element.text <| Strings.stepsProductionLarge lang
-                    , Input.option Nothing <| Element.text <| Strings.stepsProductionFullscreen lang
-                    , Input.option (Just 533) <| Element.text <| Strings.stepsProductionCustom lang
+                    [ Input.optionWith (Just 200) <| Ui.option (model.capsule.defaultWebcamSettings == Data.Disabled) <| Element.text <| Strings.stepsProductionSmall lang
+                    , Input.optionWith (Just 400) <| Ui.option (model.capsule.defaultWebcamSettings == Data.Disabled) <| Element.text <| Strings.stepsProductionMedium lang
+                    , Input.optionWith (Just 800) <| Ui.option (model.capsule.defaultWebcamSettings == Data.Disabled) <| Element.text <| Strings.stepsProductionLarge lang
+                    , Input.optionWith Nothing <| Ui.option (model.capsule.defaultWebcamSettings == Data.Disabled) <| Element.text <| Strings.stepsProductionFullscreen lang
+                    , Input.optionWith (Just 533) <| Ui.option (model.capsule.defaultWebcamSettings == Data.Disabled) <| Element.text <| Strings.stepsProductionCustom lang
                     ]
                 , selected =
                     case model.capsule.defaultWebcamSettings of
@@ -253,8 +252,7 @@ defaultProd config user model =
 
         -- Title to introduce webcam position settings
         webcamPositionTitle =
-            Strings.stepsProductionWebcamPosition lang
-                |> title webcamPositionDisabled
+            title <| Strings.stepsProductionWebcamPosition lang
 
         -- Element to choose the webcam position among the four corners
         webcamPositionRadio =
@@ -264,13 +262,18 @@ defaultProd config user model =
                 { label = Input.labelHidden <| Strings.stepsProductionWebcamPosition lang
                 , onChange = \x -> App.OptionsMsg <| Options.WebcamSettingsMsg <| Production.SetAnchor x
                 , options =
-                    [ Input.option Data.TopLeft <| Element.text <| Strings.stepsProductionTopLeft lang
-                    , Input.option Data.TopRight <| Element.text <| Strings.stepsProductionTopRight lang
-                    , Input.option Data.BottomLeft <| Element.text <| Strings.stepsProductionBottomLeft lang
-                    , Input.option Data.BottomRight <| Element.text <| Strings.stepsProductionBottomRight lang
+                    [ Input.optionWith Data.TopLeft <| Ui.option (model.capsule.defaultWebcamSettings == Data.Disabled) <| Element.text <| Strings.stepsProductionTopLeft lang
+                    , Input.optionWith Data.TopRight <| Ui.option (model.capsule.defaultWebcamSettings == Data.Disabled) <| Element.text <| Strings.stepsProductionTopRight lang
+                    , Input.optionWith Data.BottomLeft <| Ui.option (model.capsule.defaultWebcamSettings == Data.Disabled) <| Element.text <| Strings.stepsProductionBottomLeft lang
+                    , Input.optionWith Data.BottomRight <| Ui.option (model.capsule.defaultWebcamSettings == Data.Disabled) <| Element.text <| Strings.stepsProductionBottomRight lang
                     ]
                 , selected = anchor
                 }
+
+        -- Title other settings.
+        moreTitle : Element App.Msg
+        moreTitle =
+            title <| Strings.stepsProductionMoreSettings lang
 
         -- Whether the user can control the opacity
         opacityDisabled =
@@ -278,8 +281,9 @@ defaultProd config user model =
 
         -- Title to introduce webcam opacity settings
         opacityTitle =
-            Strings.stepsProductionOpacity lang
-                |> title opacityDisabled
+            Element.el (disableAttrIf opacityDisabled) <|
+                Element.text <|
+                    Strings.stepsProductionOpacity lang
 
         -- Slider to control opacity
         opacitySlider =
@@ -294,7 +298,7 @@ defaultProd config user model =
                     , max = 1
                     , min = 0
                     , step = Just 0.1
-                    , thumb = Input.defaultThumb
+                    , thumb = Ui.sliderThumb opacityDisabled
                     , value = opacity
                     }
                 , -- Text label of the opacity value
@@ -321,8 +325,14 @@ defaultProd config user model =
             , webcamPositionRadio
             ]
         , Element.column [ Ui.wf, Ui.s 10 ]
-            [ opacityTitle
-            , opacitySlider
+            [ moreTitle
+            , Element.column
+                [ Ui.s 10, Ui.wf ]
+                [ Element.column [ Ui.s 10, Ui.wf ]
+                    [ opacityTitle
+                    , opacitySlider
+                    ]
+                ]
             ]
         ]
 
@@ -509,7 +519,7 @@ generalOptions config model =
                     , max = 1
                     , min = 0
                     , step = Just 0.01
-                    , thumb = Input.defaultThumb
+                    , thumb = Ui.sliderThumb False
                     , value = volume
                     }
                 , -- Text label of the volume value

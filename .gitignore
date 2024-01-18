@@ -1,3 +1,6 @@
 *.webm
 *.mp4
 *.pdf
+**/.venv
+**/__pycache__
+.vscode

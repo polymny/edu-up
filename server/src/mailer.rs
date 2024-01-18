@@ -30,24 +30,19 @@ pub struct Mailer {
     pub root: String,
 
     /// Whether a mail will be sent for users to activate their accounts.
-    #[serde(rename = "mailer_require_email_validation")]
     pub require_email_validation: bool,
 
     /// The smtp server of the mail account.
-    #[serde(rename = "mailer_host")]
-    pub server: String,
+    pub host: String,
 
     /// The username of the mail account.
-    #[serde(rename = "mailer_user")]
     pub username: String,
 
     /// The password of the mail account.
-    #[serde(rename = "mailer_password")]
     pub password: String,
 
     /// The delay between two mails for mailing campaign, in seconds.
     #[serde(default = "default_mailer_delay")]
-    #[serde(rename = "mailer_delay")]
     pub delay: u64,
 }
 
@@ -56,7 +51,7 @@ impl Mailer {
     pub fn new(
         require_email_validation: bool,
         root: String,
-        server: String,
+        host: String,
         username: String,
         password: String,
         delay: u64,
@@ -64,7 +59,7 @@ impl Mailer {
         Mailer {
             root,
             require_email_validation,
-            server,
+            host,
             username,
             password,
             delay,
@@ -97,7 +92,7 @@ impl Mailer {
             )
             .map_err(|_| Error(Status::InternalServerError))?;
 
-        let client = SmtpTransport::relay(&self.server)
+        let client = SmtpTransport::relay(&self.host)
             .expect("Failed to create smtp client")
             .credentials(Credentials::new(
                 self.username.clone(),

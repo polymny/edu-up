@@ -17,6 +17,10 @@ import Html
 import Html.Attributes
 import Material.Icons as Icons
 import Publication.Types as Publication
+import Simple.Animation as Animation exposing (Animation)
+import Simple.Animation.Animated as Animated
+import Simple.Animation.Property as P
+import Simple.Transition as Transition
 import Strings
 import Ui.Colors as Colors
 import Ui.Elements as Ui
@@ -65,7 +69,7 @@ view config _ model =
         -- View of the video
         video =
             Element.column [ Ui.wf, Ui.hf, Element.spacing 10 ] <|
-                case Data.videoPath model.capsule of
+                case Data.capsuleVideoPath model.capsule of
                     Just p ->
                         [ title <| Strings.stepsProductionCurrentProducedVideo lang
                         , Element.el [ Ui.wf ] <| videoElement p
@@ -192,8 +196,8 @@ view config _ model =
         usePromptForSubtitles =
             Input.checkbox []
                 { checked = model.capsule.promptSubtitles
-                , icon = Input.defaultCheckbox
-                , label = Input.labelRight [] <| Element.text <| Strings.stepsPublicationPromptSubtitles lang ++ "."
+                , icon = Ui.checkbox False
+                , label = Input.labelRight [ Ui.cy ] <| Element.text <| Strings.stepsPublicationPromptSubtitles lang ++ "."
                 , onChange = \x -> App.PublicationMsg <| Publication.SetPromptSubtitles x
                 }
 
@@ -259,6 +263,77 @@ view config _ model =
                 , action = action
                 }
 
+        -- The production progress bar
+        progressBar : Element App.Msg
+        progressBar =
+            let
+                loadingAnimation : Animation
+                loadingAnimation =
+                    Animation.steps
+                        { startAt = [ P.x -300 ]
+                        , options = [ Animation.loop ]
+                        }
+                        [ Animation.step 1000 [ P.x 300 ]
+                        , Animation.wait 100
+                        , Animation.step 1000 [ P.x -300 ]
+                        , Animation.wait 100
+                        ]
+
+                bar : Maybe Float -> Element App.Msg
+                bar progress =
+                    Element.el
+                        [ Ui.p 5
+                        , Ui.wpx 300
+                        , Ui.hpx 30
+                        , Ui.r 20
+                        , Ui.al
+                        , Background.color <| Colors.alpha 0.1
+                        , Border.shadow
+                            { size = 1
+                            , blur = 8
+                            , color = Colors.alpha 0.1
+                            , offset = ( 0, 0 )
+                            }
+                        ]
+                    <|
+                        Element.el
+                            [ Ui.wf
+                            , Element.htmlAttribute <| Html.Attributes.style "overflow" "hidden"
+                            , Ui.r 100
+                            , Ui.hf
+                            ]
+                        <|
+                            case progress of
+                                Just p ->
+                                    Element.el
+                                        [ Ui.wf
+                                        , Ui.hf
+                                        , Ui.r 5
+                                        , Element.moveLeft (300.0 * (1.0 - p))
+                                        , Background.color Colors.green2
+                                        , Element.htmlAttribute <|
+                                            Transition.properties [ Transition.transform 200 [ Transition.easeInOut ] ]
+                                        ]
+                                        Element.none
+
+                                Nothing ->
+                                    Animated.ui
+                                        { behindContent = Element.behindContent
+                                        , htmlAttribute = Element.htmlAttribute
+                                        , html = Element.html
+                                        }
+                                        (\attr el -> Element.el attr el)
+                                        loadingAnimation
+                                        [ Ui.wf, Ui.hf, Ui.r 5, Background.color Colors.green2 ]
+                                        Element.none
+            in
+            case model.capsule.published of
+                Data.Running progress ->
+                    bar progress
+
+                _ ->
+                    Element.none
+
         -- Can't publish if the video is not produced
         cantPublish =
             if model.capsule.produced == Data.Done then
@@ -293,6 +368,7 @@ view config _ model =
                             ]
                         , cantPublish
                         ]
+                    , progressBar
                     ]
                 ]
     in

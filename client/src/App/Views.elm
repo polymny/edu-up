@@ -8,6 +8,8 @@ module App.Views exposing (view, viewSuccess, viewError)
 
 import Acquisition.Types as Acquisition
 import Acquisition.Views as Acquisition
+import Admin.Types as Admin
+import Admin.Views as Admin
 import App.Types as App
 import App.Utils as App
 import Browser
@@ -23,6 +25,7 @@ import Element.Border as Border
 import Element.Font as Font
 import Error.Types as Error
 import Error.Views as Error
+import Home.Types as Home
 import Home.Views as Home
 import Html
 import Html.Attributes
@@ -130,6 +133,15 @@ title model =
 
                         App.Profile _ ->
                             [ Strings.uiProfile lang ]
+
+                        App.Admin (Admin.Users _ _ _) ->
+                            []
+
+                        App.Admin (Admin.Capsules _ _ _) ->
+                            []
+
+                        App.Admin (Admin.UserDetails _ _) ->
+                            []
 
                         App.Error _ ->
                             []
@@ -240,7 +252,7 @@ viewSuccess model =
             Error.view model.config model.user (Error.init Error.ServerError)
 
         ( ( App.Home m, _ ), _ ) ->
-            Home.view model.config model.user m
+            Home.view (\x -> App.HomeMsg (Home.Toggle x)) model.config model.user m
 
         ( ( App.NewCapsule m, _ ), _ ) ->
             NewCapsule.view model.config model.user m
@@ -287,6 +299,9 @@ viewSuccess model =
 
         ( ( App.Profile m, _ ), _ ) ->
             Profile.view model.config model.user m
+
+        ( ( App.Admin m, _ ), _ ) ->
+            Admin.view model.config model.user m
 
         ( ( App.Error m, _ ), _ ) ->
             Error.view model.config model.user m

@@ -26,6 +26,8 @@ import Lang exposing (Lang)
 import Material.Icons
 import Material.Icons.Outlined
 import Strings
+import Svg
+import Svg.Attributes
 import Time
 import TimeUtils
 import Ui.Colors as Colors
@@ -329,8 +331,8 @@ view config user model =
         -- Displays the video element in case the slide has an extra resource
         videoElement : Element App.Msg
         videoElement =
-            case currentSlide |> Maybe.andThen .extra of
-                Just video ->
+            case Maybe.andThen (Data.extraPath model.capsule) currentSlide of
+                Just url ->
                     Html.video
                         [ Html.Attributes.id "extra"
                         , Html.Events.on "playing" (Decode.succeed <| App.AcquisitionMsg <| Acquisition.ExtraPlayed)
@@ -339,7 +341,7 @@ view config user model =
                         , Html.Events.on "timeupdate" decodePosition
                         ]
                         [ Html.source
-                            [ Html.Attributes.src <| Data.assetPath model.capsule video ++ ".mp4"
+                            [ Html.Attributes.src url
                             , Html.Attributes.controls False
                             ]
                             []
@@ -348,6 +350,16 @@ view config user model =
 
                 _ ->
                     Element.none
+
+        -- Indicates if we are replaying.
+        replaying : Bool
+        replaying =
+            case model.recordPlaying of
+                Just _ ->
+                    True
+
+                _ ->
+                    False
 
         -- Displays the video control bar if the slide has an extra resource
         videoControls : Element App.Msg
@@ -363,11 +375,26 @@ view config user model =
                     in
                     Element.row [ Ui.wf, Ui.s 10, Ui.p 10 ]
                         [ Ui.secondaryIcon []
-                            { action = Ui.Msg <| App.AcquisitionMsg <| Acquisition.PlayExtra
+                            { action =
+                                if replaying then
+                                    Ui.None
+
+                                else
+                                    Ui.Msg <| App.AcquisitionMsg <| Acquisition.PlayExtra
                             , icon = Utils.tern model.isExtraPlaying Material.Icons.pause Material.Icons.play_arrow
                             , tooltip = Strings.stepsAcquisitionPlayRecord lang
                             }
-                        , [ Element.el [ Ui.wfp progress, Border.width 2, Border.color Colors.red ] <| Element.none
+                        , [ Element.el
+                                [ Ui.wfp progress
+                                , Border.width 2
+                                , if replaying then
+                                    Border.color <| Colors.grey 4
+
+                                  else
+                                    Border.color Colors.red
+                                ]
+                            <|
+                                Element.none
                           , Element.el [ Ui.wfp (precision - progress), Border.width 2, Border.color Colors.greyBorder ] <| Element.none
                           ]
                             |> Element.row [ Ui.wf, Ui.cy ]
@@ -376,11 +403,21 @@ view config user model =
                                 , Ui.wf
                                 , Element.inFront <|
                                     Element.el
-                                        [ Ui.wf
-                                        , Ui.hf
-                                        , Element.pointer
-                                        , Element.htmlAttribute (Html.Events.on "pointerdown" (decodeSeek model.extraDuration))
-                                        ]
+                                        ([ Ui.wf
+                                         , Ui.hf
+                                         , if not replaying then
+                                            Element.pointer
+
+                                           else
+                                            Element.htmlAttribute (Html.Attributes.style "cursor" "not-allowed")
+                                         ]
+                                            ++ (if replaying then
+                                                    []
+
+                                                else
+                                                    [ Element.htmlAttribute (Html.Events.on "pointerdown" (decodeSeek model.extraDuration)) ]
+                                               )
+                                        )
                                         Element.none
                                 ]
                         ]
@@ -425,11 +462,7 @@ view config user model =
                 , statusElement
                 , Element.row
                     [ Ui.wf, Ui.hf, Element.clip ]
-                    [ if Data.isPremium user then
-                        pointerControl model
-
-                      else
-                        Element.none
+                    [ pointerControl model user lang
                     , slideElement
                     ]
                 , videoControls
@@ -723,6 +756,35 @@ devicePlayer user config model =
                 _ ->
                     Element.none
 
+        -- Transparent circle.
+        transparentCircle : Element App.Msg
+        transparentCircle =
+            if config.clientConfig.displayRecordCircle then
+                Element.html <|
+                    Html.div
+                        [ Html.Attributes.style "overflow" "hidden"
+                        , Html.Attributes.style "height" "100%"
+                        , Html.Attributes.style "text-align" "center"
+                        , Html.Attributes.style "position" "relative"
+                        ]
+                        [ Svg.svg
+                            [ Svg.Attributes.fill "#ddd8"
+                            , Svg.Attributes.viewBox "0 0 300 100"
+                            , Html.Attributes.style "height" "100%"
+                            , Html.Attributes.style "position" "absolute"
+                            , Html.Attributes.style "left" "50%"
+                            , Html.Attributes.style "transform" "translateX(-50%)"
+                            ]
+                            [ Svg.path
+                                [ Svg.Attributes.d "m0,0h300v100h-300v-100m200,50a10,10 0 0 0 -100,0a10,10 0 0 0 100,0"
+                                ]
+                                []
+                            ]
+                        ]
+
+            else
+                Element.none
+
         -- Element displayed in front of the device feedback during loading or when camera is disabled
         inFrontElement : Element App.Msg
         inFrontElement =
@@ -780,32 +842,20 @@ devicePlayer user config model =
                 [ Ui.wf
                 , Ui.at
                 , Element.inFront inFrontElement
+                , Element.inFront transparentCircle
                 , Element.inFront vumeterElement
                 , Element.inFront settingsElement
                 ]
-                (Element.html (Html.video [ Html.Attributes.class "wf", Html.Attributes.id "video" ] []))
+                (Element.html
+                    (Html.video
+                        [ Html.Attributes.id "video"
+                        , Html.Attributes.class "wf"
+                        ]
+                        []
+                    )
+                )
     in
     player
-
-
-
-{- Creates a canvas to previous the green screen video -}
-
-
-greenVideo : Bool -> Element App.Msg
-greenVideo display =
-    Element.html
-        (Html.canvas
-            [ Html.Attributes.class "wf hf"
-            , Html.Attributes.id "greened-video"
-            , Html.Attributes.style "display" <|
-                Utils.tern
-                    display
-                    "block"
-                    "none"
-            ]
-            []
-        )
 
 
 {-| Creates the settings popup, with all the information about the different devices.
@@ -889,7 +939,24 @@ settingsPopup user config model =
         [ Element.row [ Ui.wf, Ui.hf, Element.scrollbars, Ui.s 10 ]
             [ Element.el [ Ui.wf, Ui.hf, Element.scrollbars ] settings
             , Element.column [ Ui.hf, Ui.wf ]
-                [ Element.el [ Ui.hf ] <| devicePlayer user config model
+                [ Element.el
+                    [ Ui.wf
+                    , Ui.cx
+                    , Ui.cy
+                    ]
+                  <|
+                    devicePlayer user config model
+                , Ui.navigationElement (Ui.Msg <| App.ConfigMsg Config.ToggleRecordCircle) [] <|
+                    Input.checkbox
+                        [ Ui.ar
+                        , Ui.ab
+                        , Ui.p 10
+                        ]
+                        { onChange = \_ -> App.ConfigMsg <| Config.Noop
+                        , checked = config.clientConfig.displayRecordCircle
+                        , label = Input.labelRight [ Ui.cy ] <| Element.text <| Strings.uiRecordCircle lang
+                        , icon = Ui.checkbox False
+                        }
                 ]
             ]
         , Ui.primary [ Ui.ab, Ui.ar ]
@@ -1035,9 +1102,19 @@ vumeter ratio value =
 
 {-| Element to control the style of the pointer.
 -}
-pointerControl : Acquisition.Model Data.Capsule Data.Gos -> Element App.Msg
-pointerControl model =
+pointerControl : Acquisition.Model Data.Capsule Data.Gos -> Data.User -> Lang -> Element App.Msg
+pointerControl model user lang =
     let
+        premiumIcon : Element App.Msg
+        premiumIcon =
+            Element.el
+                [ Ui.tooltip <| Strings.stepsProductionPremiumFeature lang
+                , Element.htmlAttribute <| Html.Attributes.style "cursor" "help"
+                , Font.color <| Colors.yellow
+                ]
+            <|
+                Ui.icon 20 Material.Icons.workspace_premium
+
         colorToButton : Element.Color -> Element App.Msg
         colorToButton color =
             let
@@ -1066,112 +1143,146 @@ pointerControl model =
                     ]
                     Element.none
                 )
+
+        frontElement : Element App.Msg
+        frontElement =
+            if Data.isPremium user then
+                Element.none
+
+            else
+                Element.el
+                    [ Ui.wf
+                    , Ui.hf
+                    , Element.htmlAttribute <|
+                        Html.Attributes.style "cursor" "not-allowed"
+                    ]
+                    Element.none
     in
-    Element.column [ Ui.cy, Ui.p 5, Ui.s 8 ]
-        [ Element.column [ Ui.s 8 ]
-            [ Element.row [ Ui.s 8 ]
-                [ Ui.navigationElement
-                    (Ui.Msg <| App.AcquisitionMsg <| Acquisition.SetPointerMode <| Acquisition.Pointer)
-                    [ Ui.r 10
-                    , Border.color <|
-                        Utils.tern
-                            (model.pointerStyle.mode == Acquisition.Pointer)
-                            Colors.green2
-                            (Colors.alpha 0.1)
-                    , Ui.b 4
-                    , Font.color Colors.green2
-                    , Element.mouseOver [ Background.color <| Colors.alpha 0.1 ]
-                    , Border.shadow
-                        { offset = ( 0.0, 0.0 )
-                        , size = 1.0
-                        , blur = 4.0
-                        , color = Colors.alpha 0.4
-                        }
-                    ]
-                    (Ui.icon 35 Material.Icons.gps_fixed)
-                , Ui.navigationElement
-                    (Ui.Msg <| App.AcquisitionMsg <| Acquisition.SetPointerMode <| Acquisition.Brush)
-                    [ Ui.r 10
-                    , Border.color <|
-                        Utils.tern
-                            (model.pointerStyle.mode == Acquisition.Brush)
-                            Colors.green2
-                            (Colors.alpha 0.1)
-                    , Ui.b 4
-                    , Font.color Colors.green2
-                    , Element.mouseOver [ Background.color <| Colors.alpha 0.1 ]
-                    , Border.shadow
-                        { offset = ( 0.0, 0.0 )
-                        , size = 1.0
-                        , blur = 4.0
-                        , color = Colors.alpha 0.4
-                        }
-                    ]
-                    (Ui.icon 35 Material.Icons.brush)
-                ]
-            , Element.row [ Ui.s 8 ]
-                [ Ui.navigationElement
-                    (Ui.Msg <| App.AcquisitionMsg <| Acquisition.ClearPointer)
-                    [ Ui.r 10
-                    , Border.color <| Colors.alpha 0.1
-                    , Ui.b 4
-                    , Font.color Colors.green2
-                    , Element.mouseOver [ Background.color <| Colors.alpha 0.1 ]
-                    , Border.shadow
-                        { offset = ( 0.0, 0.0 )
-                        , size = 1.0
-                        , blur = 4.0
-                        , color = Colors.alpha 0.4
-                        }
-                    ]
-                    (Ui.icon 35 Material.Icons.recycling)
-                , Element.el [ Ui.wpx 45, Ui.hpx 45 ] <|
-                    Element.el
-                        [ Ui.wpx (model.pointerStyle.size * 2)
-                        , Ui.hpx (model.pointerStyle.size * 2)
-                        , Ui.r 100
-                        , Ui.cy
-                        , Ui.cx
-                        , Background.color Colors.green2
-                        ]
-                        Element.none
-                ]
-            , Element.row [ Ui.s 8 ]
-                [ Ui.navigationElement
-                    (Ui.Msg <| App.AcquisitionMsg <| Acquisition.SetPointerSize <| model.pointerStyle.size - 5)
-                    [ Ui.r 10
-                    , Border.color <| Colors.alpha 0.1
-                    , Ui.b 4
-                    , Font.color Colors.green2
-                    , Element.mouseOver [ Background.color <| Colors.alpha 0.1 ]
-                    , Border.shadow
-                        { offset = ( 0.0, 0.0 )
-                        , size = 1.0
-                        , blur = 4.0
-                        , color = Colors.alpha 0.4
-                        }
-                    ]
-                    (Ui.icon 35 Material.Icons.remove)
-                , Ui.navigationElement
-                    (Ui.Msg <| App.AcquisitionMsg <| Acquisition.SetPointerSize <| model.pointerStyle.size + 5)
-                    [ Ui.r 10
-                    , Border.color <| Colors.alpha 0.1
-                    , Ui.b 4
-                    , Font.color Colors.green2
-                    , Element.mouseOver [ Background.color <| Colors.alpha 0.1 ]
-                    , Border.shadow
-                        { offset = ( 0.0, 0.0 )
-                        , size = 1.0
-                        , blur = 4.0
-                        , color = Colors.alpha 0.4
-                        }
-                    ]
-                    (Ui.icon 35 Material.Icons.add)
-                ]
+    Element.column []
+        [ Element.row [ Ui.p 5, Ui.s 5 ]
+            [ Element.el [] <|
+                Element.text <|
+                    Strings.stepsAcquisitionPointer lang
+            , premiumIcon
             ]
-        , palette
-            |> List.map (\( x, y ) -> Element.row [ Ui.s 8 ] [ colorToButton x, colorToButton y ])
-            |> Element.column [ Ui.s 8 ]
+        , Element.column
+            [ Ui.cy
+            , Ui.p 5
+            , Ui.s 8
+            , Element.inFront frontElement
+            , Element.htmlAttribute <|
+                Html.Attributes.style "opacity" <|
+                    if Data.isPremium user then
+                        "1"
+
+                    else
+                        "0.5"
+            ]
+            [ Element.column [ Ui.s 8 ]
+                [ Element.row [ Ui.s 8 ]
+                    [ Ui.navigationElement
+                        (Ui.Msg <| App.AcquisitionMsg <| Acquisition.SetPointerMode <| Acquisition.Pointer)
+                        [ Ui.r 10
+                        , Border.color <|
+                            Utils.tern
+                                (model.pointerStyle.mode == Acquisition.Pointer)
+                                Colors.green2
+                                (Colors.alpha 0.1)
+                        , Ui.b 4
+                        , Font.color Colors.green2
+                        , Element.mouseOver [ Background.color <| Colors.alpha 0.1 ]
+                        , Border.shadow
+                            { offset = ( 0.0, 0.0 )
+                            , size = 1.0
+                            , blur = 4.0
+                            , color = Colors.alpha 0.4
+                            }
+                        ]
+                        (Ui.icon 35 Material.Icons.gps_fixed)
+                    , Ui.navigationElement
+                        (Ui.Msg <| App.AcquisitionMsg <| Acquisition.SetPointerMode <| Acquisition.Brush)
+                        [ Ui.r 10
+                        , Border.color <|
+                            Utils.tern
+                                (model.pointerStyle.mode == Acquisition.Brush)
+                                Colors.green2
+                                (Colors.alpha 0.1)
+                        , Ui.b 4
+                        , Font.color Colors.green2
+                        , Element.mouseOver [ Background.color <| Colors.alpha 0.1 ]
+                        , Border.shadow
+                            { offset = ( 0.0, 0.0 )
+                            , size = 1.0
+                            , blur = 4.0
+                            , color = Colors.alpha 0.4
+                            }
+                        ]
+                        (Ui.icon 35 Material.Icons.brush)
+                    ]
+                , Element.row [ Ui.s 8 ]
+                    [ Ui.navigationElement
+                        (Ui.Msg <| App.AcquisitionMsg <| Acquisition.ClearPointer)
+                        [ Ui.r 10
+                        , Border.color <| Colors.alpha 0.1
+                        , Ui.b 4
+                        , Font.color Colors.green2
+                        , Element.mouseOver [ Background.color <| Colors.alpha 0.1 ]
+                        , Border.shadow
+                            { offset = ( 0.0, 0.0 )
+                            , size = 1.0
+                            , blur = 4.0
+                            , color = Colors.alpha 0.4
+                            }
+                        ]
+                        (Ui.icon 35 Material.Icons.recycling)
+                    , Element.el [ Ui.wpx 45, Ui.hpx 45 ] <|
+                        Element.el
+                            [ Ui.wpx (model.pointerStyle.size * 2)
+                            , Ui.hpx (model.pointerStyle.size * 2)
+                            , Ui.r 100
+                            , Ui.cy
+                            , Ui.cx
+                            , Background.color Colors.green2
+                            ]
+                            Element.none
+                    ]
+                , Element.row [ Ui.s 8 ]
+                    [ Ui.navigationElement
+                        (Ui.Msg <| App.AcquisitionMsg <| Acquisition.SetPointerSize <| model.pointerStyle.size - 5)
+                        [ Ui.r 10
+                        , Border.color <| Colors.alpha 0.1
+                        , Ui.b 4
+                        , Font.color Colors.green2
+                        , Element.mouseOver [ Background.color <| Colors.alpha 0.1 ]
+                        , Border.shadow
+                            { offset = ( 0.0, 0.0 )
+                            , size = 1.0
+                            , blur = 4.0
+                            , color = Colors.alpha 0.4
+                            }
+                        ]
+                        (Ui.icon 35 Material.Icons.remove)
+                    , Ui.navigationElement
+                        (Ui.Msg <| App.AcquisitionMsg <| Acquisition.SetPointerSize <| model.pointerStyle.size + 5)
+                        [ Ui.r 10
+                        , Border.color <| Colors.alpha 0.1
+                        , Ui.b 4
+                        , Font.color Colors.green2
+                        , Element.mouseOver [ Background.color <| Colors.alpha 0.1 ]
+                        , Border.shadow
+                            { offset = ( 0.0, 0.0 )
+                            , size = 1.0
+                            , blur = 4.0
+                            , color = Colors.alpha 0.4
+                            }
+                        ]
+                        (Ui.icon 35 Material.Icons.add)
+                    ]
+                ]
+            , palette
+                |> List.map (\( x, y ) -> Element.row [ Ui.s 8 ] [ colorToButton x, colorToButton y ])
+                |> Element.column [ Ui.s 8 ]
+            ]
         ]
 
 

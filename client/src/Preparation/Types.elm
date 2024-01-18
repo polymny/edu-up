@@ -1,6 +1,6 @@
 module Preparation.Types exposing
-    ( Model, ChangeSlideForm, ChangeSlide(..), Slide, slideSystem, gosSystem, setupSlides, init, Msg(..), ExtraMsg(..), DnDMsg(..), enumerate, PopupType(..)
-    , withCapsule
+    ( Model, ChangeSlide(..), Slide, slideSystem, gosSystem, setupSlides, init, Msg(..), ResourceMsg(..), DnDMsg(..), enumerate, PopupType(..), encodeChangeSlide, decodeChangeSlide
+    , ResourceModel, initResource, withCapsule
     )
 
 {-| This module contains the type for the preparation page, where user can manage a capsule.
@@ -8,7 +8,7 @@ module Preparation.Types exposing
 In all the following documentation, DnD refers to Drag'n'Drop. It is necessary to have a user-friendly interface, but is
 quite a pain to deal with.
 
-@docs Model, ChangeSlideForm, ChangeSlide, Slide, slideSystem, gosSystem, setupSlides, init, Msg, ExtraMsg, DnDMsg, enumerate, PopupType
+@docs Model, ChangeSlide, Slide, slideSystem, gosSystem, setupSlides, init, Msg, ResourceMsg, DnDMsg, enumerate, PopupType, encodeChangeSlide, decodeChangeSlide
 
 -}
 
@@ -16,7 +16,10 @@ import Data.Capsule as Data exposing (Capsule)
 import DnDList
 import DnDList.Groups
 import File exposing (File)
+import FileValue
 import Home.Types exposing (Msg(..))
+import Json.Decode as Decode exposing (Decoder)
+import Json.Encode as Encode
 import RemoteData
 import Utils
 
@@ -32,6 +35,34 @@ type alias Model a =
     , popupType : PopupType
     , displayPopup : Bool
     , changeSlide : RemoteData.WebData Data.Capsule
+    , resource : ResourceModel
+    }
+
+
+{-| The type for the resource model.
+-}
+type alias ResourceModel =
+    { selectedPages : List Int
+    , onlyOnePage : Bool
+    , nbPages : Int
+    , file : Maybe FileValue.File
+    , status : RemoteData.WebData ()
+    , changeSlide : ChangeSlide
+    , renderFinished : Bool
+    }
+
+
+{-| Creates a initial resource model.
+-}
+initResource : Bool -> ChangeSlide -> ResourceModel
+initResource onlyOnePage changeSlide =
+    { selectedPages = []
+    , onlyOnePage = onlyOnePage
+    , nbPages = 0
+    , file = Nothing
+    , status = RemoteData.NotAsked
+    , changeSlide = changeSlide
+    , renderFinished = False
     }
 
 
@@ -41,10 +72,11 @@ type PopupType
     = NoPopup
     | DeleteSlidePopup Data.Slide
     | DeleteExtraPopup Data.Slide
-    | ChangeSlidePopup ChangeSlideForm
+    | ChangeSlidePopup ChangeSlide
     | EditPromptPopup Data.Slide
     | ConfirmUpdateCapsulePopup Capsule
     | ConfirmAddSlide Int
+    | ConfirmUploadExtraVideo FileValue.File Data.Slide
 
 
 {-| Transforms the capsule id into a real capsule.
@@ -59,24 +91,91 @@ withCapsule capsule model =
     , changeSlide = model.changeSlide
     , popupType = model.popupType
     , displayPopup = model.displayPopup
-    }
-
-
-{-| The content of the form to change or add a slide.
--}
-type alias ChangeSlideForm =
-    { slide : ChangeSlide
-    , page : String
-    , file : File
+    , resource = model.resource
     }
 
 
 {-| The different possibilities for changing a slide.
 -}
 type ChangeSlide
-    = ReplaceSlide Data.Slide
+    = NewCapsule String String -- Project Name / Capsule Name
+    | ReplaceSlide Data.Slide
     | AddSlide Int
     | AddGos Int
+
+
+{-| Encore ChangeSlide.
+-}
+encodeChangeSlide : ChangeSlide -> Encode.Value
+encodeChangeSlide changeSlide =
+    case changeSlide of
+        NewCapsule project capsule ->
+            Encode.object
+                [ ( "type", Encode.string "newCapsule" )
+                , ( "project", Encode.string project )
+                , ( "capsule", Encode.string capsule )
+                ]
+
+        ReplaceSlide slide ->
+            Encode.object
+                [ ( "type", Encode.string "replace" )
+                , ( "slide", Data.encodeSlide slide )
+                ]
+
+        AddSlide page ->
+            Encode.object
+                [ ( "type", Encode.string "add" )
+                , ( "page", Encode.int page )
+                ]
+
+        AddGos page ->
+            Encode.object
+                [ ( "type", Encode.string "addGos" )
+                , ( "page", Encode.int page )
+                ]
+
+
+{-| Decode ChangeSlide.
+-}
+decodeChangeSlide : Decoder ChangeSlide
+decodeChangeSlide =
+    let
+        newCapsule =
+            Decode.map2 NewCapsule
+                (Decode.field "project" Decode.string)
+                (Decode.field "capsule" Decode.string)
+
+        replaceSlide =
+            Decode.map ReplaceSlide
+                (Decode.field "slide" Data.decodeSlide)
+
+        addSlide =
+            Decode.map AddSlide
+                (Decode.field "page" Decode.int)
+
+        addGos =
+            Decode.map AddGos
+                (Decode.field "page" Decode.int)
+    in
+    Decode.field "type" Decode.string
+        |> Decode.andThen
+            (\str ->
+                case str of
+                    "replace" ->
+                        replaceSlide
+
+                    "newCapsule" ->
+                        newCapsule
+
+                    "add" ->
+                        addSlide
+
+                    "addGos" ->
+                        addGos
+
+                    _ ->
+                        Decode.fail "Unknown type"
+            )
 
 
 {-| A helper function to initialiaze a model.
@@ -91,6 +190,7 @@ init capsule =
     , changeSlide = RemoteData.NotAsked
     , popupType = NoPopup
     , displayPopup = False
+    , resource = initResource True (AddSlide -1)
     }
 
 
@@ -101,7 +201,7 @@ type Msg
     | CapsuleUpdate Int (RemoteData.WebData ())
     | DeleteSlide Utils.Confirmation Data.Slide
     | DeleteExtra Utils.Confirmation Data.Slide
-    | Extra ExtraMsg
+    | Resource ResourceMsg
     | EditPrompt Data.Slide
     | PromptChanged Utils.Confirmation Data.Slide
     | GoToPreviousSlide Int Data.Slide
@@ -110,16 +210,22 @@ type Msg
     | EnterPressed
     | ConfirmUpdateCapsule
     | CancelUpdateCapsule
+    | PageClicked Int
 
 
 {-| The type that handles all file upload.
 -}
-type ExtraMsg
-    = Select Utils.Confirmation ChangeSlide
-    | Selected ChangeSlide File (Maybe Int)
-    | PageChanged String
+type ResourceMsg
+    = SelectAddSlides Utils.Confirmation Int -- The GOS id
+    | SelectAddGos Utils.Confirmation Int -- The GOS before
+    | SelectReplaceSlide Utils.Confirmation Data.Slide
+    | PdfSent
     | PageCancel
     | ChangeSlideUpdated (RemoteData.WebData Data.Capsule)
+    | NbPagesReceived Int
+    | SelectedFileReceived Utils.Confirmation FileValue.File
+    | AddSlides
+    | RenderFinished
 
 
 {-| The different DnD messages that can occur.

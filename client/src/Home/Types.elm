@@ -22,7 +22,7 @@ import Utils
 type Msg
     = Toggle Data.Project
     | SlideUploadClicked (Maybe String)
-    | SlideUploadReceived (Maybe String) FileValue.File File.File
+    | SlideUploadReceived (Maybe String) FileValue.File Int
     | DeleteCapsule Utils.Confirmation Data.Capsule
     | RenameCapsule Utils.Confirmation Data.Capsule
     | CapsuleNameChanged Data.Capsule String

@@ -4,3 +4,4 @@ Rocket.*.toml
 dist/js
 data
 log.txt
+*.env

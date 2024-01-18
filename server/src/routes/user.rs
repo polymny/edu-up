@@ -23,6 +23,7 @@ use crate::db::session::Session;
 use crate::db::user::User;
 use crate::routes::global_flags;
 use crate::routes::Cors;
+use crate::storage::Storage;
 use crate::templates::index_html;
 use crate::{Db, Error, Lang, Result};
 
@@ -97,7 +98,7 @@ pub async fn new_user<'a>(db: Db, config: &S<Config>, user: Json<NewUserForm>) -
     let user = User::new(
         &user.username,
         &user.email,
-        &user.password,
+        Some(&user.password),
         user.0.subscribed,
         &config.mailer,
         &db,
@@ -203,8 +204,9 @@ pub async fn login(
     config: &S<Config>,
     cookies: &CookieJar<'_>,
     login: Json<LoginForm>,
+    storage: &S<Storage>,
 ) -> Cors<Result<Value>> {
-    match login_wrapper(db, config, cookies, login).await {
+    match login_wrapper(db, config, cookies, login, storage).await {
         Ok(v) => Cors::ok(&config.home, v),
         Err(Error(e)) => Cors::err(&config.home, e),
     }
@@ -216,6 +218,7 @@ pub async fn login_wrapper(
     config: &S<Config>,
     cookies: &CookieJar<'_>,
     login: Json<LoginForm>,
+    storage: &S<Storage>,
 ) -> Result<Value> {
     let user = User::get_by_username(&login.username, &db)
         .await
@@ -239,7 +242,7 @@ pub async fn login_wrapper(
 
     add_cookies(&session.secret, &config, cookies);
 
-    Ok(user.to_json(&db).await?)
+    Ok(user.to_json(&db, storage.inner().s3()).await?)
 }
 
 /// The logout page.
@@ -314,6 +317,7 @@ pub async fn change_password(
     form: Json<ChangePasswordForm>,
     config: &S<Config>,
     cookies: &CookieJar<'_>,
+    storage: &S<Storage>,
 ) -> Result<Value> {
     let mut user = match (&form.username_and_old_password, &form.key) {
         (None, None) => return Err(Error(Status::BadRequest)),
@@ -330,7 +334,7 @@ pub async fn change_password(
     let session = user.save_session(&db).await?;
     add_cookies(&session.secret, &config, cookies);
     user.save(&db).await?;
-    let json = user.to_json(&db).await?;
+    let json = user.to_json(&db, storage.inner().s3()).await?;
 
     Ok(json)
 }
@@ -446,6 +450,7 @@ pub async fn validate_invitation<'a>(
     key: String,
     cookies: &CookieJar<'_>,
     lang: Lang,
+    storage: &S<Storage>,
 ) -> Result<Html<String>> {
     let user = User::get_by_activation_key(key, &db)
         .await?
@@ -454,7 +459,7 @@ pub async fn validate_invitation<'a>(
     let session = user.save_session(&db).await?;
     add_cookies(&session.secret, &config, cookies);
 
-    let json = user.to_json(&db).await?;
+    let json = user.to_json(&db, storage.inner().s3()).await?;
     let body = index_html(json!({"user": json, "global": global_flags(&config, &lang) }));
 
     Ok(Html(body))
@@ -478,6 +483,7 @@ pub async fn request_invitation<'a>(
     cookies: &CookieJar<'_>,
     form: Json<RequestInvitationForm>,
     lang: Lang,
+    storage: &S<Storage>,
 ) -> Result<Html<String>> {
     let mut user = User::get_by_activation_key(form.key.to_string(), &db)
         .await?
@@ -489,7 +495,51 @@ pub async fn request_invitation<'a>(
     let session = user.save_session(&db).await?;
     add_cookies(&session.secret, &config, cookies);
 
-    let json = user.to_json(&db).await?;
+    let json = user.to_json(&db, storage.inner().s3()).await?;
     let body = index_html(json!({"user": json, "global": global_flags(&config, &lang) }));
     Ok(Html(body))
+}
+
+/// Route to log in via OpenID.
+#[get("/openid?<session_state>&<code>")]
+pub async fn openid(
+    #[allow(unused)] session_state: String,
+    code: &str,
+    config: &S<Config>,
+    db: Db,
+    cookies: &CookieJar<'_>,
+) -> Result<Redirect> {
+    let openid = match config.openid {
+        Some(ref x) => x,
+        None => unreachable!("this route must not be mounted if openid is not configured"),
+    };
+
+    let redirect_uri = &format!("{}/openid", config.root);
+    let res = openid.get_access_token(redirect_uri, code).await?;
+
+    let user = User::get_by_email(&res.email, &db).await?;
+
+    let user = match user {
+        Some(u) => u,
+        None => {
+            let mut user = User::new(
+                &res.username,
+                &res.email,
+                Option::<String>::None,
+                false,
+                &None,
+                &db,
+                config,
+            )
+            .await?;
+            user.activated = true;
+            user.save(&db).await?;
+            user
+        }
+    };
+
+    let session = user.save_session(&db).await?;
+    add_cookies(&session.secret, &config, cookies);
+
+    Ok(Redirect::to("/"))
 }

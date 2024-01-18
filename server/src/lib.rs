@@ -10,10 +10,15 @@ pub mod config;
 pub mod db;
 pub mod log_fairing;
 pub mod mailer;
+pub mod openid;
 pub mod routes;
+pub mod s3;
+pub mod storage;
+pub mod tasks;
 pub mod templates;
 pub mod websockets;
 
+use std::env;
 use std::error::Error as StdError;
 use std::fmt;
 use std::fs::OpenOptions;
@@ -30,6 +35,10 @@ use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use tokio::fs::remove_dir_all;
 use tokio::sync::Semaphore;
 
+use lapin::options::{BasicQosOptions, ExchangeDeclareOptions, QueueDeclareOptions};
+use lapin::types::FieldTable;
+use lapin::{Connection, ConnectionProperties, ExchangeKind};
+
 use ergol::deadpool::managed::Object;
 use ergol::tokio_postgres::Error as TpError;
 use ergol::{tokio, Pool};
@@ -41,10 +50,13 @@ use rocket::response::{self, Responder};
 use rocket::shield::{NoSniff, Permission, Shield};
 use rocket::{Ignite, Rocket, State};
 
-use crate::command::run_command;
+use crate::command::{get_size, run_command};
 use crate::config::Config;
 use crate::db::group::populate_db;
-use crate::websockets::{websocket, WebSockets};
+use crate::s3::S3;
+use crate::storage::Storage;
+use crate::tasks::TaskRunner;
+use crate::websockets::{notifier, Notifier, WebSockets};
 
 lazy_static! {
     /// The harsh encoder and decoder for capsule ids.
@@ -95,7 +107,6 @@ macro_rules! impl_from_error {
 impl_from_error!(std::io::Error);
 impl_from_error!(TpError);
 impl_from_error!(bcrypt::BcryptError);
-impl_from_error!(tungstenite::Error);
 impl_from_error!(std::str::Utf8Error);
 impl_from_error!(std::num::ParseIntError);
 
@@ -126,19 +137,19 @@ impl<'r> FromRequest<'r> for Db {
     async fn from_request(request: &'r Request<'_>) -> Outcome<Self, Self::Error> {
         let pool = match request.guard::<&State<Pool>>().await {
             Outcome::Success(pool) => pool,
-            Outcome::Failure(_) => {
-                return Outcome::Failure((
+            Outcome::Error(_) => {
+                return Outcome::Error((
                     Status::InternalServerError,
                     Error(Status::InternalServerError),
                 ))
             }
-            Outcome::Forward(()) => return Outcome::Forward(()),
+            Outcome::Forward(s) => return Outcome::Forward(s),
         };
 
         let db = match pool.get().await {
             Ok(db) => db,
             Err(_) => {
-                return Outcome::Failure((
+                return Outcome::Error((
                     Status::InternalServerError,
                     Error(Status::InternalServerError),
                 ))
@@ -264,20 +275,23 @@ pub async fn reset_db() {
 
     use crate::db::user::{Plan, User};
 
-    let mut user = User::new(
-        "polymny",
-        "contacter@polymny.studio",
-        "hashed",
-        true,
-        &None,
-        &db,
-        &config,
-    )
-    .await
-    .unwrap();
+    // Add user only if we're not using openid.
+    if config.openid.is_none() {
+        let mut user = User::new(
+            env::var("POLYMNY_USER").unwrap_or(String::from("polymny")),
+            env::var("POLYMNY_EMAIL").unwrap_or(String::from("polymny@example.com")),
+            Some(env::var("POLYMNY_PASS").unwrap_or(String::from("hashed"))),
+            true,
+            &None,
+            &db,
+            &config,
+        )
+        .await
+        .unwrap();
 
-    user.plan = Plan::Admin;
-    user.save(&db).await.unwrap();
+        user.plan = Plan::Admin;
+        user.save(&db).await.unwrap();
+    }
 
     populate_db(&db, &config).await.unwrap();
 }
@@ -290,9 +304,14 @@ pub async fn user_disk_usage() {
     let pool = ergol::pool(&config.databases.database.url, 32).unwrap();
     let db = Db::from_pool(pool).await.unwrap();
 
+    let s3 = config.s3.map(S3::new);
+
     use crate::db::capsule::Capsule;
     use crate::db::user::Plan;
     use ergol::prelude::*;
+
+    let mut total_used = 0;
+    let mut total_freed = 0;
 
     for mut capsule in Capsule::select().execute(&db).await.unwrap() {
         let owner = capsule.owner(&db).await.unwrap();
@@ -302,26 +321,48 @@ pub async fn user_disk_usage() {
             continue;
         }
 
-        let path = &config.data_path.join(format!("{}", capsule.id));
+        let old_disk_usage = capsule.disk_usage;
 
-        let output = run_command(&vec!["../scripts/psh", "du", path.to_str().unwrap()]);
-        match &output {
-            Ok(o) => {
-                for line in std::str::from_utf8(&o.stdout)
-                    .map_err(|_| Error(Status::InternalServerError))
-                    .unwrap()
-                    .lines()
-                {
-                    let du = line.parse::<i32>().unwrap();
-                    if du != capsule.disk_usage {
-                        capsule.disk_usage = du;
-                        capsule.save(&db).await.unwrap();
-                    }
+        let new_size = match s3.as_ref() {
+            Some(s3) => {
+                capsule.garbage_collect_s3(s3).await.unwrap();
+                let dir = s3.read_dir(&format!("{}/", capsule.id)).await.unwrap();
+                let mut total_size = 0;
+                for object in dir.contents().unwrap() {
+                    total_size += object.size();
                 }
+                total_size as i32
             }
-            Err(_) => println!("error"),
+
+            _ => {
+                capsule.garbage_collect(&config.data_path).await.unwrap();
+                let path = &config.data_path.join(format!("{}", capsule.id));
+                let size = get_size(path).unwrap();
+                size as i32
+            }
         };
+
+        let du = new_size / 1e6 as i32;
+        if du != capsule.disk_usage {
+            capsule.disk_usage = du;
+            capsule.save(&db).await.unwrap();
+        }
+
+        let diff = capsule.disk_usage - old_disk_usage;
+
+        total_used += capsule.disk_usage;
+        total_freed += diff;
+
+        eprintln!(
+            "Cleaned \"{} / {}\" from user \"{}\", current disk usage: {}MB, freed: {}MB",
+            capsule.project, capsule.name, owner.username, capsule.disk_usage, diff,
+        );
     }
+
+    eprintln!(
+        "All cleaned, total disk usage: {}MB, total freed: {}MB",
+        total_used, total_freed
+    );
 }
 
 /// update duration of all capsules
@@ -340,9 +381,15 @@ pub async fn update_video_duration() {
         let path = &config
             .data_path
             .join(format!("{}", capsule.id))
-            .join("output.mp4");
+            .join("produced")
+            .join("capsule.mp4");
         if Path::new(path).exists() {
-            let output = run_command(&vec!["../scripts/psh", "duration", path.to_str().unwrap()]);
+            let output = run_command(&vec![
+                "../scripts/popy.py",
+                "duration",
+                "-f",
+                path.to_str().unwrap(),
+            ]);
 
             match &output {
                 Ok(o) => {
@@ -376,6 +423,7 @@ pub async fn rocket() -> StdResult<Rocket<Ignite>, rocket::Error> {
     let figment = rocket::Config::figment();
     let config = Config::from_figment(&figment);
 
+    // Logging system
     let rocket = if figment.profile() == "release" {
         use simplelog::*;
 
@@ -399,10 +447,33 @@ pub async fn rocket() -> StdResult<Rocket<Ignite>, rocket::Error> {
         rocket::build()
     };
 
+    // Some variables required for app preparation
+    let socks = WebSockets::new();
+    let socks_task_runner = socks.clone();
+    let socks_notifier = socks.clone();
+    let socks_rabbitmq = socks.clone();
+
+    let use_s3 = config.s3.is_some();
+    let data_path = config.data_path.clone();
+    let rabbitmq_url = config.rabbitmq.as_ref().map(|x| x.url.clone());
+
+    // Storage system (whether data is stored on the local disk or on S3)
+    let rocket = if let Some(s3) = config.s3 {
+        rocket.attach(AdHoc::on_ignite("Storage", |rocket| async move {
+            let s3 = S3::new(s3);
+            rocket.manage(Storage::S3(s3))
+        }))
+    } else {
+        rocket.attach(AdHoc::on_ignite("Storage", |rocket| async move {
+            rocket.manage(Storage::Disk(data_path))
+        }))
+    };
+
     let shield = Shield::new()
         .enable(NoSniff::default())
         .enable(Permission::default());
 
+    // Mounting the other attributes and routes
     let rocket = rocket
         .attach(shield)
         .attach(AdHoc::on_ignite("Config", |rocket| async move {
@@ -414,15 +485,84 @@ pub async fn rocket() -> StdResult<Rocket<Ignite>, rocket::Error> {
             let pool = ergol::pool(&config.databases.database.url, 32).unwrap();
             rocket.manage(pool)
         }))
-        .attach(AdHoc::on_ignite("WebSockets", |rocket| async move {
-            rocket.manage(WebSockets::new())
-        }))
         .attach(AdHoc::on_ignite("Semaphore", |rocket| async move {
             let config = config::Config::from_rocket(&rocket);
             rocket.manage(Arc::new(Semaphore::new(config.concurrent_tasks)))
         }))
-        .mount(
-            "/",
+        .attach(AdHoc::on_ignite("WebSockets", |rocket| async move {
+            rocket.manage(socks)
+        }));
+
+    // Task runner and notifier
+    // If rabbitmq is enabled, the tasks and the notifications must go through rabbitmq, otherwise
+    // they just stay on the local machine
+    let rocket = if let Some(rabbitmq) = config.rabbitmq.as_ref() {
+        let url = rabbitmq.url.clone();
+        let url2 = rabbitmq.url.clone();
+
+        rocket
+            .attach(AdHoc::on_ignite("TaskRunner", |rocket| async move {
+                let options = ConnectionProperties::default()
+                    .with_executor(tokio_executor_trait::Tokio::current())
+                    .with_reactor(tokio_reactor_trait::Tokio);
+
+                let connection = Connection::connect(&url, options).await.unwrap();
+                let channel = connection.create_channel().await.unwrap();
+
+                channel
+                    .basic_qos(1, BasicQosOptions { global: false })
+                    .await
+                    .unwrap();
+
+                // Declare rabbitmq queue for tasks
+                channel
+                    .queue_declare(
+                        "tasks",
+                        QueueDeclareOptions::default(),
+                        FieldTable::default(),
+                    )
+                    .await
+                    .unwrap();
+
+                // Declare rabbitmq queue for websockets messages
+                channel
+                    .exchange_declare(
+                        "websockets",
+                        ExchangeKind::Fanout,
+                        ExchangeDeclareOptions::default(),
+                        FieldTable::default(),
+                    )
+                    .await
+                    .unwrap();
+
+                rocket.manage(TaskRunner::from_rabbitmq_channel(channel))
+            }))
+            .attach(AdHoc::on_ignite("Notifier", |rocket| async move {
+                let options = ConnectionProperties::default()
+                    .with_executor(tokio_executor_trait::Tokio::current())
+                    .with_reactor(tokio_reactor_trait::Tokio);
+
+                let connection = Connection::connect(&url2, options).await.unwrap();
+                let channel = connection.create_channel().await.unwrap();
+                rocket.manage(Notifier::from_rabbitmq_channel(channel))
+            }))
+    } else {
+        rocket
+            .attach(AdHoc::on_ignite("TaskRunner", |rocket| async move {
+                let pool = rocket.state::<Pool>().unwrap().clone();
+                let config = Config::from_rocket(&rocket);
+                rocket.manage(TaskRunner::local(pool, config, socks_task_runner))
+            }))
+            .attach(AdHoc::on_ignite("Notifier", |rocket| async move {
+                rocket.manage(Notifier::from_websockets(socks_notifier))
+            }))
+    };
+
+    let rocket = rocket.mount(
+        "/",
+        if config.openid.as_ref().map(|x| x.only) == Some(true) {
+            routes![routes::user::openid]
+        } else {
             routes![
                 routes::user::login_external_cors,
                 routes::user::login_external,
@@ -450,52 +590,63 @@ pub async fn rocket() -> StdResult<Rocket<Ignite>, rocket::Error> {
                 routes::watch::watch,
                 routes::watch::watch_asset,
                 routes::watch::polymny_video,
-            ],
+            ]
+        },
+    );
+
+    // Dynamic routes for S3 published videos
+    let rocket = if use_s3 {
+        rocket.mount(
+            "/",
+            routes![routes::watch::manifest, routes::watch::resolution_manifest,],
         )
-        .mount(
-            "/o/",
-            routes![
-                routes::index,
-                routes::preparation,
-                routes::acquisition,
-                routes::production,
-                routes::publication,
-                routes::options,
-                routes::profile,
-                routes::admin_dashboard,
-                routes::admin_user,
-                routes::admin_users,
-                routes::admin_capsules,
-                routes::capsule_settings,
-                // routes::user::reset_password,
-                // routes::user::validate_email,
-                // routes::user::validate_invitation,
-            ],
-        )
+    } else {
+        rocket
+    };
+
+    // Api routes
+    let rocket = rocket
         .mount("/dist", routes![routes::dist])
-        .mount(
-            "/data",
-            routes![routes::assets, routes::tmp, routes::produced_video],
-        )
-        .mount(
-            "/api",
-            if config.registration_disabled {
-                routes![]
-            } else {
-                routes![routes::user::new_user_cors, routes::user::new_user,]
-            },
-        )
-        .mount(
-            "/api",
-            routes![
+        .mount("/data", routes![routes::assets, routes::produced]);
+
+    let rocket = rocket.mount(
+        "/api",
+        match (
+            config.registration_disabled,
+            config.openid.as_ref().map(|x| x.only),
+        ) {
+            // OpenID only : no user creation, no login route, no change email or password
+            (_, Some(true)) => routes![],
+
+            // OpenID disabled, registration disabled, only login, forget password, change
+            // password, change email routes
+            (true, _) => routes![
                 routes::user::login,
-                routes::user::login_cors,
-                routes::user::logout,
-                routes::user::delete,
                 routes::user::request_new_password,
                 routes::user::request_new_password_cors,
                 routes::user::change_password,
                 routes::user::request_change_email,
+            ],
+
+            // OpenID disabled, registration enabled, all routes
+            _ => routes![
+                routes::user::new_user_cors,
+                routes::user::new_user,
+                routes::user::login,
+                routes::user::request_new_password,
+                routes::user::request_new_password_cors,
+                routes::user::change_password,
+                routes::user::request_change_email,
+            ],
+        },
+    );
+
+    let rocket = rocket
+        .mount(
+            "/api",
+            routes![
+                routes::user::logout,
+                routes::user::delete,
                 routes::user::request_invitation,
                 routes::capsule::get_capsule,
                 routes::capsule::empty_capsule,
@@ -540,16 +691,21 @@ pub async fn rocket() -> StdResult<Rocket<Ignite>, rocket::Error> {
                 routes::admin::get_search_capsules,
                 routes::admin::request_invite_user,
                 routes::admin::delete_user,
-                routes::admin::clear_websockets,
             ],
         )
         .register("/", catchers![routes::not_found])
         .ignite()
         .await?;
 
-    let socks = rocket.state::<WebSockets>().unwrap();
-    let pool = rocket.state::<Pool>().unwrap();
-    tokio::spawn(websocket(socks.clone(), pool.clone()));
+    // let pool = rocket.state::<Pool>().unwrap();
+
+    // Starts the websocket server
+    // tokio::spawn(websocket(socks.clone(), pool.clone()));
+
+    // Monitors rabbitmq exchange to forward notifications from other instances
+    if let Some(url) = rabbitmq_url {
+        tokio::spawn(notifier(url, socks_rabbitmq));
+    }
 
     rocket.launch().await
 }

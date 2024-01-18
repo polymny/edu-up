@@ -6,7 +6,7 @@ port module Config exposing
     , Msg(..)
     , update, subs
     , saveStorage
-    , PopupType(..), TaskId, decodeTaskStatus, isClientTask, isServerTask, taskProgress
+    , AuthMethod(..), PopupType(..), TaskId, decodeTaskStatus, isClientTask, isServerTask, taskProgress
     )
 
 {-| This module contains the core types for Polymny app.
@@ -162,6 +162,7 @@ type alias ClientConfig =
     , devices : Device.Devices
     , preferredDevice : Maybe Device.Device
     , awareOfNewClient : Bool
+    , displayRecordCircle : Bool
     }
 
 
@@ -176,6 +177,7 @@ defaultClientConfig =
     , devices = { audio = [], video = [] }
     , preferredDevice = Nothing
     , awareOfNewClient = False
+    , displayRecordCircle = True
     }
 
 
@@ -191,6 +193,7 @@ encodeClientConfig config =
         , ( "devices", Device.encodeDevices config.devices )
         , ( "preferredDevice", Maybe.map Device.encodeDevice config.preferredDevice |> Maybe.withDefault Encode.null )
         , ( "awareOfNewClient", Encode.bool config.awareOfNewClient )
+        , ( "displayRecordCircle", Encode.bool config.displayRecordCircle )
         ]
 
 
@@ -205,7 +208,7 @@ makeDefault default arg =
 -}
 decodeClientConfig : Decoder ClientConfig
 decodeClientConfig =
-    Decode.map7 ClientConfig
+    Decode.map8 ClientConfig
         (Decode.field "lang" Decode.string |> Decode.map Lang.fromString |> makeDefault defaultClientConfig.lang)
         (Decode.field "zoomLevel" Decode.int |> makeDefault defaultClientConfig.zoomLevel)
         (Decode.field "promptSize" Decode.int |> makeDefault defaultClientConfig.promptSize)
@@ -213,6 +216,7 @@ decodeClientConfig =
         (Decode.field "devices" Device.decodeDevices |> makeDefault defaultClientConfig.devices)
         (Decode.maybe (Decode.field "preferredDevice" Device.decodeDevice))
         (Decode.field "awareOfNewClient" Decode.bool |> makeDefault defaultClientConfig.awareOfNewClient)
+        (Decode.field "displayRecordCircle" Decode.bool |> makeDefault defaultClientConfig.displayRecordCircle)
 
 
 {-| This type holds the client global state.
@@ -271,7 +275,8 @@ type Task
     | AddSlide TaskId String Int
     | AddGos TaskId String
     | ReplaceSlide TaskId String Int
-    | Production TaskId String
+    | CapsuleProduction TaskId String
+    | GosProduction TaskId String Int
     | Publication TaskId String
     | ExportCapsule TaskId String
     | ImportCapsule TaskId
@@ -359,10 +364,16 @@ decodeTask =
                             (Decode.field "capsuleId" Decode.string)
                             (Decode.field "gos" Decode.int)
 
-                    "Production" ->
-                        Decode.map2 Production
+                    "CapsuleProduction" ->
+                        Decode.map2 CapsuleProduction
                             (Decode.field "taskId" decodeTaskId)
                             (Decode.field "capsuleId" Decode.string)
+
+                    "GosProduction" ->
+                        Decode.map3 GosProduction
+                            (Decode.field "taskId" decodeTaskId)
+                            (Decode.field "capsuleId" Decode.string)
+                            (Decode.field "gosId" Decode.int)
 
                     "ExportCapsule" ->
                         Decode.map2 ExportCapsule
@@ -409,7 +420,10 @@ getId task =
         ReplaceSlide id _ _ ->
             id
 
-        Production id _ ->
+        CapsuleProduction id _ ->
+            id
+
+        GosProduction id _ _ ->
             id
 
         Publication id _ ->
@@ -513,9 +527,16 @@ compareTasks t1 t2 =
         ( ReplaceSlide id1 _ _, ReplaceSlide id2 _ _ ) ->
             id1 == id2
 
-        ( Production id1 capsuleId1, Production id2 capsuleId2 ) ->
+        ( CapsuleProduction id1 capsuleId1, CapsuleProduction id2 capsuleId2 ) ->
             if id1 < 0 || id2 < 0 then
                 capsuleId1 == capsuleId2
+
+            else
+                id1 == id2
+
+        ( GosProduction id1 capsuleId1 gosId1, GosProduction id2 capsuleId2 gosId2 ) ->
+            if id1 < 0 || id2 < 0 then
+                capsuleId1 == capsuleId2 && gosId1 == gosId2
 
             else
                 id1 == id2
@@ -571,6 +592,7 @@ type Msg
     | UploadRecordFailed TaskId
     | HasError
     | CloseNewClientInfo
+    | ToggleRecordCircle
 
 
 {-| This functions updates the config.
@@ -998,6 +1020,15 @@ update msg { serverConfig, clientConfig, clientState } =
                     ( { serverConfig = serverConfig
                       , clientConfig = { clientConfig | awareOfNewClient = True }
                       , clientState = { clientState | popupType = NoPopup }
+                      }
+                    , True
+                    , []
+                    )
+
+                ToggleRecordCircle ->
+                    ( { serverConfig = serverConfig
+                      , clientConfig = { clientConfig | displayRecordCircle = not clientConfig.displayRecordCircle }
+                      , clientState = clientState
                       }
                     , True
                     , []

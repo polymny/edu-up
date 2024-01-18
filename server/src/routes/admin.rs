@@ -2,10 +2,6 @@
 
 use tokio::fs::remove_dir_all;
 
-use futures::{poll, task::Poll, StreamExt};
-
-use tungstenite::{Error as TError, Message};
-
 use rocket::http::Status;
 use rocket::serde::json::{json, Json, Value};
 use rocket::State as S;
@@ -15,7 +11,7 @@ use serde::{Deserialize, Serialize};
 use crate::config::Config;
 use crate::db::capsule::Role;
 use crate::db::user::{Admin, User};
-use crate::websockets::WebSockets;
+use crate::storage::Storage;
 use crate::{Db, Error, Result};
 
 /// Admin get dashboard
@@ -26,8 +22,8 @@ pub async fn get_dashboard(admin: Admin, db: Db) -> Result<Value> {
 
 /// Admin get pagniated users
 #[get("/admin/users/<page>")]
-pub async fn get_users(admin: Admin, db: Db, page: i32) -> Result<Value> {
-    admin.get_users(&db, page).await
+pub async fn get_users(admin: Admin, db: Db, storage: &S<Storage>, page: i32) -> Result<Value> {
+    admin.get_users(&db, storage.inner().s3(), page).await
 }
 
 /// Admin get search users
@@ -37,28 +33,34 @@ pub async fn get_search_users(
     db: Db,
     username: Option<String>,
     email: Option<String>,
+    storage: &S<Storage>,
 ) -> Result<Value> {
     if let Some(username) = &username {
-        admin.search_by_username(&db, username).await
+        admin
+            .search_by_username(&db, storage.inner().s3(), username)
+            .await
     } else {
         if let Some(email) = &email {
-            admin.search_by_email(&db, email).await
+            admin
+                .search_by_email(&db, storage.inner().s3(), email)
+                .await
         } else {
-            Ok(json!("Nothing"))
+            let v: Vec<Value> = vec![];
+            Ok(json!(v))
         }
     }
 }
 
 /// Admin get user id
 #[get("/admin/user/<id>")]
-pub async fn get_user(admin: Admin, db: Db, id: i32) -> Result<Value> {
-    admin.get_user(&db, id).await
+pub async fn get_user(admin: Admin, db: Db, storage: &S<Storage>, id: i32) -> Result<Value> {
+    admin.get_user(&db, storage.inner().s3(), id).await
 }
 
 /// Admin get pagniated capsules
 #[get("/admin/capsules/<page>")]
-pub async fn get_capsules(admin: Admin, db: Db, page: i32) -> Result<Value> {
-    admin.get_capsules(&db, page).await
+pub async fn get_capsules(admin: Admin, db: Db, storage: &S<Storage>, page: i32) -> Result<Value> {
+    admin.get_capsules(&db, storage.inner().s3(), page).await
 }
 
 /// Admin get search capsules
@@ -68,14 +70,20 @@ pub async fn get_search_capsules(
     db: Db,
     capsule: Option<String>,
     project: Option<String>,
+    storage: &S<Storage>,
 ) -> Result<Value> {
     if let Some(capsule) = &capsule {
-        admin.search_by_capsule(&db, capsule).await
+        admin
+            .search_by_capsule(&db, storage.inner().s3(), capsule)
+            .await
     } else {
         if let Some(project) = &project {
-            admin.search_by_project(&db, project).await
+            admin
+                .search_by_project(&db, storage.inner().s3(), project)
+                .await
         } else {
-            Ok(json!("Nothing"))
+            let v: Vec<Value> = vec![];
+            Ok(json!(v))
         }
     }
 }
@@ -120,47 +128,4 @@ pub async fn delete_user(_admin: Admin, db: Db, id: i32, config: &S<Config>) -> 
     }
 
     Ok(user.delete(&db).await?)
-}
-
-/// A routes that clears unused websockets.
-#[get("/admin/clear-websockets")]
-pub async fn clear_websockets(_admin: Admin, socks: &S<WebSockets>) -> Result<()> {
-    let mut map = socks.lock().await;
-
-    for (_key, val) in &mut *map {
-        let mut to_remove = vec![];
-
-        for (i, s) in val.iter_mut().enumerate() {
-            let mut count: u32 = 0;
-            loop {
-                count += 1;
-
-                if count > 50 {
-                    // Infinite loop detection
-                    to_remove.push(i);
-                    info!("INFINITE LOOP DETECTED");
-                    break;
-                }
-
-                match poll!(s.next()) {
-                    Poll::Ready(Some(Err(TError::ConnectionClosed)))
-                    | Poll::Ready(Some(Err(TError::AlreadyClosed)))
-                    | Poll::Ready(Some(Ok(Message::Close(_)))) => {
-                        to_remove.push(i);
-                        break;
-                    }
-                    Poll::Ready(None) | Poll::Pending => break,
-                    _ => continue,
-                }
-            }
-        }
-
-        for i in to_remove.iter().rev() {
-            if val[*i].close(None).await.is_err() {
-                info!("cannot close websocket");
-            }
-            val.remove(*i);
-        }
-    }
-    Ok(())
 }

@@ -8,7 +8,7 @@ import App.Types as App
 import App.Utils as App
 import Browser.Events
 import Config
-import Data.Capsule as Data exposing (Capsule, WebcamSettings)
+import Data.Capsule as Data exposing (Capsule, Gos, WebcamSettings)
 import Data.Types as Data
 import Data.User as Data
 import Json.Decode as Decode
@@ -100,32 +100,36 @@ update msg model =
                         newCapsule =
                             { capsule | produced = Data.Running Nothing }
 
-                        task : Config.TaskStatus
-                        task =
-                            { task = Config.Production model.config.clientState.taskId capsule.id
-                            , progress = Just 0.0
-                            , finished = False
-                            , aborted = False
-                            , global = True
-                            }
-
-                        ( newConfig, _ ) =
-                            Config.update (Config.UpdateTaskStatus task) model.config
-
                         newModel : App.Model
                         newModel =
                             { model
                                 | user =
                                     Data.updateUser
                                         { capsule
-                                            | produced = Data.Running (Just 0.0)
+                                            | produced = Data.Running Nothing
                                             , published = Data.Idle
                                         }
                                         model.user
-                                , config = Config.incrementTaskId newConfig
                             }
                     in
                     ( newModel, Api.produceCapsule capsule ((\_ -> App.Noop) |> App.orError) )
+
+                Production.ProduceGos ->
+                    let
+                        newGos : Gos
+                        newGos =
+                            { gos | produced = Data.Running Nothing }
+
+                        newCapsule : Capsule
+                        newCapsule =
+                            updateGos m.gos newGos capsule
+                    in
+                    ( { model | user = Data.updateUser newCapsule model.user }
+                    , Api.produceGos capsule m.gos ((\_ -> App.Noop) |> App.orError)
+                    )
+
+                Production.ToggleFoldable id ->
+                    ( model, toggleFoldable id )
 
                 Production.WebcamSettingsMsg Production.Noop ->
                     ( model, Cmd.none )
@@ -308,3 +312,15 @@ setPointerCapture id =
 
 
 port setPointerCapturePort : ( String, Int ) -> Cmd msg
+
+
+{-| Folds or unfolds a foldable.
+-}
+toggleFoldable : String -> Cmd msg
+toggleFoldable id =
+    toggleFoldablePort id
+
+
+{-| Port to fold or unfold a foldable.
+-}
+port toggleFoldablePort : String -> Cmd msg

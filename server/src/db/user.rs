@@ -12,8 +12,6 @@ use rand::distributions::Alphanumeric;
 use rand::rngs::OsRng;
 use rand::Rng;
 
-use tungstenite::Message;
-
 use rocket::http::Status;
 use rocket::request::{FromRequest, Outcome, Request};
 use rocket::serde::json::{json, Value};
@@ -23,12 +21,13 @@ use crate::db::capsule::{capsule, Capsule, Role};
 use crate::db::notification::Notification;
 use crate::db::session::Session;
 use crate::mailer::Mailer;
+use crate::s3::S3;
 use crate::templates::{
     reset_password_email_html, reset_password_email_plain_text, validation_email_html,
     validation_email_plain_text, validation_invitation_html, validation_invitation_plain_text,
     validation_new_email_html, validation_new_email_plain_text,
 };
-use crate::websockets::WebSockets;
+use crate::websockets::Notifier;
 use crate::{Db, Error, Result};
 
 const PAGE_SIZE: usize = 50;
@@ -49,6 +48,7 @@ pub enum Plan {
 
 /// A user of polymny.
 #[ergol]
+#[derive(Serialize)]
 pub struct User {
     /// The id of the user.
     #[id]
@@ -66,7 +66,10 @@ pub struct User {
     pub secondary_email: Option<String>,
 
     /// The hash of the user's password.
-    pub hashed_password: String,
+    ///
+    /// If the password is none, it means that the user is not allowed to log in by typing a
+    /// password.
+    pub hashed_password: Option<String>,
 
     /// Whether the user is activated or not.
     pub activated: bool,
@@ -105,7 +108,7 @@ impl User {
     pub async fn new<P: Into<String>, Q: Into<String>, R: Into<String>>(
         username: P,
         email: Q,
-        password: R,
+        password: Option<R>,
         subscribed: bool,
         mailer: &Option<Mailer>,
         db: &Db,
@@ -113,7 +116,6 @@ impl User {
     ) -> Result<User> {
         let username = username.into();
         let email = email.into();
-        let password = password.into();
 
         // Check username constraints
         if username.len() < 4 {
@@ -129,7 +131,11 @@ impl User {
         }
 
         // Hash the password
-        let hashed_password = bcrypt::hash(&password, bcrypt::DEFAULT_COST)?;
+        let hashed_password = if let Some(pass) = password {
+            Some(bcrypt::hash(&pass.into(), bcrypt::DEFAULT_COST)?)
+        } else {
+            None
+        };
 
         let unsubscribe_key = if subscribed {
             let rng = OsRng {};
@@ -275,16 +281,21 @@ impl User {
 
     /// Updates the password with the specified hash.
     pub fn set_password(&mut self, new_password: &str) -> Result<()> {
-        self.hashed_password = bcrypt::hash(new_password, bcrypt::DEFAULT_COST)?;
+        self.hashed_password = Some(bcrypt::hash(new_password, bcrypt::DEFAULT_COST)?);
         Ok(())
     }
 
     /// Tests if the password is correct.
     pub fn test_password(&self, password: &str) -> Result<()> {
-        if !bcrypt::verify(password, &self.hashed_password)? {
-            Err(Error(Status::Unauthorized))
-        } else {
-            Ok(())
+        match &self.hashed_password {
+            Some(hash) => {
+                if !bcrypt::verify(password, &hash)? {
+                    Err(Error(Status::Unauthorized))
+                } else {
+                    Ok(())
+                }
+            }
+            _ => Err(Error(Status::Unauthorized)),
         }
     }
 
@@ -312,11 +323,11 @@ impl User {
     }
 
     /// Returns a json representation of the user.
-    pub async fn to_json(&self, db: &Db) -> Result<Value> {
+    pub async fn to_json(&self, db: &Db, s3: Option<&S3>) -> Result<Value> {
         let capsules = self.capsules(&db).await?;
         let capsules = capsules
             .iter()
-            .map(|(capsule, role)| capsule.to_json(*role, db))
+            .map(|(capsule, role)| capsule.to_json(*role, db, s3))
             .collect::<Vec<_>>();
 
         let capsules = try_join_all(capsules).await?;
@@ -341,7 +352,6 @@ impl User {
         Ok(json!({
             "username": self.username,
             "email": self.email,
-            "cookie": self.sessions(&db).await?.get(0).map(|x| x.secret.clone()),
             "capsules": capsules,
             "notifications": notifications,
             "plan": self.plan,
@@ -351,11 +361,13 @@ impl User {
     }
 
     /// Returns a json representation of the user (for admin).
-    pub async fn admin_to_json(&self, db: &Db) -> Result<Value> {
-        let mut user_json = self.to_json(&db).await?;
+    pub async fn admin_to_json(&self, db: &Db, s3: Option<&S3>) -> Result<Value> {
+        let mut user_json = self.to_json(&db, s3).await?;
         user_json["id"] = json!(self.id);
         user_json["activated"] = json!(self.activated);
         user_json["newsletter_subscribed"] = json!(self.unsubscribe_key.is_some());
+        user_json["member_since"] = json!(self.member_since.map(|x| x.timestamp()));
+        user_json["last_visited"] = json!(self.last_visited.map(|x| x.timestamp()));
 
         Ok(user_json)
     }
@@ -382,12 +394,12 @@ impl User {
                 let text = reset_password_email_plain_text(&activation_url);
                 let html = reset_password_email_html(&activation_url);
 
-                mailer.send_mail(
+                dbg!(mailer.send_mail(
                     &self.email,
                     String::from("Reset your Polymny password"),
                     text,
                     html,
-                )?;
+                ))?;
             }
 
             _ => (),
@@ -498,20 +510,13 @@ impl User {
     }
 
     /// Sends a notification to the user.
-    pub async fn notify(
-        &self,
-        sock: &WebSockets,
-        title: &str,
-        message: &str,
-        db: &Db,
-    ) -> Result<()> {
+    pub async fn notify(&self, sock: &Notifier, title: &str, message: &str, db: &Db) -> Result<()> {
         let notification =
             Notification::create(title.to_string(), message.to_string(), false, self)
                 .save(&db)
                 .await?;
 
-        sock.write_message(self.id, Message::Text(notification.to_json().to_string()))
-            .await?;
+        sock.write_message(self.id, &notification.to_json()).await?;
 
         Ok(())
     }
@@ -532,28 +537,28 @@ impl<'r> FromRequest<'r> for User {
     async fn from_request(request: &'r Request<'_>) -> Outcome<Self, Self::Error> {
         let db = match request.guard::<Db>().await {
             Outcome::Success(db) => db,
-            Outcome::Failure(x) => return Outcome::Failure(x),
-            Outcome::Forward(()) => return Outcome::Forward(()),
+            Outcome::Error(x) => return Outcome::Error(x),
+            Outcome::Forward(s) => return Outcome::Forward(s),
         };
 
         let cookie = match request.cookies().get_private("EXAUTH") {
             Some(c) => c,
-            _ => return Outcome::Failure((Status::Unauthorized, Error(Status::Unauthorized))),
+            _ => return Outcome::Error((Status::Unauthorized, Error(Status::Unauthorized))),
         };
 
         let mut user = match User::get_from_session(cookie.value(), &db).await {
             Ok(Some(user)) => user,
-            _ => return Outcome::Failure((Status::Unauthorized, Error(Status::Unauthorized))),
+            _ => return Outcome::Error((Status::Unauthorized, Error(Status::Unauthorized))),
         };
 
         if !user.activated {
-            return Outcome::Failure((Status::Unauthorized, Error(Status::Unauthorized)));
+            return Outcome::Error((Status::Unauthorized, Error(Status::Unauthorized)));
         }
 
         user.last_visited = Some(Utc::now().naive_utc());
 
         if user.save(&db).await.is_err() {
-            return Outcome::Failure((
+            return Outcome::Error((
                 Status::InternalServerError,
                 Error(Status::InternalServerError),
             ));
@@ -574,11 +579,11 @@ impl<'r> FromRequest<'r> for Admin {
     async fn from_request(request: &'r Request<'_>) -> Outcome<Self, Self::Error> {
         let user = match User::from_request(request).await {
             Outcome::Success(user) => user,
-            Outcome::Failure(x) => return Outcome::Failure(x),
-            Outcome::Forward(()) => return Outcome::Forward(()),
+            Outcome::Error(x) => return Outcome::Error(x),
+            Outcome::Forward(s) => return Outcome::Forward(s),
         };
         if user.plan != Plan::Admin {
-            return Outcome::Failure((Status::Forbidden, Error(Status::Forbidden)));
+            return Outcome::Error((Status::Forbidden, Error(Status::Forbidden)));
         }
         Outcome::Success(Admin(user))
     }
@@ -586,7 +591,7 @@ impl<'r> FromRequest<'r> for Admin {
 
 impl Admin {
     /// Returns a json representation of the user.
-    pub async fn to_json(&self, db: &Db) -> Result<Value> {
+    pub async fn to_json(&self, db: &Db, s3: Option<&S3>) -> Result<Value> {
         let users = futures::future::join_all(
             User::select()
                 .order_by(user::id::descend())
@@ -594,7 +599,7 @@ impl Admin {
                 .execute(&db)
                 .await?
                 .iter()
-                .map(|user| user.admin_to_json(db)),
+                .map(|user| user.admin_to_json(db, s3)),
         )
         .await
         .into_iter()
@@ -607,7 +612,7 @@ impl Admin {
                 .execute(&db)
                 .await?
                 .iter()
-                .map(|capsule| capsule.to_json(Role::Read, db)),
+                .map(|capsule| capsule.to_json(Role::Read, db, s3)),
         )
         .await
         .into_iter()
@@ -623,7 +628,12 @@ impl Admin {
     }
 
     /// Returns a paged representation users.
-    pub async fn get_users(&self, db: &Db, page: i32) -> Result<Value> {
+    pub async fn get_users(&self, db: &Db, s3: Option<&S3>, page: i32) -> Result<Value> {
+        if page < 0 {
+            let users: Vec<User> = vec![];
+            return Ok(json!(users));
+        }
+
         let users = futures::future::join_all(
             User::select()
                 .order_by(user::id::descend())
@@ -632,7 +642,7 @@ impl Admin {
                 .execute(&db)
                 .await?
                 .iter()
-                .map(|user| user.admin_to_json(db)),
+                .map(|user| user.admin_to_json(db, s3)),
         )
         .await
         .into_iter()
@@ -642,7 +652,12 @@ impl Admin {
     }
 
     /// Search by username.
-    pub async fn search_by_username(&self, db: &Db, search: &str) -> Result<Value> {
+    pub async fn search_by_username(
+        &self,
+        db: &Db,
+        s3: Option<&S3>,
+        search: &str,
+    ) -> Result<Value> {
         let users = futures::future::join_all(
             User::select()
                 .filter(user::username::like(format!("%{}%", search.to_string())))
@@ -650,7 +665,7 @@ impl Admin {
                 .execute(&db)
                 .await?
                 .iter()
-                .map(|user| user.admin_to_json(db)),
+                .map(|user| user.admin_to_json(db, s3)),
         )
         .await
         .into_iter()
@@ -660,7 +675,7 @@ impl Admin {
     }
 
     /// Search by email.
-    pub async fn search_by_email(&self, db: &Db, search: &str) -> Result<Value> {
+    pub async fn search_by_email(&self, db: &Db, s3: Option<&S3>, search: &str) -> Result<Value> {
         let users = futures::future::join_all(
             User::select()
                 .filter(user::email::like(format!("%{}%", search.to_string())))
@@ -668,7 +683,7 @@ impl Admin {
                 .execute(&db)
                 .await?
                 .iter()
-                .map(|user| user.admin_to_json(db)),
+                .map(|user| user.admin_to_json(db, s3)),
         )
         .await
         .into_iter()
@@ -678,18 +693,18 @@ impl Admin {
     }
 
     /// Returns a user for admin in json fomat.
-    pub async fn get_user(&self, db: &Db, id: i32) -> Result<Value> {
+    pub async fn get_user(&self, db: &Db, s3: Option<&S3>, id: i32) -> Result<Value> {
         let user = User::get_by_id(id, db)
             .await?
             .ok_or(Error(Status::NotFound))?;
 
-        let user = user.admin_to_json(db).await?;
+        let user = user.admin_to_json(db, s3).await?;
 
         Ok(json!(user))
     }
 
     /// Returns a paginated representation of capsules.
-    pub async fn get_capsules(&self, db: &Db, page: i32) -> Result<Value> {
+    pub async fn get_capsules(&self, db: &Db, s3: Option<&S3>, page: i32) -> Result<Value> {
         let capsules = futures::future::join_all(
             Capsule::select()
                 .order_by(capsule::last_modified::descend())
@@ -698,7 +713,7 @@ impl Admin {
                 .execute(&db)
                 .await?
                 .iter()
-                .map(|capsule| capsule.to_json(Role::Read, db)),
+                .map(|capsule| capsule.to_json(Role::Read, db, s3)),
         )
         .await
         .into_iter()
@@ -708,7 +723,7 @@ impl Admin {
     }
 
     /// Search by capsules.
-    pub async fn search_by_capsule(&self, db: &Db, search: &str) -> Result<Value> {
+    pub async fn search_by_capsule(&self, db: &Db, s3: Option<&S3>, search: &str) -> Result<Value> {
         let capsules = futures::future::join_all(
             Capsule::select()
                 .filter(capsule::name::like(format!("%{}%", search.to_string())))
@@ -716,7 +731,7 @@ impl Admin {
                 .execute(&db)
                 .await?
                 .iter()
-                .map(|capsule| capsule.to_json(Role::Read, db)),
+                .map(|capsule| capsule.to_json(Role::Read, db, s3)),
         )
         .await
         .into_iter()
@@ -726,7 +741,7 @@ impl Admin {
     }
 
     /// Search by project.
-    pub async fn search_by_project(&self, db: &Db, search: &str) -> Result<Value> {
+    pub async fn search_by_project(&self, db: &Db, s3: Option<&S3>, search: &str) -> Result<Value> {
         let capsules = futures::future::join_all(
             Capsule::select()
                 .filter(capsule::project::like(format!("%{}%", search.to_string())))
@@ -734,7 +749,7 @@ impl Admin {
                 .execute(&db)
                 .await?
                 .iter()
-                .map(|capsule| capsule.to_json(Role::Read, db)),
+                .map(|capsule| capsule.to_json(Role::Read, db, s3)),
         )
         .await
         .into_iter()

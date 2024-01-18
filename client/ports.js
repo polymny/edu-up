@@ -92,6 +92,7 @@ function init(node, flags) {
 
     // Video of the pointer for replaying a record with pointer.
     let pointerVideo = document.createElement('video');
+    pointerVideo.crossOrigin = "anonymous";
 
     // A temporary canvas to use as a transition before rendering the replay of the pointer.
     let tmpCanvas = document.createElement('canvas');
@@ -109,6 +110,9 @@ function init(node, flags) {
 
     // The list of requests.
     let requests = {};
+
+    // Last selected file.
+    let lastSelectedFile = null;
 
     ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     ////////////////////////////////////////////// CLIENT INITIALIZATION //////////////////////////////////////////////
@@ -140,7 +144,6 @@ function init(node, flags) {
 
         socket.onopen = function () {
             app.ports.webSocketStatus.send(true);
-            socket.send(flags.user.cookie);
         }
 
         socket.onclose = function () {
@@ -194,6 +197,24 @@ function init(node, flags) {
     ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     ///////////////////////////////////////////////// UTIL FUNCTIONS //////////////////////////////////////////////////
     ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+
+    // This function adds a new event to the currentEvents array.
+    seekedEventRegister = function () {
+        let extra = document.getElementById('extra');
+
+        if (extra !== null && !extra.paused && recording) {
+            currentTime = Math.round(window.performance.now() - (currentEvents.length === 0 ? 0 : currentEvents[0].time))
+
+            let extraEvent = {
+                "ty": "play",
+                "time": currentTime,
+                "extra_time": Math.round(extra.currentTime * 1000)
+            }
+
+            currentEvents.push(extraEvent);
+        }
+    }
 
     // dbg! like in rust (logs and returns the value).
     function dbg(arg) {
@@ -543,7 +564,7 @@ function init(node, flags) {
     }
 
     // Starts the recording.
-    function startRecording() {
+    function startRecording(events) {
         if (recorder !== undefined && !recording) {
 
             pointerExists = false;
@@ -556,10 +577,26 @@ function init(node, flags) {
                 pointerRecorder.start();
             }
 
+            let currentTime = Math.round(window.performance.now());
+
             currentEvents = [{
-                time: Math.round(window.performance.now()),
+                time: currentTime,
                 ty: "start"
             }];
+
+            // Add the events to the current events.
+            events.forEach(event => {
+                let correctedEvent = {
+                    time: 0,  // Make sure the time is 0, because it will be corrected later.
+                    ty: event.ty,
+                };
+
+                if (event.extra_time !== undefined) {
+                    correctedEvent.extra_time = event.extra_time;
+                };
+
+                currentEvents.push(correctedEvent);
+            });
 
             // let extra = document.getElementById('extra');
             // if (extra instanceof HTMLVideoElement) {
@@ -704,7 +741,7 @@ function init(node, flags) {
             {
                 webcam_blob: recordingPointerForRecord === null ? recordArrived : recordingPointerForRecord[1].webcam_blob,
                 pointer_blob: (isPremium && pointerExists) ? pointerArrived : null,
-                events: recordingPointerForRecord === null ? currentEvents : recordingPointerForRecord[1].events,
+                events: dbg(recordingPointerForRecord === null ? currentEvents : recordingPointerForRecord[1].events),
                 matted: 'idle',
             }
         ]);
@@ -713,20 +750,26 @@ function init(node, flags) {
         pointerArrived = null;
     }
 
-    // Registers an event in the currentEvents array.
-    function registerEvent(event) {
-        let jsonEvent = {
-            ty: event.ty,
-            time: Math.round(window.performance.now() - (currentEvents.length === 0 ? 0 : currentEvents[0].time)),
-        };
-
-        if (event.ty === "seek") {
-            jsonEvent.extra_time = event.extra_time;
+    // Registers events in the currentEvents array.
+    function registerEvents(events) {
+        if (!recording) {
+            return;
         }
 
-        console.log(jsonEvent);
+        currentTime = Math.round(window.performance.now() - (currentEvents.length === 0 ? 0 : currentEvents[0].time))
 
-        currentEvents.push(jsonEvent);
+        events.forEach(event => {
+            let jsonEvent = {
+                ty: event.ty,
+                time: currentTime,
+            };
+
+            if (event.extra_time !== undefined) {
+                jsonEvent.extra_time = event.extra_time;
+            }
+
+            currentEvents.push(jsonEvent);
+        });
     }
 
     function clearPointerAndCallbacks(pointerCanvas, pointerCtx) {
@@ -759,12 +802,13 @@ function init(node, flags) {
         video.onended = () => {
             app.ports.playRecordFinished.send(null);
             bindDevice(currentSettings);
-            // let extra = document.getElementById('extra');
-            // if (extra instanceof HTMLVideoElement) {
-            //     extra.pause();
-            //     extra.currentTime = 0;
-            // }
-            // app.ports.playRecordFinished.send(null);
+
+            // Stop extra video.
+            let extra = document.getElementById('extra');
+            if (extra instanceof HTMLVideoElement) {
+                extra.pause();
+                extra.currentTime = 0;
+            }
         };
 
         // Manage pointer
@@ -797,22 +841,22 @@ function init(node, flags) {
                     callback = () => app.ports.nextSentenceReceived.send(null);
                     break;
 
-                // case "play":
-                //     callback = () => {
-                //         let extra = document.getElementById('extra');
-                //         extra.muted = true;
-                //         extra.currentTime = 0;
-                //         extra.play();
-                //     };
-                //     break;
+                case "play":
+                    callback = () => {
+                        let extra = document.getElementById('extra');
+                        extra.muted = true;
+                        extra.currentTime = event.extra_time / 1000;
+                        extra.play();
+                    };
+                    break;
 
-                // case "stop":
-                //     callback = () => {
-                //         let extra = document.getElementById('extra');
-                //         extra.currentTime = 0;
-                //         extra.stop();
-                //     };
-                //     break;
+                case "pause":
+                    callback = () => {
+                        let extra = document.getElementById('extra');
+                        extra.currentTime = event.extra_time / 1000;
+                        extra.pause();
+                    };
+                    break;
             }
 
             if (callback !== undefined) {
@@ -865,6 +909,18 @@ function init(node, flags) {
 
     // Stops the current record.
     function stopRecord() {
+        // Stop extra video.
+        let extra = document.getElementById('extra');
+        if (extra instanceof HTMLVideoElement) {
+            extra.pause();
+            extra.currentTime = 0;
+        }
+
+        // Delete callbacks.
+        for (let timeoutId of nextSlideCallbacks) {
+            clearTimeout(timeoutId);
+        }
+
         app.ports.playRecordFinished.send(null);
         bindDevice(currentSettings);
     }
@@ -1117,7 +1173,7 @@ function init(node, flags) {
             this.capsule = args[0];
             this.taskId = args[1];
             this.aborted = false;
-            this.totalSubasks = this.countSubtasks();
+            this.totalSubtasks = this.countSubtasks();
         }
 
         // Starts the export.
@@ -1131,26 +1187,46 @@ function init(node, flags) {
 
                 let gos = this.capsule.structure[gosIndex];
                 let gosDir = zip.folder(gosIndex + 1);
+                delete gos["produced_hash"];
+                delete gos["produced_presign"];
 
                 // Export slides.
                 for (let slideIndex = 0; slideIndex < gos.slides.length; slideIndex++) {
 
                     let slide = gos.slides[slideIndex];
-                    let resp = await fetch("/data/" + this.capsule.id + "/assets/" + slide.uuid + ".png");
+                    let resp;
+                    if (slide.presign !== null) {
+                        resp = await fetch(slide.presign);
+                    } else {
+                        resp = await fetch("/data/" + this.capsule.id + "/assets/" + slide.uuid + ".webp");
+                    }
+
+                    delete slide["presign"];
+
                     let blob = await resp.blob();
 
-                    gosDir.file((slideIndex + 1) + ".png", blob);
-                    slide.uuid = (gosIndex + 1) + "/" + (slideIndex + 1) + ".png";
-                    if (this.updateProgress(++taskCounter / this.totalSubasks / 2)) return;
+                    gosDir.file((slideIndex + 1) + ".webp", blob);
+                    slide.uuid = (gosIndex + 1) + "/" + (slideIndex + 1) + ".webp";
+                    if (this.updateProgress(++taskCounter / this.totalSubtasks / 2)) return;
+
+                    let extra_presign = slide.extra_presign;
+                    delete slide["extra_presign"];
 
                     if (slide.extra != undefined) {
 
-                        let resp = await fetch("/data/" + this.capsule.id + "/assets/" + slide.extra + ".mp4");
+                        let resp;
+
+                        if (extra_presign !== null) {
+                            resp = await fetch(extra_presign);
+                        } else {
+                            resp = await fetch("/data/" + this.capsule.id + "/assets/" + slide.extra + ".mp4");
+                        }
+
                         let blob = await resp.blob();
 
                         gosDir.file((slideIndex + 1) + ".mp4", blob);
                         slide.extra = (gosIndex + 1) + "/" + (slideIndex + 1) + ".mp4";
-                        if (this.updateProgress(++taskCounter / this.totalSubasks / 2)) return;
+                        if (this.updateProgress(++taskCounter / this.totalSubtasks / 2)) return;
 
                     }
 
@@ -1159,12 +1235,40 @@ function init(node, flags) {
                 // Export record.
                 if (gos.record != undefined) {
 
-                    let resp = await fetch("/data/" + this.capsule.id + "/assets/" + gos.record.uuid + ".webm");
+                    let pointer_uuid = gos.record.pointer_uuid;
+                    let pointer_presign = gos.record.pointer_presign;
+
+                    let resp;
+
+                    if (gos.record.presign !== null) {
+                        resp = await fetch(gos.record.presign);
+                    } else {
+                        resp = await fetch("/data/" + this.capsule.id + "/assets/" + gos.record.uuid + ".webm");
+                    }
+
                     let blob = await resp.blob();
 
                     gosDir.file("record.webm", blob);
                     gos.record = (gosIndex + 1) + "/record.webm";
-                    if (this.updateProgress(++taskCounter / this.totalSubasks / 2)) return;
+                    if (this.updateProgress(++taskCounter / this.totalSubtasks / 2)) return;
+
+                    if (pointer_uuid !== null) {
+
+                        let resp;
+
+                        if (pointer_presign !== null) {
+                            resp = await fetch(pointer_presign);
+                        } else {
+                            resp = await fetch("/data/" + this.capsule.id + "/assets/" + pointer_uuid + ".webm");
+                        }
+
+                        let blob = await resp.blob();
+
+                        gosDir.file("pointer.webm", blob);
+                        gos.pointer = (gosIndex + 1) + "/pointer.webm";
+                        if (this.updateProgress(++taskCounter / this.totalSubtasks / 2)) return;
+
+                    }
 
                 }
 
@@ -1173,22 +1277,45 @@ function init(node, flags) {
             // Export output.
             if (this.capsule.produced) {
 
-                let resp = await fetch("/data/" + this.capsule.id + "/output.mp4");
+                let resp;
+
+                if (this.capsule.output_presign !== null) {
+                    resp = await fetch(this.capsule.output_presign);
+                } else {
+                    resp = await fetch("/data/" + this.capsule.id + "/produced/capsule.mp4");
+                }
+
+                delete this.capsule["output_presign"];
+
                 let blob = await resp.blob();
 
-                zip.file("output.mp4", blob);
-                if (this.updateProgress(++taskCounter / this.totalSubasks / 2)) return;
+                let produced = zip.folder("produced");
+                produced.file("capsule.mp4", blob);
+                if (this.updateProgress(++taskCounter / this.totalSubtasks / 2)) return;
 
             }
 
             // Export osundtrack.
+            let sound_track_presign = this.capsule.sound_track_presign;
+            delete this.capsule["sound_track_presign"];
+
             if (this.capsule.sound_track != undefined) {
 
-                let resp = await fetch("/data/" + this.capsule.id + "/assets/" + this.capsule.sound_track.uuid + ".m4a");
+                let resp;
+
+                if (sound_track_presign !== null) {
+                    resp = await fetch(sound_track_presign);
+                } else {
+                    resp = await fetch("/data/" + this.capsule.id + "/assets/" + this.capsule.sound_track.uuid + ".m4a");
+                }
+
+
                 let blob = await resp.blob();
 
                 zip.file("soundtrack.m4a", blob);
-                if (this.updateProgress(++taskCounter / this.totalSubasks / 2)) return;
+                this.capsule.sound_track.name = "soundtrack.m4a";
+                delete this.capsule.sound_track["uuid"];
+                if (this.updateProgress(++taskCounter / this.totalSubtasks / 2)) return;
 
             }
 
@@ -1240,29 +1367,33 @@ function init(node, flags) {
 
         // Count the number of subtasks.
         countSubtasks() {
-            let totalSubasks = 0;
+            let totalSubtasks = 0;
 
             // Count the number of slides and records.
             for (let gosIndex = 0; gosIndex < this.capsule.structure.length; gosIndex++) {
                 let gos = this.capsule.structure[gosIndex];
-                if (gos.record) totalSubasks++;
+                if (gos.record) {
+                    totalSubtasks++;
+
+                    if (gos.record.pointer_uuid) totalSubtasks++;
+                }
 
                 for (let slideIndex = 0; slideIndex < gos.slides.length; slideIndex++) {
-                    totalSubasks++;
+                    totalSubtasks++;
 
                     let slide = gos.slides[slideIndex];
-                    if (slide.extra) totalSubasks++;
+                    if (slide.extra) totalSubtasks++;
                 }
 
             }
 
             // Count the output.
-            if (this.capsule.produced) totalSubasks++;
+            if (this.capsule.produced) totalSubtasks++;
 
             // Count the soundtrack.
-            if (this.capsule.sound_track) totalSubasks++;
+            if (this.capsule.sound_track) totalSubtasks++;
 
-            return totalSubasks;
+            return totalSubtasks;
         }
 
         // Abort the task.
@@ -1303,7 +1434,7 @@ function init(node, flags) {
             this.capsule = null;
             this.newCapsule = null;
             this.aborted = false;
-            this.totalSubasks = 0;
+            this.totalSubtasks = 0;
         }
 
         // Initializes the importer.
@@ -1313,7 +1444,7 @@ function init(node, flags) {
             let zip = new JSZip();
             this.capsuleContent = await zip.loadAsync(this.capsuleZip);
             this.capsule = await JSON.parse(await this.capsuleContent.file("structure.json").async("string"));
-            this.totalSubasks = this.countSubtasks();
+            this.totalSubtasks = this.countSubtasks();
 
             // Creates the empty capsule.
             let resp = await fetch("/api/empty-capsule/" + this.project + "/" + this.capsule.name, { method: "POST" });
@@ -1337,7 +1468,7 @@ function init(node, flags) {
                     let gosOrMinusOne = slideIndex !== 0 ? gosIndex : -1;
                     let slide = gos.slides[slideIndex];
                     let image = await this.capsuleContent.file(slide.uuid).async("blob");
-                    image = image.slice(0, image.size, "image/png")
+                    image = image.slice(0, image.size, "image/webp")
 
                     // Upload the slide.
                     resp = await fetch("/api/add-slide/" + this.newCapsule.id + "/" + gosOrMinusOne + "/-1", { method: "POST", body: image });
@@ -1349,7 +1480,7 @@ function init(node, flags) {
 
                     slide.uuid = newSlide.uuid;
 
-                    if (this.updateProgress(++taskCounter / this.totalSubasks)) return;
+                    if (this.updateProgress(++taskCounter / this.totalSubtasks)) return;
                 }
 
             }
@@ -1384,7 +1515,17 @@ function init(node, flags) {
                     resp = await fetch("/api/upload-record/" + this.newCapsule.id + "/" + gosIndex, { method: "POST", body: blob });
                     this.newCapsule = await resp.json();
 
-                    if (this.updateProgress(++taskCounter / this.totalSubasks)) return;
+                    if (this.updateProgress(++taskCounter / this.totalSubtasks)) return;
+                }
+
+                // Upload the pointer if any.
+                if (gos.pointer != null) {
+                    let blob = await this.capsuleContent.file(gos.pointer).async("blob");
+                    blob = blob.slice(0, blob.size, "video/webm");
+                    resp = await fetch("/api/upload-pointer/" + this.newCapsule.id + "/" + gosIndex, { method: "POST", body: blob });
+                    this.newCapsule = await resp.json();
+
+                    if (this.updateProgress(++taskCounter / this.totalSubtasks)) return;
                 }
 
                 // Upload the extra if any.
@@ -1396,7 +1537,7 @@ function init(node, flags) {
                         resp = await fetch("/api/replace-slide/" + this.newCapsule.id + "/" + slide.uuid + "/-1", { method: "POST", body: blob });
                         this.newCapsule = await resp.json();
 
-                        if (this.updateProgress(++taskCounter / this.totalSubasks)) return;
+                        if (this.updateProgress(++taskCounter / this.totalSubtasks)) return;
                     }
                 }
             }
@@ -1408,10 +1549,34 @@ function init(node, flags) {
                 resp = await fetch("/api/sound-track/" + this.newCapsule.id + "/" + this.capsule.sound_track.name, { method: "POST", body: track });
                 this.newCapsule = await resp.json();
 
-                if (this.updateProgress(++taskCounter / this.totalSubasks)) return;
+                if (this.updateProgress(++taskCounter / this.totalSubtasks)) return;
+            }
+
+            this.newCapsule.privacy = this.capsule.privacy;
+            this.newCapsule.prompt_subtitles = this.capsule.prompt_subtitles;
+            for (let gosId = 0; gosId < this.capsule.structure.length; gosId++) {
+                let newGos = this.newCapsule.structure[gosId];
+                let oldGos = this.capsule.structure[gosId];
+
+                newGos.events = oldGos.events;
+                newGos.webcam_settings = oldGos.webcam_settings;
+                newGos.fade = oldGos.fade;
+
+                for (let slideId = 0; slideId < oldGos.slides.length; slideId++) {
+                    let newSlide = newGos.slides[slideId];
+                    let oldSlide = oldGos.slides[slideId];
+
+                    newSlide.prompt = oldSlide.prompt;
+                }
             }
 
             app.ports.capsuleUpdated.send(this.newCapsule);
+
+            await fetch("/api/update-capsule/", {
+                method: "POST",
+                body: JSON.stringify(this.newCapsule),
+                headers: { "Content-Type": "application/json" },
+            });
 
             // Update the task.
             let task = {
@@ -1429,25 +1594,28 @@ function init(node, flags) {
         // Counts the number of subtasks.
         countSubtasks() {
 
-            let totalSubasks = 0;
+            let totalSubtasks = 0;
 
             for (let gos of this.capsule.structure) {
                 // Count the slides.
-                totalSubasks += gos.slides.length;
+                totalSubtasks += gos.slides.length;
 
                 // Count the records.
-                if (gos.record !== null) totalSubasks++;
+                if (gos.record !== null) totalSubtasks++;
+
+                // Count the pointers.
+                if (gos.pointer != null) totalSubtasks++;
 
                 // Count the extras.
                 for (let slide of gos.slides) {
-                    if (slide.extra !== null) totalSubasks++;
+                    if (slide.extra !== null) totalSubtasks++;
                 }
             }
 
             // Count the sound track.
-            if (this.capsuleZip.sound_track) totalSubasks++;
+            if (this.capsuleZip.sound_track) totalSubtasks++;
 
-            return totalSubasks;
+            return totalSubtasks;
         }
 
         // Updates the progress of the task.
@@ -1499,6 +1667,92 @@ function init(node, flags) {
         delete requests[tracker];
     }
 
+    function readFile(buffer) {
+        return new Promise((resolve, reject) => {
+            let fileReader = new FileReader();
+            fileReader.onload = () => {
+                resolve(fileReader.result);
+            }
+            fileReader.readAsArrayBuffer(buffer);
+        });
+    }
+
+    // Open a pdf file.
+    async function openPdf(file) {
+        let result = await readFile(file);
+
+        var typedarray = new Uint8Array(result);
+        const loadingTask = pdfjsLib.getDocument(typedarray);
+        return await loadingTask.promise;
+    }
+
+    // Render pdf on a canvas.
+    async function renderPdf(pdf, i, canvas) {
+        let context = canvas.getContext('2d');
+
+        // Force canvas size.
+        canvas.width = 1920;
+        canvas.height = 1080;
+
+        let page = await pdf.getPage(i);
+
+        // Scale the pdf to fit the canvas.
+        let naturalSize = page.getViewport({ scale: 1 });
+        let scale = Math.min(canvas.width / naturalSize.width, canvas.height / naturalSize.height);
+        let viewport = page.getViewport({ scale: scale });
+
+        // Center the pdf on the canvas.
+        viewport.transform[4] += (canvas.width - viewport.width) / 2;
+        viewport.transform[5] += (canvas.height - viewport.height) / 2;
+
+        let renderContext = {
+            canvasContext: context,
+            transform: null,
+            viewport: viewport,
+            // background: 'rgb(0,0,0)',
+        };
+        await page.render(renderContext).promise;
+
+        // Draw black borders.
+        context.fillStyle = "#fff";
+        context.fillRect(0, 0, (canvas.width - viewport.width) / 2, canvas.height); // Left
+        context.fillRect(canvas.width - (canvas.width - viewport.width) / 2, 0, (canvas.width - viewport.width) / 2, canvas.height); // Right
+        context.fillRect(0, 0, canvas.width, (canvas.height - viewport.height) / 2); // Top
+        context.fillRect(0, canvas.height - (canvas.height - viewport.height) / 2, canvas.width, (canvas.height - viewport.height) / 2); // Bottom
+    }
+
+    // Render pdf port.
+    async function renderPdfForm(file) {
+        let pdfViewer = document.getElementById("pdf-viewer");
+        if (pdfViewer === null) {
+            sleep(1000).then(() => renderPdfForm(file));
+            return;
+        }
+
+        let pdf = await openPdf(file);
+
+        let canvases = document.getElementById('pdf-viewer').getElementsByTagName("canvas");
+        let promises = [];
+        for (let i = 0; i < pdf.numPages; i++) {
+            promises.push(renderPdf(pdf, i + 1, canvases[i]));
+        }
+
+        for (let i = pdf.numPages; i < canvases.length; i++) {
+            canvases[i].style.border = "none";
+        }
+
+        await Promise.all(promises);
+        app.ports.renderFinishedPort.send(null);
+    }
+
+    // Async/await support for canvas toBlob method.
+    function canvasToBlob(canvas) {
+        return new Promise(resolve => {
+            canvas.toBlob(function () {
+                resolve(...arguments);
+            });
+        });
+    }
 
     ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     //////////////////////////////////////////////// PORTS DEFINITION /////////////////////////////////////////////////
@@ -1519,6 +1773,51 @@ function init(node, flags) {
         app.ports[name + "Port"].subscribe(fn);
     }
 
+    // Folds or unfolds a foldable.
+    makePort("toggleFoldable", async function (id) {
+        let foldable = document.getElementById("foldable-" + id);
+        let icon = document.getElementById("foldable-icon-" + id);
+        let folded = foldable.style.height === "0px";
+        if (folded) {
+            let curHeight = foldable.clientHeight + "px";
+
+            // Set element to natural height.
+            let transitionBak = foldable.style.transition;
+            foldable.style.transition = "none";
+            foldable.style.height = "auto";
+            await new Promise(requestAnimationFrame);
+
+            // Get the height of the element.
+            let newHeight = foldable.clientHeight + "px";
+
+            // Reset the height of the element.
+            foldable.style.height = curHeight;
+            foldable.style.transition = transitionBak;
+            await new Promise(requestAnimationFrame);
+
+            // Set the height of the element.
+            foldable.style.height = newHeight;
+            icon.style.rotate = "90deg";
+
+            // Wait for the transition to end.
+            foldable.addEventListener('transitionend', event => {
+                if (foldable.style.height === newHeight) {
+                    foldable.style.height = "auto";
+                }
+            }, { once: true });
+
+        } else {
+            // Get the height of the element.
+            let curHeight = foldable.clientHeight + "px";
+            foldable.style.height = curHeight;
+            await new Promise(requestAnimationFrame);
+
+            // Fold the element.
+            foldable.style.height = 0;
+            icon.style.rotate = "0deg";
+        }
+    });
+
     // Scroll to the element view.
     makePort("scrollIntoView", args => {
         let scrollVal = args[0];
@@ -1533,16 +1832,117 @@ function init(node, flags) {
     });
 
     // Open the file select popup.
+    makePort("selectFile", function (mimes) {
+        let input = document.createElement('input');
+        input.type = 'file';
+        input.accept = mimes.join(',');
+        input.onchange = async function (e) {
+            let file = e.target.files[0];
+            app.ports.receiveSelectedFile.send([file.type.startsWith('video/') ? "request" : "confirm", file]);
+        };
+        input.click();
+    });
+
+    // Open the file select popup.
     makePort("select", function (args) {
         let project = args[0];
         let mimes = args[1];
         let input = document.createElement('input');
         input.type = 'file';
         input.accept = mimes.join(',');
-        input.onchange = function (e) {
-            app.ports.selected.send([project, e.target.files[0]]);
+        input.onchange = async function (e) {
+            let file = e.target.files[0];
+            if (file.type === "application/zip") {
+                app.ports.selected.send([project, file, -1]);
+            } else {
+                let pdf = await openPdf(file);
+                app.ports.selected.send([project, file, pdf.numPages]);
+            }
         };
         input.click();
+    });
+
+    // Computes and returns the number of pages of a pdf file.
+    makePort("requestNbPages", async (arg) => {
+        let pdf = await openPdf(arg);
+        app.ports.receivedNbPages.send(pdf.numPages);
+    });
+
+    // Send a pdf to the server as a zip of webps.
+    makePort("sendPdf", async args => {
+        let changeSlide = args[0];
+        let file = args[1][0];
+        let pages = args[1][1];
+        let capsule = args[2];
+
+        let response;
+
+        if (file.type === "application/pdf") {
+
+            let pdf = await openPdf(file);
+            let canvases = document.getElementById('pdf-viewer').getElementsByTagName("canvas");
+
+            if (changeSlide.type === "replace") {
+
+                let canvas = canvases[pages[0] - 1];
+                let content = await canvasToBlob(canvas);
+                let url = "/api/replace-slide/" + capsule + "/" + changeSlide.slide.uuid + "/-1";
+                let request = new PolymnyRequest("POST", url, content, null);
+                response = await request.send();
+
+            } else {
+
+
+                let content;
+                if (pages.length === 1) {
+
+                    let canvas = canvases[pages[0] - 1];
+                    content = await canvasToBlob(canvas);
+
+                } else {
+
+                    // Convert pdf to webps and zip them.
+                    let zip = new JSZip();
+                    for (let i = 0; i < pages.length; i++) {
+                        let blob = await canvasToBlob(canvases[pages[i] - 1]);
+                        await zip.file(i + ".webp", blob);
+                    }
+
+                    // Generate zip.
+                    content = await zip.generateAsync({ type: "blob" });
+                }
+
+                // Send post request.
+                let url;
+                if (changeSlide.type === "add") {
+                    url = "/api/add-slide/" + capsule + "/" + changeSlide.page + "/-1";
+                } else if (changeSlide.type === "addGos") {
+                    url = "/api/add-gos/" + capsule + "/" + changeSlide.page + "/-1";
+                } else if (changeSlide.type === "newCapsule") {
+                    url = "/api/new-capsule/" + changeSlide.project + "/" + changeSlide.capsule;
+                }
+                let request = new PolymnyRequest("POST", url, content, null);
+                // TODO: what to do with the response?
+                response = await request.send();
+
+            }
+
+        } else if (file.type.startsWith('image/')) {
+
+            let url;
+            if (changeSlide.type === "replace") {
+                url = "/api/replace-slide/" + capsule + "/" + changeSlide.slide.uuid + "/-1";
+            } else if (changeSlide.type === "add") {
+                url = "/api/add-slide/" + capsule + "/" + changeSlide.page + "/-1";
+            } else {
+                url = "/api/add-gos/" + capsule + "/" + changeSlide.page + "/-1";
+            }
+
+            let request = new PolymnyRequest("POST", url, file, null);
+            response = await request.send();
+        }
+
+        app.ports.pdfSentPort.send(JSON.parse(response.responseText));
     });
 
     // Copies the string to the clipboard.
@@ -1675,36 +2075,64 @@ function init(node, flags) {
     });
 
     // Plays or pauses the extra resource in acquisition phase.
-    makePort("playExtra", function() {
+    makePort("playExtra", async function () {
         let extra = document.getElementById('extra');
         if (extra === null) {
             return;
         }
 
+        let currentTime = Math.round(window.performance.now() - (currentEvents.length === 0 ? 0 : currentEvents[0].time))
+
+        let extraEvent = {
+            "time": currentTime
+        };
+
         if (extra.paused) {
-            extra.play();
+            await extra.play();
+            extraEvent.ty = "play";
         } else if (extra.ended) {
             extra.currentTime = 0;
-            extra.play();
+            await extra.play();
+            extraEvent.ty = "play";
         } else {
-            extra.pause();
+            await extra.pause();
+            extraEvent.ty = "pause";
+        }
+        extraEvent.extra_time = Math.round(extra.currentTime * 1000);
+
+        if (recording) {
+            currentEvents.push(extraEvent);
         }
     });
 
     // Seeks at a certain position in the extra video.
-    makePort("seekExtra", function(x) {
+    makePort("seekExtra", function (x) {
         let extra = document.getElementById('extra');
         if (extra === null) {
             return;
         }
 
         extra.currentTime = x;
+
+        if (recording) {
+            let currentTime = Math.round(window.performance.now() - (currentEvents.length === 0 ? 0 : currentEvents[0].time))
+
+            let extraEvent = {
+                "ty": "pause",
+                "time": currentTime,
+                "extra_time": Math.round(extra.currentTime * 1000)
+            };
+            currentEvents.push(extraEvent);
+        }
+
+        extra.removeEventListener('seeked', seekedEventRegister);
+        extra.addEventListener('seeked', seekedEventRegister);
     });
 
     makePort("detectDevices", (args) => detectDevices(true, args[0], args[1]));
     makePort("bindDevice", bindDevice);
     makePort("unbindDevice", unbindDevice);
-    makePort("registerEvent", registerEvent);
+    makePort("registerEvents", registerEvents);
     makePort("startRecording", startRecording);
     makePort("stopRecording", stopRecording);
     makePort("startPointerRecording", startPointerRecording);
@@ -1715,4 +2143,5 @@ function init(node, flags) {
     makePort("clearPointerAndCallbacks", () => clearRequested = true);
     makePort("exportCapsule", exportCapsule);
     makePort("importCapsule", importCapsule);
+    makePort("renderPdfForm", renderPdfForm);
 }

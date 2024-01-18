@@ -346,6 +346,10 @@ msgstr "This change will destroy some of your records"
 msgid "Steps.Preparation.addSlideWillBreak"
 msgstr "Adding a slide to this grain will destroy the associated record"
 
+#. A sentence that explains that adding an extra video will destroy the record.
+msgid "Steps.Preparation.addExtraResourceWillBreak"
+msgstr "Adding an external video to this grain will destry the associated record"
+
 #. A sentence that explains that deleting a slide will destroy the record.
 msgid "Steps.Preparation.deleteSlideWillBreak"
 msgstr "Deleting this slide will destroy the record associated to the grain"
@@ -414,6 +418,10 @@ msgstr "Go to the next slide"
 #. When editing the prompt, go the the previous slide.
 msgid "Steps.Preparation.goToPreviousSlide"
 msgstr "Go to the previous slide"
+
+#. Pointer
+msgid "Steps.Acquisition.pointer"
+msgstr "Pointer"
 
 #. Step of video and audio acquisition.
 msgid "Steps.Acquisition.acquisition"
@@ -565,6 +573,10 @@ msgstr "Use video"
 msgid "Tasks.productionCapsule"
 msgstr "Production"
 
+#. GOS production task.
+msgid "Tasks.productionGos"
+msgstr "GOS production"
+
 #. Can't use video because there is no record.
 msgid "Steps.Production.cantUseVideoBecauseNoRecord"
 msgstr "You cannot use the video because there is no record for this grain"
@@ -665,6 +677,10 @@ msgstr "Video has not been produced yet"
 msgid "Steps.Production.downloadVideo"
 msgstr "Download video"
 
+#. More settings.
+msgid "Steps.Production.moreSettings"
+msgstr "More settings"
+
 #. This grain uses the default production options.
 msgid "Steps.Production.grainUsesDefaultProductionOptions"
 msgstr "This grain uses the capsule's default production options"
@@ -684,6 +700,10 @@ msgstr "Publication"
 #. Verb to publish the video.
 msgid "Steps.Publication.publish"
 msgstr "Publish"
+
+#. Premium feature.
+msgid "Steps.Production.premiumFeature"
+msgstr "This is a premium feature: only users with a premium account can use it."
 
 #. Currently publishing video.
 msgid "Steps.Publication.publishingVideo"
@@ -787,6 +807,14 @@ msgstr "Users"
 #. Admin can invite a user.
 msgid "Admin.inviteUser"
 msgstr "Invite a user"
+
+#. Registration date.
+msgid "Admin.registrationDate"
+msgstr "Registration date"
+
+#. Last visit.
+msgid "Admin.lastVisit"
+msgstr "Last visit"
 
 #. An error to the user.
 msgid "Ui.error"
@@ -999,6 +1027,10 @@ msgstr "License GNU Affero V3"
 #. The shorthand for the license of the code.
 msgid "Config.licenseShort"
 msgstr "AGPLv3"
+
+#. Display the record circle.
+msgid "Ui.recordCircle"
+msgstr "Display the record circle"
 
 #. Welcome on Polymny.
 msgid "Intro.welcomeOnPolymny"

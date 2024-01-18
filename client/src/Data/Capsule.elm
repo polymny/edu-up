@@ -1,7 +1,7 @@
 module Data.Capsule exposing
-    ( Capsule, emptyCapsule, assetPath, iframeHtml, Collaborator
-    , Gos, gosFromSlides, WebcamSettings(..), defaultWebcamSettings, setWebcamSettingsSize, Fade, defaultFade, Anchor(..), Event, EventType(..), eventTypeToString, updateGos
-    , Slide, slidePath, videoPath, recordPath, pointerPath, gosVideoPath, deleteSlide, deleteExtra, updateSlide, updateSlideInGos
+    ( Capsule, emptyCapsule, assetPath, miniaturePath, iframeHtml, Collaborator
+    , Gos, gosFromSlides, emptyGos, WebcamSettings(..), defaultWebcamSettings, setWebcamSettingsSize, Fade, defaultFade, Anchor(..), Event, EventType(..), eventTypeToString, updateGos
+    , Slide, emptySlide, slidePath, extraPath, capsuleVideoPath, recordPath, pointerPath, gosVideoPath, deleteSlide, deleteExtra, updateSlide, updateSlideInGos
     , Record, emptyRecord
     , encodeCapsule, encodeGos, encodeWebcamSettings, encodeFade, encodeRecord, encodeEvent, encodeEventType, encodeAnchor
     , encodeSlide, encodePair
@@ -15,17 +15,17 @@ module Data.Capsule exposing
 
 # The capsule type
 
-@docs Capsule, emptyCapsule, assetPath, iframeHtml, Collaborator
+@docs Capsule, emptyCapsule, assetPath, miniaturePath, iframeHtml, Collaborator
 
 
 # The GoS (Group of Slides) type
 
-@docs Gos, gosFromSlides, WebcamSettings, defaultWebcamSettings, setWebcamSettingsSize, Fade, defaultFade, Anchor, Event, EventType, eventTypeToString, updateGos
+@docs Gos, gosFromSlides, emptyGos, WebcamSettings, defaultWebcamSettings, setWebcamSettingsSize, Fade, defaultFade, Anchor, Event, EventType, eventTypeToString, updateGos
 
 
 ## Slides
 
-@docs Slide, slidePath, videoPath, recordPath, pointerPath, gosVideoPath, deleteSlide, deleteExtra, updateSlide, updateSlideInGos
+@docs Slide, emptySlide, slidePath, extraPath, capsuleVideoPath, recordPath, pointerPath, gosVideoPath, deleteSlide, deleteExtra, updateSlide, updateSlideInGos
 
 
 ## Records
@@ -66,6 +66,7 @@ type alias Capsule =
     , collaborators : List Collaborator
     , videoUploaded : Data.TaskStatus
     , produced : Data.TaskStatus
+    , producedHash : Maybe String
     , published : Data.TaskStatus
     , privacy : Data.Privacy
     , structure : List Gos
@@ -75,6 +76,9 @@ type alias Capsule =
     , diskUsage : Int
     , duration : Int
     , soundTrack : Maybe SoundTrack
+    , outputPresign : Maybe String
+    , soundTrackPresign : Maybe String
+    , hidden : Bool
     }
 
 
@@ -106,6 +110,7 @@ emptyCapsule =
     , collaborators = []
     , videoUploaded = Data.Idle
     , produced = Data.Idle
+    , producedHash = Nothing
     , published = Data.Idle
     , privacy = Data.Private
     , structure = []
@@ -115,6 +120,9 @@ emptyCapsule =
     , diskUsage = 0
     , duration = 0
     , soundTrack = Nothing
+    , outputPresign = Nothing
+    , soundTrackPresign = Nothing
+    , hidden = False
     }
 
 
@@ -145,9 +153,11 @@ encodeCapsuleAll capsule =
         , ( "privacy", Data.encodePrivacy capsule.privacy )
         , ( "prompt_subtitles", Encode.bool capsule.promptSubtitles )
         , ( "webcam_settings", encodeWebcamSettings capsule.defaultWebcamSettings )
-        , ( "structure", Encode.list encodeGos capsule.structure )
+        , ( "structure", Encode.list encodeGosAll capsule.structure )
         , ( "sound_track", Maybe.map encodeSoundTrack capsule.soundTrack |> Maybe.withDefault Encode.null )
         , ( "produced", Encode.bool (capsule.produced /= Data.Idle) )
+        , ( "output_presign", Maybe.withDefault Encode.null <| Maybe.map Encode.string capsule.outputPresign )
+        , ( "sound_track_presign", Maybe.withDefault Encode.null <| Maybe.map Encode.string capsule.soundTrackPresign )
         ]
 
 
@@ -163,6 +173,7 @@ decodeCapsule =
         |> andMap (Decode.field "users" (Decode.list decodeCollaborator))
         |> andMap (Decode.field "video_uploaded" Data.decodeTaskStatus)
         |> andMap (Decode.field "produced" Data.decodeTaskStatus)
+        |> andMap (Decode.maybe (Decode.field "produced_hash" Decode.string))
         |> andMap (Decode.field "published" Data.decodeTaskStatus)
         |> andMap (Decode.field "privacy" Data.decodePrivacy)
         |> andMap (Decode.field "structure" (Decode.list decodeGos))
@@ -172,6 +183,9 @@ decodeCapsule =
         |> andMap (Decode.field "disk_usage" Decode.int)
         |> andMap (Decode.field "duration_ms" Decode.int)
         |> andMap (Decode.maybe (Decode.field "sound_track" decodeSoundTrack))
+        |> andMap (Decode.maybe (Decode.field "output_presign" Decode.string))
+        |> andMap (Decode.maybe (Decode.field "sound_track_presign" Decode.string))
+        |> andMap (Decode.succeed False)
 
 
 {-| Returns an asset path from its capsule and basename.
@@ -208,6 +222,20 @@ type alias Slide =
     { uuid : String
     , extra : Maybe String
     , prompt : String
+    , presign : Maybe String
+    , extraPresign : Maybe String
+    }
+
+
+{-| An empty slide.
+-}
+emptySlide : Slide
+emptySlide =
+    { uuid = ""
+    , extra = Nothing
+    , prompt = ""
+    , presign = Nothing
+    , extraPresign = Nothing
     }
 
 
@@ -222,38 +250,86 @@ encodeSlide slide =
         ]
 
 
+{-| JSON encoder for all data of a slide.
+-}
+encodeSlideAll : Slide -> Encode.Value
+encodeSlideAll slide =
+    Encode.object
+        [ ( "uuid", Encode.string slide.uuid )
+        , ( "extra", Maybe.map Encode.string slide.extra |> Maybe.withDefault Encode.null )
+        , ( "prompt", Encode.string slide.prompt )
+        , ( "presign", Maybe.withDefault Encode.null <| Maybe.map Encode.string slide.presign )
+        , ( "extra_presign", Maybe.withDefault Encode.null <| Maybe.map Encode.string slide.extra )
+        ]
+
+
 {-| JSON decoder for a slide.
 -}
 decodeSlide : Decoder Slide
 decodeSlide =
-    Decode.map3 Slide
+    Decode.map5 Slide
         (Decode.field "uuid" Decode.string)
         (Decode.maybe (Decode.field "extra" Decode.string))
         (Decode.field "prompt" Decode.string)
+        (Decode.maybe (Decode.field "presign" Decode.string))
+        (Decode.maybe (Decode.field "extra_presign" Decode.string))
 
 
 {-| Returns the path to the image of the slide.
 -}
 slidePath : Capsule -> Slide -> String
 slidePath capsule slide =
-    assetPath capsule (slide.uuid ++ ".png")
+    case slide.presign of
+        Just u ->
+            u
+
+        Nothing ->
+            assetPath capsule (slide.uuid ++ ".webp")
+
+
+{-| Returns the path to the extra resource of a slide.
+-}
+extraPath : Capsule -> Slide -> Maybe String
+extraPath capsule slide =
+    case ( slide.extraPresign, slide.extra ) of
+        ( Just url, _ ) ->
+            Just url
+
+        ( _, Just extra ) ->
+            Just <| assetPath capsule (extra ++ ".mp4")
+
+        _ ->
+            Nothing
 
 
 {-| Returns the path the the video record of a gos.
 -}
 recordPath : Capsule -> Gos -> Maybe String
 recordPath capsule gos =
-    gos.record
-        |> Maybe.andThen (\x -> Just <| assetPath capsule (x.uuid ++ ".webm"))
+    case ( Maybe.andThen .presign gos.record, gos.record ) of
+        ( Just url, _ ) ->
+            Just url
+
+        ( _, Just record ) ->
+            Just <| assetPath capsule (record.uuid ++ ".webm")
+
+        _ ->
+            Nothing
 
 
 {-| Returns the path to the pointer record of a gos.
 -}
 pointerPath : Capsule -> Gos -> Maybe String
 pointerPath capsule gos =
-    gos.record
-        |> Maybe.andThen .pointerUuid
-        |> Maybe.andThen (\x -> Just <| assetPath capsule (x ++ ".webm"))
+    case ( Maybe.andThen .pointerPresign gos.record, Maybe.andThen .pointerUuid gos.record ) of
+        ( Just url, _ ) ->
+            Just url
+
+        ( _, Just pointerUuid ) ->
+            Just <| assetPath capsule (pointerUuid ++ ".webm")
+
+        _ ->
+            Nothing
 
 
 {-| Returns the path of the first record of a capsule.
@@ -264,7 +340,7 @@ firstRecordPath capsule =
         gos :: goss ->
             case gos.record of
                 Just r ->
-                    Just <| assetPath capsule (r.uuid ++ ".webm")
+                    recordPath capsule gos
 
                 Nothing ->
                     firstRecordPath { capsule | structure = goss }
@@ -278,13 +354,35 @@ firstRecordPath capsule =
 Returns Nothing if the capsule hasn't been produced yet.
 
 -}
-videoPath : Capsule -> Maybe String
-videoPath capsule =
-    if capsule.produced == Data.Done then
-        Just ("/data/" ++ capsule.id ++ "/output.mp4")
+capsuleVideoPath : Capsule -> Maybe String
+capsuleVideoPath capsule =
+    case ( capsule.produced, capsule.producedHash, capsule.outputPresign ) of
+        ( Data.Done, _, Just url ) ->
+            Just url
 
-    else
-        Nothing
+        ( Data.Done, Just hash, _ ) ->
+            Just ("/data/" ++ capsule.id ++ "/produced/capsule.mp4?v=" ++ hash)
+
+        _ ->
+            Nothing
+
+
+{-| Returns the path to the video file of a produced GOS.
+
+Return Nothing if the GOS hasn't been produced yet.
+
+-}
+gosVideoPath : Capsule -> Gos -> Maybe String
+gosVideoPath capsule gos =
+    case ( gos.produced, gos.producedHash, gos.producedPresign ) of
+        ( Data.Done, _, Just url ) ->
+            Just url
+
+        ( Data.Done, Just hash, _ ) ->
+            Just ("/data/" ++ capsule.id ++ "/produced/" ++ hash ++ ".mp4")
+
+        _ ->
+            Nothing
 
 
 {-| Returns the path to the track of a capsule.
@@ -294,8 +392,11 @@ Returns Nothing if the capsule doesn't have a track.
 -}
 trackPath : Capsule -> Maybe String
 trackPath capsule =
-    case capsule.soundTrack of
-        Just track ->
+    case ( capsule.soundTrackPresign, capsule.soundTrack ) of
+        ( Just url, Just _ ) ->
+            Just url
+
+        ( _, Just track ) ->
             Just <| assetPath capsule (track.uuid ++ ".m4a")
 
         _ ->
@@ -315,13 +416,6 @@ trackPreviewPath capsule =
 
         _ ->
             Nothing
-
-
-{-| Returns the path to a specific gos that has been produced independantly from the video.
--}
-gosVideoPath : Capsule -> Int -> String
-gosVideoPath capsule gos =
-    assetPath capsule "tmp/gos_" ++ String.fromInt gos ++ ".mp4"
 
 
 {-| Removes a specific slide from a capsule.
@@ -357,7 +451,7 @@ deleteExtra slide capsule =
     let
         gosMapper : Gos -> Gos
         gosMapper gos =
-            { gos | slides = List.map (\x -> Utils.tern (x.uuid == slide.uuid) { x | extra = Nothing } x) gos.slides }
+            { gos | record = Nothing, slides = List.map (\x -> Utils.tern (x.uuid == slide.uuid) { x | extra = Nothing } x) gos.slides }
     in
     { capsule | structure = List.map gosMapper capsule.structure }
 
@@ -393,7 +487,25 @@ type alias Record =
     { uuid : String
     , pointerUuid : Maybe String
     , size : Maybe ( Int, Int )
+    , presign : Maybe String
+    , pointerPresign : Maybe String
+    , miniaturePresign : Maybe String
     }
+
+
+{-| Returns the path to the miniature of the record.
+-}
+miniaturePath : Capsule -> Record -> Maybe String
+miniaturePath capsule record =
+    case ( record.size, record.miniaturePresign ) of
+        ( Nothing, _ ) ->
+            Nothing
+
+        ( _, Just url ) ->
+            Just url
+
+        _ ->
+            Just <| assetPath capsule (record.uuid ++ ".webp")
 
 
 {-| Empty record.
@@ -403,6 +515,9 @@ emptyRecord =
     { uuid = ""
     , pointerUuid = Nothing
     , size = Nothing
+    , presign = Nothing
+    , pointerPresign = Nothing
+    , miniaturePresign = Nothing
     }
 
 
@@ -422,14 +537,35 @@ encodeRecord record =
             Encode.null
 
 
+{-| JSON encoder for all of record data.
+-}
+encodeRecordAll : Maybe Record -> Encode.Value
+encodeRecordAll record =
+    case record of
+        Just r ->
+            Encode.object
+                [ ( "uuid", Encode.string r.uuid )
+                , ( "pointer_uuid", r.pointerUuid |> Maybe.map Encode.string |> Maybe.withDefault Encode.null )
+                , ( "size", r.size |> Maybe.map (encodePair Encode.int) |> Maybe.withDefault Encode.null )
+                , ( "presign", Maybe.withDefault Encode.null <| Maybe.map Encode.string r.presign )
+                , ( "pointer_presign", Maybe.withDefault Encode.null <| Maybe.map Encode.string r.pointerPresign )
+                ]
+
+        Nothing ->
+            Encode.null
+
+
 {-| JSON decoder for record.
 -}
 decodeRecord : Decoder Record
 decodeRecord =
-    Decode.map3 Record
+    Decode.map6 Record
         (Decode.field "uuid" Decode.string)
         (Decode.maybe (Decode.field "pointer_uuid" Decode.string))
         (Decode.maybe (Decode.field "size" (decodePair Decode.int)))
+        (Decode.maybe (Decode.field "presign" Decode.string))
+        (Decode.maybe (Decode.field "pointer_presign" Decode.string))
+        (Decode.maybe (Decode.field "miniature_presign" Decode.string))
 
 
 {-| JSON encoder for any pair.
@@ -455,9 +591,8 @@ type EventType
     | NextSlide
     | PreviousSlide
     | NextSentence
-    | Play
-    | Pause
-    | Seek Int
+    | Play Int
+    | Pause Int
     | Stop
     | End
 
@@ -479,14 +614,11 @@ eventTypeToString e =
         NextSentence ->
             "next_sentence"
 
-        Play ->
+        Play _ ->
             "play"
 
-        Pause ->
+        Pause _ ->
             "pause"
-
-        Seek _ ->
-            "seek"
 
         Stop ->
             "stop"
@@ -522,17 +654,17 @@ decodeEventType extraTime =
                     ( "next_sentence", _ ) ->
                         Decode.succeed NextSentence
 
+                    ( "play", Just e ) ->
+                        Decode.succeed (Play e)
+
                     ( "play", _ ) ->
-                        Decode.succeed Play
+                        Decode.fail "Play event must have an extra time"
+
+                    ( "pause", Just e ) ->
+                        Decode.succeed (Pause e)
 
                     ( "pause", _ ) ->
-                        Decode.succeed Pause
-
-                    ( "seek", Just e ) ->
-                        Decode.succeed (Seek e)
-
-                    ( "seek", _ ) ->
-                        Decode.fail <| "Can't decode Seek event without extra time"
+                        Decode.fail "Pause event must have an extra time"
 
                     ( "stop", _ ) ->
                         Decode.succeed Stop
@@ -558,11 +690,18 @@ type alias Event =
 encodeEvent : Event -> Encode.Value
 encodeEvent e =
     case e.ty of
-        Seek time ->
+        Play extraTime ->
             Encode.object
                 [ ( "ty", encodeEventType e.ty )
                 , ( "time", Encode.int e.time )
-                , ( "extra_time", Encode.int time )
+                , ( "extra_time", Encode.int extraTime )
+                ]
+
+        Pause extraTime ->
+            Encode.object
+                [ ( "ty", encodeEventType e.ty )
+                , ( "time", Encode.int e.time )
+                , ( "extra_time", Encode.int extraTime )
                 ]
 
         _ ->
@@ -845,6 +984,24 @@ type alias Gos =
     , events : List Event
     , webcamSettings : Maybe WebcamSettings
     , fade : Fade
+    , producedHash : Maybe String
+    , producedPresign : Maybe String
+    , produced : Data.TaskStatus
+    }
+
+
+{-| This is an empty GOS.
+-}
+emptyGos : Gos
+emptyGos =
+    { record = Nothing
+    , slides = []
+    , events = []
+    , webcamSettings = Nothing
+    , fade = defaultFade
+    , producedHash = Nothing
+    , producedPresign = Nothing
+    , produced = Data.Idle
     }
 
 
@@ -865,6 +1022,31 @@ encodeGos gos =
                     Encode.null
           )
         , ( "fade", encodeFade gos.fade )
+        , ( "produced_hash", Maybe.map Encode.string gos.producedHash |> Maybe.withDefault Encode.null )
+        , ( "produced", Data.encodeTaskStatus gos.produced )
+        ]
+
+
+{-| JSON encoder for all data of gos.
+-}
+encodeGosAll : Gos -> Encode.Value
+encodeGosAll gos =
+    Encode.object
+        [ ( "record", encodeRecordAll gos.record )
+        , ( "slides", Encode.list encodeSlideAll gos.slides )
+        , ( "events", Encode.list encodeEvent gos.events )
+        , ( "webcam_settings"
+          , case gos.webcamSettings of
+                Just ws ->
+                    encodeWebcamSettings ws
+
+                Nothing ->
+                    Encode.null
+          )
+        , ( "fade", encodeFade gos.fade )
+        , ( "produced_hash", Maybe.map Encode.string gos.producedHash |> Maybe.withDefault Encode.null )
+        , ( "produced", Data.encodeTaskStatus gos.produced )
+        , ( "produced_presign", Maybe.withDefault Encode.null <| Maybe.map Encode.string gos.producedPresign )
         ]
 
 
@@ -872,12 +1054,15 @@ encodeGos gos =
 -}
 decodeGos : Decoder Gos
 decodeGos =
-    Decode.map5 Gos
+    Decode.map8 Gos
         (Decode.maybe (Decode.field "record" decodeRecord))
         (Decode.field "slides" (Decode.list decodeSlide))
         (Decode.field "events" (Decode.list decodeEvent))
         (Decode.maybe (Decode.field "webcam_settings" decodeWebcamSettings))
         (Decode.field "fade" decodeFade)
+        (Decode.maybe (Decode.field "produced_hash" Decode.string))
+        (Decode.maybe (Decode.field "produced_presign" Decode.string))
+        (Decode.field "produced" Data.decodeTaskStatus)
 
 
 {-| Creates a gos from only slides.
@@ -889,6 +1074,9 @@ gosFromSlides slides =
     , events = []
     , webcamSettings = Nothing
     , fade = defaultFade
+    , producedHash = Nothing
+    , producedPresign = Nothing
+    , produced = Data.Idle
     }
 
 

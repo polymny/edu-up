@@ -8,6 +8,8 @@ use rocket::figment::Figment;
 use rocket::Phase;
 
 use crate::mailer::Mailer;
+use crate::openid::OpenId;
+use crate::s3;
 
 fn default_premium_only() -> bool {
     false
@@ -29,12 +31,8 @@ fn default_videos_path() -> PathBuf {
     PathBuf::from("videos")
 }
 
-fn default_socket_listen() -> String {
-    String::from("localhost:8001")
-}
-
 fn default_socket_root() -> String {
-    String::from("/")
+    String::from("ws://localhost:8000/ws")
 }
 
 fn default_video_root() -> String {
@@ -144,10 +142,6 @@ pub struct Config {
     #[serde(default = "default_videos_path")]
     pub videos_path: PathBuf,
 
-    /// The url to which the websocket server must listen.
-    #[serde(default = "default_socket_listen")]
-    pub socket_listen: String,
-
     /// The root of the socket server.
     #[serde(default = "default_socket_root")]
     pub socket_root: String,
@@ -172,7 +166,6 @@ pub struct Config {
     pub mailer_enabled: bool,
 
     /// The mailer, if any.
-    #[serde(flatten)]
     pub mailer: Option<Mailer>,
 
     /// The version of the crate.
@@ -190,11 +183,11 @@ pub struct Config {
     #[serde(default = "default_harsh_length")]
     pub harsh_length: usize,
 
-    /// Pdf to png conversion : target size.
+    /// Pdf to webp conversion : target size.
     #[serde(default = "default_pdf_target_size")]
     pub pdf_target_size: String,
 
-    /// Pdf to png conversion : target density.
+    /// Pdf to webp conversion : target density.
     #[serde(default = "default_pdf_target_density")]
     pub pdf_target_density: String,
 
@@ -216,6 +209,22 @@ pub struct Config {
     /// Disk quota for admin account
     #[serde(default = "default_quota_disk_admin")]
     pub quota_disk_admin: usize,
+
+    /// Configuration for object storage.
+    pub s3: Option<s3::Config>,
+
+    /// Configuration for RabbitMQ.
+    pub rabbitmq: Option<RabbitMq>,
+
+    /// Configuration for OpenID.
+    pub openid: Option<OpenId>,
+}
+
+/// Configuration for Rabbit MQ.
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct RabbitMq {
+    /// The url of the server.
+    pub url: String,
 }
 
 impl Config {
@@ -227,10 +236,6 @@ impl Config {
     /// Creates the config struct from the rocket figment.
     pub fn from_figment(figment: &Figment) -> Config {
         let mut config: Config = figment.extract().expect("Failed to parse config");
-
-        if !config.mailer_enabled {
-            config.mailer = None;
-        }
 
         if let Some(mailer) = config.mailer.as_mut() {
             mailer.root = config.root.clone();

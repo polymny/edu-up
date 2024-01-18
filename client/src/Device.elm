@@ -394,7 +394,7 @@ encodeRecordingSettings device =
         ( Nothing, Just _ ) ->
             Encode.object
                 [ ( "audioBitsPerSecond", Encode.int 128000 )
-                , ( "mimeType", Encode.string "video/webm;codecs=opus" )
+                , ( "mimeType", Encode.string "audio/webm;codecs=opus" )
                 ]
 
         ( Just ( _, resolution ), Nothing ) ->

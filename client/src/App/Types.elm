@@ -19,6 +19,7 @@ module App.Types exposing
 -}
 
 import Acquisition.Types as Acquisition
+import Admin.Types as Admin
 import Browser
 import Collaboration.Types as Collaboration
 import Config exposing (Config)
@@ -35,6 +36,7 @@ import Production.Types as Production
 import Profile.Types as Profile
 import Publication.Types as Publication
 import RemoteData exposing (RemoteData)
+import Route exposing (Route)
 import Unlogged.Types as Unlogged
 import Url
 
@@ -87,6 +89,7 @@ type Page
     | Options (Options.Model String)
     | Collaboration (Collaboration.Model String)
     | Profile Profile.Model
+    | Admin Admin.Model
     | Error Error.Model
     | Courses (Courses.Model Int)
 
@@ -120,12 +123,14 @@ type Msg
     | CollaborationMsg Collaboration.Msg
     | ProfileMsg Profile.Msg
     | CoursesMsg Courses.Msg
+    | AdminMsg Admin.Msg
     | ConfigMsg Config.Msg
     | WebSocketMsg WebSocketMsg
     | OnUrlChange Url.Url
     | InternalUrl Url.Url
     | ExternalUrl String
     | CopyString String
+    | AddExternalCapsule Data.Capsule Route
     | Logout
     | LoggedOut
 
@@ -136,7 +141,8 @@ orError : (RemoteData a b -> Msg) -> RemoteData a b -> Msg
 orError toMsg result =
     case result of
         RemoteData.Failure _ ->
-            ConfigMsg Config.HasError
+            -- ConfigMsg Config.HasError
+            Noop
 
         _ ->
             toMsg result
@@ -150,7 +156,8 @@ the bool indicates whether the task is finished.
 -}
 type WebSocketMsg
     = CapsuleUpdated Data.Capsule
-    | ProductionProgress String Float Bool
+    | CapsuleProductionProgress String Float Bool
+    | GosProductionProgress String Int Float Bool
     | PublicationProgress String Float Bool
     | ExtraRecordProgress String String Float Bool
 

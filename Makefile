@@ -2,19 +2,15 @@ ifeq ("$(ELM)","")
 	ELM=elm
 endif
 
-ifeq ("$(ELMLIVE)", "")
-	ELMLIVE=elm-live
-endif
-
 ifeq ("$(UGLIFYJS)", "")
 	UGLIFYJS=uglifyjs
 endif
 
 BUILD_DIR=server/dist/js/
 
-all: client-dev old-client-dev unlogged-dev server-dev
+all: client-dev unlogged-dev server-dev
 
-release: client-release old-client-release unlogged-release server-release
+release: client-release unlogged-release server-release
 
 .NOTPARALLEL: client-dev client-release client-watch
 
@@ -24,7 +20,7 @@ client-dev: client/src/** server/dist/js/ports.js client/src/Strings.elm
 	@cd client && $(ELM) make src/Main.elm --output ../$(BUILD_DIR)/main.js
 	@/bin/echo -e "\033[32;1m    Finished\033[0m client (debug)"
 
-client-release: client/src/** client/src/Strings.elm
+client-release: client/src/** server/dist/js/ports.js client/src/Strings.elm
 	@/bin/echo -e "\033[32;1m   Compiling\033[0m client (release)"
 	@mkdir -p $(BUILD_DIR)
 	@cd client && $(ELM) make src/Main.elm --optimize --output ../$(BUILD_DIR)/main.tmp.js
@@ -34,7 +30,7 @@ client-release: client/src/** client/src/Strings.elm
 client-watch:
 	@/bin/echo -e "\033[32;1m    Watching\033[0m client"
 	@mkdir -p $(BUILD_DIR)
-	@cd client && $(ELMLIVE) src/Main.elm -p 7000 -d ../$(BUILD_DIR)/ -- --output ../$(BUILD_DIR)/main.js
+	@mars-server -w client -i client/elm-stuff -i client/src/Strings.elm -c client-dev
 
 unlogged-dev: client/src/**
 	@/bin/echo -e "\033[32;1m   Compiling\033[0m unlogged (debug)"
@@ -79,27 +75,8 @@ server/dist/js/ports.js: client/ports.js
 	@mkdir -p server/dist/js
 	@cp client/ports.js server/dist/js/ports.js
 
-multiview:
-	@rm -rf $$HOME/.npmbin/lib/node_modules/multiview/cli/multiview_main.sock && multiview [ sh -c "cd server && unbuffer cargo run" ] [ unbuffer make client-watch ] [ unbuffer make old-client-watch ]
+tileview:
+	@tileview sh -c "cd server && unbuffer cargo run" :: sh -c "killall mars-server 2>/dev/null; unbuffer make client-watch"
 
-old-client-dev: old-client/src/**
-	@/bin/echo -e "\033[32;1m   Compiling\033[0m old-client (debug)"
-	@cp old-client/src/Log.elm.debug old-client/src/Log.elm
-	@mkdir -p $(BUILD_DIR)
-	@cd old-client && $(ELM) make src/OldMain.elm --output ../$(BUILD_DIR)/old-main.js
-	@/bin/echo -e "\033[32;1m    Finished\033[0m old-client (debug)"
-
-old-client-release: old-client/src/**
-	@/bin/echo -e "\033[32;1m   Compiling\033[0m old-client (release)"
-	@cp old-client/src/Log.elm.release old-client/src/Log.elm
-	@mkdir -p $(BUILD_DIR)
-	@cd old-client && $(ELM) make src/OldMain.elm --optimize --output ../$(BUILD_DIR)/old-main.tmp.js
-	@cd old-client && $(UGLIFYJS) ../$(BUILD_DIR)/old-main.tmp.js --compress 'pure_funcs="F2,F3,F4,F5,F6,F7,F8,F9,A2,A3,A4,A5,A6,A7,A8,A9",pure_getters,keep_fargs=false,unsafe_comps,unsafe' | uglifyjs --mangle > ../$(BUILD_DIR)/old-main.min.js
-	@/bin/echo -e "\033[32;1m    Finished\033[0m old-client (release)"
-
-old-client-watch:
-	@/bin/echo -e "\033[32;1m    Watching\033[0m old-client"
-	@cp old-client/src/Log.elm.debug old-client/src/Log.elm
-	@mkdir -p $(BUILD_DIR)
-	@cd old-client && $(ELMLIVE) src/OldMain.elm -p 7001 -d ../$(BUILD_DIR)/ -- --output ../$(BUILD_DIR)/old-main.js
-
+tileview-worker:
+	@tileview sh -c "cd server && unbuffer cargo run" :: sh -c "cd server && unbuffer cargo run --bin worker" :: sh -c "killall mars-server 2>/dev/null; unbuffer make client-watch"

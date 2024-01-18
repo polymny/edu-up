@@ -1,11 +1,11 @@
 module Data.User exposing
-    ( User, decodeUser, isPremium, addCapsule, deleteCapsule, updateUser, sortProjects, getCapsuleById, Project, toggleProject, compareCapsule, compareProject
+    ( User, decodeUser, isPremium, addCapsule, deleteCapsule, updateUser, sortProjects, getCapsuleById, Project, toggleProject, compareCapsule, compareProject, fixPresign
     , addAssignment, getAssignmentById, getGroupById, updateAssignment
     )
 
 {-| This module contains all the data related to the user.
 
-@docs User, decodeUser, isPremium, addCapsule, deleteCapsule, updateUser, sortProjects, getCapsuleById, Project, toggleProject, compareCapsule, compareProject
+@docs User, decodeUser, isPremium, addCapsule, deleteCapsule, updateUser, sortProjects, getCapsuleById, Project, toggleProject, compareCapsule, compareProject, fixPresign
 
 -}
 
@@ -267,7 +267,7 @@ updateUser capsule user =
         capsuleMapper : Capsule -> ( Capsule, Bool )
         capsuleMapper c =
             if c.id == capsule.id then
-                ( capsule, True )
+                fixPresign c capsule
 
             else
                 ( c, False )
@@ -341,3 +341,138 @@ getAssignmentById id user =
         |> List.concatMap .assignments
         |> List.filter (\x -> x.id == id)
         |> List.head
+
+
+{-| Updates the capsule but keeping the old presign values to avoid redownloading the same files over and over again.
+-}
+fixPresign : Capsule -> Capsule -> Capsule
+fixPresign old new =
+    { new
+        | outputPresign = fixMaybePresignUrl old.outputPresign new.outputPresign
+        , soundTrackPresign = fixMaybePresignUrl old.soundTrackPresign new.soundTrackPresign
+        , structure = fixPresignStructure old.structure new.structure
+    }
+
+
+{-| Fix presign structure.
+-}
+fixPresignStructure : List Data.Gos -> List Data.Gos -> List Data.Gos
+fixPresignStructure old new =
+    let
+        oldSlides =
+            List.concatMap .slides old
+
+        gosMapper : Data.Gos -> Data.Gos
+        gosMapper current =
+            let
+                slides =
+                    fixPresignSlides oldSlides current.slides
+
+                producedPresign =
+                    case List.filter (\x -> x.producedHash == current.producedHash) old |> List.head |> Maybe.map .producedPresign of
+                        Just presign ->
+                            presign
+
+                        _ ->
+                            current.producedPresign
+
+                record =
+                    case current.record of
+                        Just r ->
+                            let
+                                ( presign, miniaturePresign ) =
+                                    case List.filter (\x -> Maybe.map .uuid x.record == Just r.uuid) old of
+                                        h :: _ ->
+                                            -- h.record can't be null because its .uuid == Just r.uuid
+                                            ( Maybe.andThen .presign h.record, Maybe.andThen .miniaturePresign h.record )
+
+                                        _ ->
+                                            ( r.presign, r.miniaturePresign )
+
+                                pointerPresign =
+                                    case List.filter (\x -> Maybe.map .pointerUuid x.record == Just r.pointerUuid) old of
+                                        h :: _ ->
+                                            -- h.record can't be null because its .uuid == Just r.uuid
+                                            Maybe.andThen .pointerPresign h.record
+
+                                        _ ->
+                                            r.pointerPresign
+                            in
+                            Just { r | presign = presign, pointerPresign = pointerPresign, miniaturePresign = miniaturePresign }
+
+                        _ ->
+                            Nothing
+            in
+            { current | record = record, slides = slides, producedPresign = producedPresign }
+    in
+    List.map gosMapper new
+
+
+{-| Fix presign slides.
+-}
+fixPresignSlides : List Data.Slide -> List Data.Slide -> List Data.Slide
+fixPresignSlides old new =
+    let
+        slideMapper : Data.Slide -> Data.Slide
+        slideMapper current =
+            let
+                presign =
+                    case List.filter (\x -> x.uuid == current.uuid) old of
+                        h :: _ ->
+                            h.presign
+
+                        _ ->
+                            current.presign
+
+                extraPresign =
+                    case List.filter (\x -> x.extra == current.extra) old of
+                        h :: _ ->
+                            h.extraPresign
+
+                        _ ->
+                            current.extraPresign
+            in
+            { current | presign = presign, extraPresign = extraPresign }
+    in
+    List.map slideMapper new
+
+
+{-| Helper to easy fix maybe presign urls.
+-}
+fixMaybePresignUrl : Maybe String -> Maybe String -> Maybe String
+fixMaybePresignUrl old new =
+    case ( old, new ) of
+        ( Just o, Just n ) ->
+            Just <| fixPresignUrl o n
+
+        ( _, Just n ) ->
+            Just n
+
+        _ ->
+            Nothing
+
+
+{-| Checks two presign URLs and return the correct one.
+-}
+fixPresignUrl : String -> String -> String
+fixPresignUrl old new =
+    let
+        -- This is the old file url
+        oldBaseUrl =
+            List.head <| String.split "?" old
+
+        -- This is the new file url
+        newBaseUrl =
+            List.head <| String.split "?" new
+
+        answerUrl =
+            -- If the old file url and new file url are the same, it is the same file, so we want to preserve the
+            -- oldPresign
+            if oldBaseUrl == newBaseUrl then
+                old
+
+            else
+                -- Otherwise, it means that it is a new file and we should update it
+                new
+    in
+    answerUrl

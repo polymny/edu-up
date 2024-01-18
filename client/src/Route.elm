@@ -1,4 +1,7 @@
-module Route exposing (Route(..), toUrl, compareTab, fromUrl, push)
+module Route exposing
+    ( Route(..), toUrl, compareTab, fromUrl, push
+    , AdminRoute(..)
+    )
 
 {-| This module contains the type definition of the routes of the app, and the utility functions to manipulate routes.
 
@@ -8,6 +11,7 @@ module Route exposing (Route(..), toUrl, compareTab, fromUrl, push)
 
 import Browser.Navigation
 import Url
+import Utils
 
 
 {-| This type represents the different routes of our application.
@@ -23,8 +27,17 @@ type Route
     | Profile
     | Courses (Maybe Int)
     | Assignment Int
+    | Admin AdminRoute
     | NotFound
     | Custom String
+
+
+{-| This type represents the different administration routes.
+-}
+type AdminRoute
+    = Users Int
+    | Capsules Int
+    | UserDetails Int
 
 
 {-| Converts the route to the string representing the URL of the route. The NotFound route will redirect to Home.
@@ -64,6 +77,15 @@ toUrl route =
 
         Assignment id ->
             "/assignments/" ++ String.fromInt id
+
+        Admin (Users i) ->
+            "/admin/users/" ++ String.fromInt i
+
+        Admin (UserDetails i) ->
+            "/admin/user/" ++ String.fromInt i
+
+        Admin (Capsules i) ->
+            "/admin/capsules/" ++ String.fromInt i
 
         NotFound ->
             "/"
@@ -138,6 +160,21 @@ fromUrl url =
                 |> Maybe.map (\i -> Assignment i)
                 |> Maybe.withDefault (Courses Nothing)
 
+        "admin" :: "users" :: p :: [] ->
+            String.toInt p
+                |> Maybe.map (\x -> Utils.tern (x >= 0) (Admin (Users x)) NotFound)
+                |> Maybe.withDefault NotFound
+
+        "admin" :: "capsules" :: p :: [] ->
+            String.toInt p
+                |> Maybe.map (\x -> Utils.tern (x >= 0) (Admin (Capsules x)) NotFound)
+                |> Maybe.withDefault NotFound
+
+        "admin" :: "user" :: p :: [] ->
+            String.toInt p
+                |> Maybe.map (\x -> Admin (UserDetails x))
+                |> Maybe.withDefault NotFound
+
         _ ->
             NotFound
 
@@ -175,6 +212,12 @@ compareTab r1 r2 =
             True
 
         ( Assignment _, Assignment _ ) ->
+            True
+
+        ( Admin (Users _), Admin (Users _) ) ->
+            True
+
+        ( Admin (Capsules _), Admin (Capsules _) ) ->
             True
 
         _ ->

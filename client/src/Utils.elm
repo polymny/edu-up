@@ -1,14 +1,15 @@
-module Utils exposing (Confirmation(..), andMap, get, headAndTail, tern, regroup, regroupFixed, checkEmail, passwordStrength, passwordStrengthElement, minPasswordStrength)
+module Utils exposing (Confirmation(..), encodeConfirm, decodeConfirm, andMap, get, headAndTail, tern, regroup, regroupFixed, checkEmail, passwordStrength, passwordStrengthElement, minPasswordStrength)
 
 {-| This module contains useful functions.
 
-@docs Confirmation, andMap, get, headAndTail, tern, regroup, regroupFixed, checkEmail, passwordStrength, passwordStrengthElement, minPasswordStrength
+@docs Confirmation, encodeConfirm, decodeConfirm, andMap, get, headAndTail, tern, regroup, regroupFixed, checkEmail, passwordStrength, passwordStrengthElement, minPasswordStrength
 
 -}
 
 import Element exposing (Element)
 import Element.Background as Background
 import Json.Decode as Decode exposing (Decoder)
+import Json.Encode as Encode
 import Ui.Colors as Colors
 import Ui.Utils as Ui
 
@@ -19,6 +20,44 @@ type Confirmation
     = Request
     | Confirm
     | Cancel
+
+
+{-| Encodes a confirmation.
+-}
+encodeConfirm : Confirmation -> Encode.Value
+encodeConfirm confirm =
+    Encode.string <|
+        case confirm of
+            Request ->
+                "request"
+
+            Confirm ->
+                "confirm"
+
+            Cancel ->
+                "cancel"
+
+
+{-| Decodes a confirmation.
+-}
+decodeConfirm : Decoder Confirmation
+decodeConfirm =
+    Decode.string
+        |> Decode.andThen
+            (\x ->
+                case x of
+                    "request" ->
+                        Decode.succeed Request
+
+                    "confirm" ->
+                        Decode.succeed Confirm
+
+                    "cancel" ->
+                        Decode.succeed Cancel
+
+                    _ ->
+                        Decode.fail <| "Unknown confrirmation: " ++ x
+            )
 
 
 {-| This function allows to chain Decode.map and avoid being limited by the max map value in Decode.mapX.

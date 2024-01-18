@@ -347,6 +347,10 @@ msgstr "Ce déplacement va détruire certains de vos enregistrements"
 msgid "Steps.Preparation.addSlideWillBreak"
 msgstr "Ajouter un slide à ce grain va détruire l'enregistrement associé"
 
+#. A sentence that explains that adding an extra video will destroy the record.
+msgid "Steps.Preparation.addExtraResourceWillBreak"
+msgstr "Ajouter une vidéo externe à ce grain va détruire l'enregistrement associé"
+
 #. A sentence that explains that deleting a slide will destroy the record.
 msgid "Steps.Preparation.deleteSlideWillBreak"
 msgstr "Supprimer ce slide va détruire l'enregistrement associé au grain"
@@ -416,6 +420,10 @@ msgstr "Aller à la planche suivante"
 #. When editing the prompt, go the the previous slide.
 msgid "Steps.Preparation.goToPreviousSlide"
 msgstr "Aller à la planche précedente"
+
+#. Pointer
+msgid "Steps.Acquisition.pointer"
+msgstr "Pointeur"
 
 #. Step of video and audio acquisition.
 msgid "Steps.Acquisition.acquisition"
@@ -667,6 +675,10 @@ msgstr "La vidéo n'a pas encore été produite"
 msgid "Steps.Production.downloadVideo"
 msgstr "Télécharger la vidéo"
 
+#. More settings.
+msgid "Steps.Production.moreSettings"
+msgstr "Plus d'options"
+
 #. This grain uses the default production options.
 msgid "Steps.Production.grainUsesDefaultProductionOptions"
 msgstr "Ce grain utilise les options de production par défaut de la capsule"
@@ -678,6 +690,10 @@ msgstr "Changez les options ci-dessous pour changer les options pour grain en pa
 #. Go to options tab to change options for all grains.
 msgid "Steps.Production.changeOptionsInOptionsTab"
 msgstr "Allez dans l'onglet options pour changer les options pour tous les grains de la capsule"
+
+#. Premium feature.
+msgid "Steps.Production.premiumFeature"
+msgstr "Fonctionnalité premium : seul les utilisateurs ayant un abonnement premium peuvent utiliser cette fonctionnalité"
 
 #. Step of video publication.
 msgid "Steps.Publication.publication"
@@ -790,6 +806,14 @@ msgstr "Utilisateurs"
 #. Admin can invite a user.
 msgid "Admin.inviteUser"
 msgstr "Inviter un utilisateur"
+
+#. Registration date.
+msgid "Admin.registrationDate"
+msgstr "Date d'inscription"
+
+#. Last visit.
+msgid "Admin.lastVisit"
+msgstr "Dernière visite"
 
 #. An error to the user.
 msgid "Ui.error"
@@ -1002,6 +1026,10 @@ msgstr "Licence GNU Affero V3"
 #. The shorthand for the license of the code.
 msgid "Config.licenseShort"
 msgstr "AGPLv3"
+
+#. Display the record circle.
+msgid "Ui.recordCircle"
+msgstr "Afficher le cercle de centrage de l'enregistrement"
 
 #. Welcome on Polymny.
 msgid "Intro.welcomeOnPolymny"
@@ -1318,6 +1346,10 @@ msgstr "Import capsule"
 #. Capsule production task.
 msgid "Tasks.productionCapsule"
 msgstr "Production"
+
+#. GOS production task.
+msgid "Tasks.productionGos"
+msgstr "Production grain"
 
 #. Capsule publication task.
 msgid "Tasks.publicationCapsule"

@@ -1,0 +1,3 @@
+[submodule "hls"]
+	path = hls
+	url = git@github.com:polymny/hls

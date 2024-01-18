@@ -19,6 +19,8 @@ use rocket::State as S;
 use crate::config::Config;
 use crate::db::capsule::Role;
 use crate::db::user::{Plan, User};
+use crate::s3::S3;
+use crate::storage::Storage;
 use crate::templates::index_html;
 use crate::{Db, Error, HashId, Lang, Result};
 
@@ -118,6 +120,11 @@ pub fn global_flags(config: &S<Config>, lang: &Lang) -> Value {
             "home": config.home,
             "registrationDisabled": config.registration_disabled,
             "requestLanguage": lang,
+            "openid": config
+                .openid
+                .as_ref()
+                .map(|x| x.to_json())
+                .unwrap_or(Value::Null),
         },
     })
 }
@@ -135,10 +142,11 @@ pub async fn index<'a>(
     db: Db,
     user: Option<User>,
     lang: Lang,
+    storage: &S<Storage>,
 ) -> Cors<Either<Html<String>, Redirect>> {
     let (json, redirect) = match user {
         Some(ref user) => (
-            Some(user.to_json(&db).await),
+            Some(user.to_json(&db, storage.inner().s3()).await),
             (config.premium_only != (user.plan >= Plan::PremiumLvl1)) && user.plan != Plan::Admin,
         ),
         None => (None, false),
@@ -168,10 +176,11 @@ pub async fn index_without_cors(
     db: Db,
     user: Option<User>,
     lang: Lang,
+    s3: Option<&S3>,
 ) -> Either<Html<String>, Redirect> {
     let (json, redirect) = match user {
         Some(ref user) => (
-            Some(user.to_json(&db).await),
+            Some(user.to_json(&db, s3).await),
             (config.premium_only != (user.plan >= Plan::PremiumLvl1)) && user.plan != Plan::Admin,
         ),
         None => (None, false),
@@ -206,8 +215,9 @@ pub async fn preparation(
     user: Option<User>,
     _id: String,
     lang: Lang,
+    storage: &S<Storage>,
 ) -> Either<Html<String>, Redirect> {
-    index_without_cors(config, db, user, lang).await
+    index_without_cors(config, db, user, lang, storage.inner().s3()).await
 }
 
 /// The route to the acquisition of a capsule.
@@ -219,8 +229,9 @@ pub async fn acquisition(
     _id: String,
     _gos_id: u64,
     lang: Lang,
+    storage: &S<Storage>,
 ) -> Either<Html<String>, Redirect> {
-    index_without_cors(config, db, user, lang).await
+    index_without_cors(config, db, user, lang, storage.inner().s3()).await
 }
 
 /// The route to the production of a capsule.
@@ -232,8 +243,9 @@ pub async fn production(
     _id: String,
     _gos_id: u64,
     lang: Lang,
+    storage: &S<Storage>,
 ) -> Either<Html<String>, Redirect> {
-    index_without_cors(config, db, user, lang).await
+    index_without_cors(config, db, user, lang, storage.inner().s3()).await
 }
 
 /// The route to the publication of a capsule.
@@ -244,8 +256,9 @@ pub async fn publication(
     user: Option<User>,
     _id: String,
     lang: Lang,
+    storage: &S<Storage>,
 ) -> Either<Html<String>, Redirect> {
-    index_without_cors(config, db, user, lang).await
+    index_without_cors(config, db, user, lang, storage.inner().s3()).await
 }
 
 /// The route to the publication of a capsule.
@@ -256,8 +269,9 @@ pub async fn options(
     user: Option<User>,
     _id: String,
     lang: Lang,
+    storage: &S<Storage>,
 ) -> Either<Html<String>, Redirect> {
-    index_without_cors(config, db, user, lang).await
+    index_without_cors(config, db, user, lang, storage.inner().s3()).await
 }
 
 /// The route to the profile page.
@@ -267,8 +281,9 @@ pub async fn profile(
     db: Db,
     user: Option<User>,
     lang: Lang,
+    storage: &S<Storage>,
 ) -> Either<Html<String>, Redirect> {
-    index_without_cors(config, db, user, lang).await
+    index_without_cors(config, db, user, lang, storage.inner().s3()).await
 }
 
 /// The route to the courses page.
@@ -301,8 +316,9 @@ pub async fn admin_dashboard(
     db: Db,
     user: Option<User>,
     lang: Lang,
+    storage: &S<Storage>,
 ) -> Either<Html<String>, Redirect> {
-    index_without_cors(config, db, user, lang).await
+    index_without_cors(config, db, user, lang, storage.inner().s3()).await
 }
 
 /// The route to the admin users page.
@@ -313,8 +329,9 @@ pub async fn admin_users(
     user: Option<User>,
     _page: String,
     lang: Lang,
+    storage: &S<Storage>,
 ) -> Either<Html<String>, Redirect> {
-    index_without_cors(config, db, user, lang).await
+    index_without_cors(config, db, user, lang, storage.inner().s3()).await
 }
 
 /// The route to the admin user page.
@@ -325,8 +342,9 @@ pub async fn admin_user(
     user: Option<User>,
     _id: String,
     lang: Lang,
+    storage: &S<Storage>,
 ) -> Either<Html<String>, Redirect> {
-    index_without_cors(config, db, user, lang).await
+    index_without_cors(config, db, user, lang, storage.inner().s3()).await
 }
 
 /// The route to the admin capsules page.
@@ -337,8 +355,9 @@ pub async fn admin_capsules(
     user: Option<User>,
     _page: String,
     lang: Lang,
+    storage: &S<Storage>,
 ) -> Either<Html<String>, Redirect> {
-    index_without_cors(config, db, user, lang).await
+    index_without_cors(config, db, user, lang, storage.inner().s3()).await
 }
 
 /// The route to the settings of a capsule.
@@ -349,8 +368,9 @@ pub async fn capsule_settings(
     user: Option<User>,
     _id: String,
     lang: Lang,
+    storage: &S<Storage>,
 ) -> Either<Html<String>, Redirect> {
-    index_without_cors(config, db, user, lang).await
+    index_without_cors(config, db, user, lang, storage.inner().s3()).await
 }
 
 /// The route to the collaborators of a capsule.
@@ -361,8 +381,9 @@ pub async fn capsule_collaborators(
     user: Option<User>,
     _id: String,
     lang: Lang,
+    storage: &S<Storage>,
 ) -> Either<Html<String>, Redirect> {
-    index_without_cors(config, db, user, lang).await
+    index_without_cors(config, db, user, lang, storage.inner().s3()).await
 }
 
 /// The 404 catcher.
@@ -372,7 +393,7 @@ pub async fn not_found<'a>(request: &'_ Request<'a>) -> Either<Html<String>, Red
     let config = request.guard::<&S<Config>>().await.unwrap();
     let user = Option::<User>::from_request(request).await.unwrap();
     let lang = Lang::from_request(request).await.unwrap();
-    index_without_cors(config, db, user, lang).await
+    index_without_cors(config, db, user, lang, None).await
 }
 
 /// A struct for managing the partial content range header.
@@ -421,7 +442,7 @@ impl<'r> FromRequest<'r> for PartialContent {
         };
 
         if !header.starts_with("bytes=") {
-            return Outcome::Failure((Status::NotImplemented, ()));
+            return Outcome::Error((Status::NotImplemented, ()));
         }
 
         let ranges = header[6..]
@@ -444,7 +465,7 @@ impl<'r> FromRequest<'r> for PartialContent {
 
         let ranges = match ranges {
             Some(r) => r,
-            None => return Outcome::Failure((Status::BadRequest, ())),
+            None => return Outcome::Error((Status::BadRequest, ())),
         };
 
         Outcome::Success(PartialContent { ranges })
@@ -545,32 +566,9 @@ pub async fn assets<'a>(
         .await
 }
 
-/// The route for the output video of a capsule that requires authorization.
-#[get("/<capsule_id>/output.mp4")]
-pub async fn produced_video<'a>(
-    capsule_id: HashId,
-    user: User,
-    config: &S<Config>,
-    db: Db,
-    partial_content: PartialContent,
-) -> Result<PartialContentResponse<'a>> {
-    let (_, _) = user
-        .get_capsule_with_permission(*capsule_id, Role::Read, &db)
-        .await?;
-
-    partial_content
-        .respond(
-            config
-                .data_path
-                .join(format!("{}", *capsule_id))
-                .join("output.mp4"),
-        )
-        .await
-}
-
 /// The route for temporary static files that require authorization.
-#[get("/<capsule_id>/tmp/<path..>")]
-pub async fn tmp<'a>(
+#[get("/<capsule_id>/produced/<path..>")]
+pub async fn produced<'a>(
     capsule_id: HashId,
     path: PathBuf,
     user: User,
@@ -587,7 +585,7 @@ pub async fn tmp<'a>(
             config
                 .data_path
                 .join(format!("{}", *capsule_id))
-                .join("tmp")
+                .join("produced")
                 .join(path),
         )
         .await

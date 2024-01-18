@@ -1,0 +1,139 @@
+[default]
+
+# Adresse d'écoute du serveur
+address = "0.0.0.0"
+
+# Port d'écoute du serveur
+port = 8000
+
+# URL du portail si elle existe
+{% if env.HOME_URI %}home = "{{ env.HOME_URI | default(value="http://localhost:8000") }}"{% else %}# home = "http://polymny.example.com"{% endif %}
+
+# URL de base du serveur
+root = "{{ env.ROOT_URI | default(value="http://localhost:8000") }}"
+
+# Nom de domaine pour le stockage du cookie d'authentification
+cookie_domain = "{{ env.COOKIE_DOMAIN | default(value="localhost") }}"
+
+# Clé pour le chiffrement des cookies (peut être générée par `openssl rand -base64 32`)
+secret_key = "{{ env.COOKIE_SECRET_KEY | default(value="tobedefined") }}"
+
+# Adresse de connexion du serveur websocket
+socket_root = "{{ env.SOCKET_ROOT | default(value="ws://localhost:8000/ws") }}"
+
+# URL de base pour le streaming vidéo
+video_root = {% if env.VIDEO_ROOT %}"{{ env.VIDEO_ROOT }}"{% elif env.ROOT_URI %}{{ env.ROOT_URI ~ "/v" }}{% else %}"http://localhost:8000/v"{% endif %}
+
+# Chemin de stockage des données
+data_path = "{{ env.DATA_PATH | default(value="/data") }}"
+
+# Chemin du fichier de log
+log_path = "/dev/stdout"
+
+# Sel pour la transformation des IDs des capsules en chemin (ex: capsule 1 -> https://polymny.studio/capsule/preparation/0JpzP/)
+harsh_secret = "{{ env.HARSH_SECRET | default(value="tobedefined") }}"
+
+# Longueur minimale des IDs des capsules
+harsh_length = 5
+
+# Nombre de process concurrents lancés simultanément
+concurrent_tasks = 16
+
+# Utilisation de l'encodeur video GPU
+use_nvenc = false
+
+# Si l'instance est réservée aux comptes premium, passer cette valeur à true
+premium_only = {{ env.PREMIUM_ONLY | default(value="false") }}
+
+{% if env.PREMIUM_ONLY %}
+# Si l'instance est réservée aux comptes premium, indiquer l'URL de l'instance pour les comptes gratuits
+other_host = "{{ env.OTHER_HOST }}"
+{% endif %}
+
+{% if env.MAILER_HOST %}
+# Configuration du mailer
+# Dans le cas d'une connexion via OpenID, le mailer est inutile : il ne sert pour l'instant qu'à vérifier les adresse
+# e-mail lors de l'inscription / le changement d'adresse, ou si le mot de passe a été oublié.
+# De plus, l'envoi de mail sans credentials n'est pas encore supporté par l'application, donc il faut laisser le mailer
+# désactivé.
+[default.mailer]
+
+# Les comptes ont besoin d'être activés via un clic sur un lien reçu par mail
+require_email_validation = {{ env.REQUIRE_EMAIL_VALIDATION | default(value="true") }}
+
+# Hôte SMTP pour l'envoi des mails
+host = "{{ env.MAILER_HOST }}"
+
+# Nom d'utilisateur de la boite mail d'envoi
+username = "{{ env.MAILER_USERNAME }}"
+
+# Mot de passe de la boite mail d'envoi
+password = "{{ env.MAILER_PASSWORD }}"
+{% endif %}
+
+{% if env.S3_ENDPOINT %}
+# Configuration du stockage S3
+[default.s3]
+
+# Id de la clé à utiliser
+key_id = "{{ env.S3_KEY }}"
+
+# Secret de la clé à utiliser
+secret = "{{ env.S3_SECRET }}"
+
+# Region du object storage
+region = "{{ env.S3_REGION }}"
+
+# Endpoint auquel se connecter
+endpoint = "{{ env.S3_ENDPOINT }}"
+
+# Nom du bucket
+bucket = "{{ env.S3_BUCKET }}"
+{% endif %}
+
+{% if env.RABBITMQ_URI %}
+# Configuration de RabbitMQ
+[default.rabbitmq]
+
+# Url du serveur
+url = "{{ env.RABBITMQ_URI }}"
+{% endif %}
+
+{% if env.OPENID_ROOT %}
+# Configuration de OpenID
+[default.openid]
+
+# OpenID est la seule méthode d'authentification
+only = true
+
+# URL permettant à Polymny de contacter le serveur OpenId
+root = "{{ env.OPENID_ROOT }}"
+
+# URL publique du serveur OpenId
+public_root = "{{ env.OPENID_PUBLIC_ROOT }}"
+
+# Client ID pour l'authentification
+client = "{{ env.OPENID_CLIENT }}"
+
+# Secret pour l'authentification
+secret = "{{ env.OPENID_SECRET }}"
+
+# Clé publique pour validation du JSON Web Token
+validation = "{{ env.OPENID_VALIDATION }}"
+
+{% if env.OPENID_HTTP_PROXY %}
+# Proxy pour les requetes HTTP (si nécessaire)
+http_proxy = "{{ env.OPENID_HTTP_PROXY }}"
+{% endif %}
+
+{% if env.OPENID_HTTPS_PROXY %}
+# Proxy pour les requetes HTTPS (si nécessaire)
+https_proxy = "{{ env.OPENID_HTTPS_PROXY }}"
+{% endif %}
+
+{% endif %}
+
+[default.databases.database]
+
+# URL de connexion à la base de données (postgres://username:password@host/dbname)
+url = "{{ env.POSTGRES_URI | default(value="postgres://polymny:polymny@postgres:5432/polymny") }}"

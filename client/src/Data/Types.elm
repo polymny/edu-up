@@ -2,7 +2,7 @@ module Data.Types exposing
     ( SortBy, encodeSortBy, decodeSortBy, SortKey(..), encodeSortKey, decodeSortKey
     , Plan(..), decodePlan
     , Role(..), encodeRole, roleFromString, decodeRole, ParticipantRole(..), decodeGroupRole, groupRoleFromString
-    , TaskStatus(..), isRunning, decodeTaskStatus
+    , TaskStatus(..), isRunning, decodeTaskStatus, encodeTaskStatus
     , Privacy(..), encodePrivacy, decodePrivacy
     , encodeParticipantRole
     )
@@ -27,7 +27,7 @@ module Data.Types exposing
 
 # Task status
 
-@docs TaskStatus, isRunning, decodeTaskStatus
+@docs TaskStatus, isRunning, decodeTaskStatus, encodeTaskStatus
 
 
 # Capsules privacy
@@ -246,9 +246,12 @@ decodeRole =
 {-| This type represents the different states in which a server task can be.
 -}
 type TaskStatus
-    = Idle
+    = TaskDisabled
+    | Idle
     | Running (Maybe Float)
     | Done
+    | Waiting
+    | Failed
 
 
 {-| JSON decoder for the task status.
@@ -268,9 +271,44 @@ decodeTaskStatus =
                     "done" ->
                         Decode.succeed Done
 
-                    x ->
-                        Decode.fail <| "Unknown task status: " ++ x
+                    "failed" ->
+                        Decode.succeed Failed
+
+                    "disabled" ->
+                        Decode.succeed TaskDisabled
+
+                    "waiting" ->
+                        Decode.succeed Waiting
+
+                    _ ->
+                        Decode.fail <| "Unknown task status: " ++ str
             )
+
+
+{-| Json encoder for the task status.
+-}
+encodeTaskStatus : TaskStatus -> Encode.Value
+encodeTaskStatus status =
+    Encode.string
+        (case status of
+            Idle ->
+                "idle"
+
+            Running _ ->
+                "running"
+
+            Done ->
+                "done"
+
+            Failed ->
+                "failed"
+
+            TaskDisabled ->
+                "disabled"
+
+            Waiting ->
+                "waiting"
+        )
 
 
 {-| Checks if a task status is running.

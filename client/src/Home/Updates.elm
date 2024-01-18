@@ -49,7 +49,7 @@ update msg model =
                         |> select projectName
                     )
 
-                Home.SlideUploadReceived project fileValue file ->
+                Home.SlideUploadReceived project fileValue pages ->
                     case fileValue.mime of
                         "application/pdf" ->
                             let
@@ -64,19 +64,14 @@ update msg model =
                                         |> List.reverse
                                         |> String.join "."
 
-                                newPage =
-                                    RemoteData.Loading Nothing
-                                        |> NewCapsule.init model.config.clientState.lang project name
-                                        |> App.NewCapsule
+                                ( newPage, newCmd ) =
+                                    NewCapsule.init model.config.clientState.lang
+                                        project
+                                        name
+                                        fileValue
+                                        pages
                             in
-                            ( { model | page = newPage }
-                            , Api.uploadSlideShow
-                                { project = projectName
-                                , fileValue = fileValue
-                                , file = file
-                                , toMsg = \x -> App.NewCapsuleMsg (NewCapsule.SlideUpload x)
-                                }
-                            )
+                            ( { model | page = App.NewCapsule newPage }, Cmd.map App.NewCapsuleMsg newCmd )
 
                         "application/zip" ->
                             if Data.isPremium model.user then
@@ -455,7 +450,7 @@ port selectPort : ( Maybe String, List String ) -> Cmd msg
 
 {-| Subscription to receive the selected file.
 -}
-port selected : (( Maybe String, Decode.Value ) -> msg) -> Sub msg
+port selected : (( Maybe String, Decode.Value, Int ) -> msg) -> Sub msg
 
 
 {-| Keyboard shortcuts of the home page.
@@ -506,10 +501,10 @@ subs : Sub App.Msg
 subs =
     Sub.batch
         [ selected
-            (\( p, x ) ->
-                case ( Decode.decodeValue FileValue.decoder x, Decode.decodeValue File.decoder x ) of
-                    ( Ok y, Ok z ) ->
-                        App.HomeMsg (Home.SlideUploadReceived p y z)
+            (\( p, x, pages ) ->
+                case Decode.decodeValue FileValue.decoder x of
+                    Ok y ->
+                        App.HomeMsg (Home.SlideUploadReceived p y pages)
 
                     _ ->
                         App.Noop

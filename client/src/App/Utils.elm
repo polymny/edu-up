@@ -11,6 +11,9 @@ doesn't allow circular module imports...
 -}
 
 import Acquisition.Types as Acquisition
+import Admin.Types as Admin
+import Admin.Utils as Admin
+import Api.Capsule as Api
 import App.Types as App
 import Browser.Navigation
 import Collaboration.Types as Collaboration
@@ -27,6 +30,7 @@ import Preparation.Types as Preparation
 import Production.Types as Production
 import Profile.Types as Profile
 import Publication.Types as Publication
+import RemoteData
 import Route exposing (Route)
 import Task
 import Time
@@ -72,25 +76,45 @@ init flags url key =
                             u.projects
                                 |> List.map .capsules
                                 |> List.concat
-                                |> List.filterMap
+                                |> List.map
                                     (\x ->
                                         let
-                                            -- Returns Nothing if there is no task running on the capsule, or a function
-                                            -- that creates the task from its id.
-                                            returnValue : Maybe (Config.TaskId -> Config.Task)
-                                            returnValue =
-                                                case ( x.produced, x.published ) of
-                                                    ( Data.Running _, _ ) ->
-                                                        Just (\a -> Config.Production a x.id)
-
-                                                    ( _, Data.Running _ ) ->
-                                                        Just (\a -> Config.Publication a x.id)
+                                            capsuleProduction : List (Config.TaskId -> Config.Task)
+                                            capsuleProduction =
+                                                case x.produced of
+                                                    Data.Running _ ->
+                                                        [ \a -> Config.CapsuleProduction a x.id ]
 
                                                     _ ->
-                                                        Nothing
+                                                        []
+
+                                            publication : List (Config.TaskId -> Config.Task)
+                                            publication =
+                                                case x.published of
+                                                    Data.Running _ ->
+                                                        [ \a -> Config.Publication a x.id ]
+
+                                                    _ ->
+                                                        []
+
+                                            gosProductions : List (Config.TaskId -> Config.Task)
+                                            gosProductions =
+                                                x.structure
+                                                    |> List.foldr
+                                                        (\y acc ->
+                                                            case y.produced of
+                                                                Data.Running _ ->
+                                                                    (\a -> Config.GosProduction a x.id 1) :: acc
+
+                                                                -- TODO: Replace 1 by GOS id
+                                                                _ ->
+                                                                    acc
+                                                        )
+                                                        []
                                         in
-                                        returnValue
+                                        capsuleProduction ++ publication ++ gosProductions
                                     )
+                                |> List.concat
                                 |> List.indexedMap
                                     (\i makeTaskFromId ->
                                         { task = makeTaskFromId i
@@ -119,7 +143,16 @@ init flags url key =
                     )
 
                 ( Ok s, Ok _, Ok Nothing ) ->
-                    ( App.Unlogged <| Unlogged.init clientState.lang False s.root (Just url)
+                    let
+                        openid =
+                            case s.authMethods of
+                                [ Config.OpenId { root, client } ] ->
+                                    Just ( root, client )
+
+                                _ ->
+                                    Nothing
+                    in
+                    ( App.Unlogged <| Unlogged.init clientState.lang False s.root (Just url) openid
                     , Cmd.none
                     )
 
@@ -203,6 +236,23 @@ capsuleAndGos user page =
 -}
 pageFromRoute : Config -> User -> Route -> ( App.Page, Cmd App.Msg )
 pageFromRoute _ user route =
+    let
+        fetchCapsuleIfAdmin : Route -> String -> Cmd App.Msg
+        fetchCapsuleIfAdmin r id =
+            if user.plan == Data.Admin && Data.getCapsuleById id user == Nothing then
+                Api.getCapsule id
+                    (\x ->
+                        case x of
+                            RemoteData.Success c ->
+                                App.AddExternalCapsule c r
+
+                            _ ->
+                                App.Noop
+                    )
+
+            else
+                Cmd.none
+    in
     case route of
         Route.Home ->
             ( App.Home Home.init, Cmd.none )
@@ -212,27 +262,27 @@ pageFromRoute _ user route =
                 |> Maybe.map Preparation.init
                 |> Maybe.map App.Preparation
                 |> (Maybe.withDefault <| App.Error <| Error.init Error.NotFound)
-            , Cmd.none
+            , fetchCapsuleIfAdmin (Route.Preparation id) id
             )
 
         Route.Acquisition id gos ->
             Data.getCapsuleById id user
                 |> Maybe.andThen (Acquisition.init gos)
                 |> Maybe.map (\( a, b ) -> ( App.Acquisition a, Cmd.map App.AcquisitionMsg b ))
-                |> Maybe.withDefault ( App.Error <| Error.init Error.NotFound, Cmd.none )
+                |> Maybe.withDefault ( App.Error <| Error.init Error.NotFound, fetchCapsuleIfAdmin (Route.Acquisition id gos) id )
 
         Route.Production id gos ->
             Data.getCapsuleById id user
                 |> Maybe.andThen (Production.init gos)
                 |> Maybe.map (\( a, b ) -> ( App.Production a, Cmd.map App.ProductionMsg b ))
-                |> Maybe.withDefault ( App.Error <| Error.init Error.NotFound, Cmd.none )
+                |> Maybe.withDefault ( App.Error <| Error.init Error.NotFound, fetchCapsuleIfAdmin (Route.Production id gos) id )
 
         Route.Publication id ->
             ( Data.getCapsuleById id user
                 |> Maybe.map Publication.init
                 |> Maybe.map App.Publication
                 |> (Maybe.withDefault <| App.Error <| Error.init Error.NotFound)
-            , Cmd.none
+            , fetchCapsuleIfAdmin (Route.Publication id) id
             )
 
         Route.Options id ->
@@ -240,7 +290,7 @@ pageFromRoute _ user route =
                 |> Maybe.map Options.init
                 |> Maybe.map App.Options
                 |> (Maybe.withDefault <| App.Error <| Error.init Error.NotFound)
-            , Cmd.none
+            , fetchCapsuleIfAdmin (Route.Options id) id
             )
 
         Route.Collaboration id ->
@@ -248,11 +298,18 @@ pageFromRoute _ user route =
                 |> Maybe.map Collaboration.init
                 |> Maybe.map App.Collaboration
                 |> (Maybe.withDefault <| App.Error <| Error.init Error.NotFound)
-            , Cmd.none
+            , fetchCapsuleIfAdmin (Route.Collaboration id) id
             )
 
         Route.Profile ->
             ( App.Profile Profile.init, Cmd.none )
+
+        Route.Admin adminRoute ->
+            if user.plan == Data.Admin then
+                Admin.fromRoute adminRoute |> Tuple.mapFirst App.Admin
+
+            else
+                ( App.Error <| Error.init Error.NotFound, Cmd.none )
 
         Route.NotFound ->
             ( App.Error <| Error.init <| Error.fromCode 404, Cmd.none )
@@ -303,6 +360,15 @@ routeFromPage page =
 
         App.Profile _ ->
             Route.Profile
+
+        App.Admin (Admin.Users p _ _) ->
+            Route.Admin (Route.Users p)
+
+        App.Admin (Admin.UserDetails id _) ->
+            Route.Admin (Route.UserDetails id)
+
+        App.Admin (Admin.Capsules p _ _) ->
+            Route.Admin (Route.Capsules p)
 
         App.Error _ ->
             Route.NotFound

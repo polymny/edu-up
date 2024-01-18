@@ -74,8 +74,10 @@ type Msg
     = ImageMoved Float Float Float Float
     | HoldingImageChanged (Maybe ( Int, Float, Float ))
     | Produce
+    | ProduceGos
     | ResetOptions
     | WebcamSettingsMsg WebcamSettingsMsg
+    | ToggleFoldable String
 
 
 {-| All messages that change the webcam settings.

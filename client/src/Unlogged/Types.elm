@@ -27,6 +27,7 @@ type alias Model =
     , newPasswordRequest : RemoteData.WebData ()
     , resetPasswordRequest : RemoteData.WebData User
     , signUpRequest : RemoteData.WebData ()
+    , openid : Maybe ( String, String )
     }
 
 
@@ -80,8 +81,8 @@ type Msg
 
 {-| Initializes the unlogged model.
 -}
-init : Lang -> Bool -> String -> Maybe Url -> Model
-init lang hasCookie serverRoot url =
+init : Lang -> Bool -> String -> Maybe Url -> Maybe ( String, String ) -> Model
+init lang hasCookie serverRoot url openid =
     { hasCookie = hasCookie
     , serverRoot = serverRoot
     , lang = lang
@@ -96,6 +97,7 @@ init lang hasCookie serverRoot url =
     , newPasswordRequest = RemoteData.NotAsked
     , resetPasswordRequest = RemoteData.NotAsked
     , signUpRequest = RemoteData.NotAsked
+    , openid = openid
     }
 
 
@@ -147,9 +149,18 @@ initStandalone flags =
                 |> Result.toMaybe
                 |> Maybe.withDefault False
 
+        decodeOpenId =
+            Decode.map2 Tuple.pair
+                (Decode.field "root" Decode.string)
+                (Decode.field "client" Decode.string)
+
+        openid =
+            Decode.decodeValue (Decode.field "openid" decodeOpenId) flags
+                |> Result.toMaybe
+
         model =
             Decode.decodeValue (Decode.field "root" Decode.string) flags
                 |> Result.toMaybe
-                |> Maybe.map (\x -> init lang hasCookie x Nothing)
+                |> Maybe.map (\x -> init lang hasCookie x Nothing openid)
     in
     ( model, Cmd.none )

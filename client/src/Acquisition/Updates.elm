@@ -87,8 +87,28 @@ update msg model =
 
                 Acquisition.StartRecording ->
                     if m.state == Acquisition.Ready then
+                        let
+                            -- If the slide as an extra video, register pause or play event.
+                            extraEvent : List Data.EventType
+                            extraEvent =
+                                List.head gos.slides
+                                    |> Maybe.andThen
+                                        (\slide ->
+                                            slide.extra
+                                                |> Maybe.map
+                                                    (\_ ->
+                                                        [ if m.isExtraPlaying then
+                                                            Data.Play <| round (1000 * m.extraPosition)
+
+                                                          else
+                                                            Data.Pause <| round (1000 * m.extraPosition)
+                                                        ]
+                                                    )
+                                        )
+                                    |> Maybe.withDefault []
+                        in
                         ( { model | page = App.Acquisition { m | recording = Just clientState.time, currentSlide = 0, currentSentence = 0 } }
-                        , startRecording
+                        , startRecording extraEvent
                         )
 
                     else
@@ -194,6 +214,26 @@ update msg model =
                     in
                     case ( ( m.currentReplacementPrompt, m.nextReplacementPrompt ), ( m.currentSentence + 1 < lineNumber, nextSlide ), ( m.recording, m.state, shouldRecord ) ) of
                         ( ( Nothing, Nothing ), ( _, _ ), ( Nothing, Acquisition.Ready, True ) ) ->
+                            let
+                                -- If the slide as an extra video, register pause or play event.
+                                extraEvent : List Data.EventType
+                                extraEvent =
+                                    List.head gos.slides
+                                        |> Maybe.andThen
+                                            (\slide ->
+                                                slide.extra
+                                                    |> Maybe.map
+                                                        (\_ ->
+                                                            [ if m.isExtraPlaying then
+                                                                Data.Play <| round (1000 * m.extraPosition)
+
+                                                              else
+                                                                Data.Pause <| round (1000 * m.extraPosition)
+                                                            ]
+                                                        )
+                                            )
+                                        |> Maybe.withDefault []
+                            in
                             -- If not recording, start recording (useful for remotes)
                             ( { model
                                 | page =
@@ -204,7 +244,7 @@ update msg model =
                                             , currentSentence = 0
                                         }
                               }
-                            , startRecording |> cancelCommand
+                            , startRecording extraEvent |> cancelCommand
                             )
 
                         ( ( Nothing, Nothing ), ( _, _ ), ( Nothing, _, True ) ) ->
@@ -214,13 +254,32 @@ update msg model =
                         ( ( Nothing, Nothing ), ( True, _ ), ( _, _, _ ) ) ->
                             -- If there is another line, go to the next line
                             ( { model | page = App.Acquisition { m | currentSentence = m.currentSentence + 1 } }
-                            , registerEvent Data.NextSentence |> cancelCommand
+                            , registerEvents [ Data.NextSentence ] |> cancelCommand
                             )
 
                         ( ( Nothing, Nothing ), ( _, Just _ ), ( _, _, _ ) ) ->
+                            let
+                                -- If the next slide as an extra video, register pause event.
+                                nextExtraEvents : List Data.EventType
+                                nextExtraEvents =
+                                    nextSlide
+                                        |> Maybe.andThen
+                                            (\slide ->
+                                                slide.extra
+                                                    |> Maybe.map (\_ -> [ Data.Pause 0 ])
+                                            )
+                                        |> Maybe.withDefault []
+                            in
                             -- If there is no other line but a next slide, go to the next slide
-                            ( { model | page = App.Acquisition { m | currentSlide = m.currentSlide + 1, currentSentence = 0 } }
-                            , registerEvent Data.NextSlide |> cancelCommand
+                            ( { model
+                                | page =
+                                    App.Acquisition
+                                        { m
+                                            | currentSlide = m.currentSlide + 1
+                                            , currentSentence = 0
+                                        }
+                              }
+                            , registerEvents (Data.NextSlide :: nextExtraEvents) |> cancelCommand
                             )
 
                         ( ( Nothing, Nothing ), ( _, _ ), ( _, _, _ ) ) ->
@@ -539,20 +598,18 @@ update msg model =
                     ( model, playExtraPort () )
 
                 Acquisition.SeekExtra x ->
-                    ( model, seekExtraPort x )
+                    ( model
+                    , seekExtraPort x
+                    )
 
                 Acquisition.ExtraPlayed ->
                     ( { model | page = App.Acquisition { m | isExtraPlaying = True, isExtraSeeking = False } }
-                    , if m.isExtraSeeking then
-                        registerEvent <| Data.Seek <| round (1000 * m.extraPosition)
-
-                      else
-                        registerEvent Data.Play
+                    , Cmd.none
                     )
 
                 Acquisition.ExtraPaused ->
                     ( { model | page = App.Acquisition { m | isExtraPlaying = False } }
-                    , registerEvent Data.Pause
+                    , Cmd.none
                     )
 
                 Acquisition.ExtraDurationChanged x ->
@@ -628,31 +685,35 @@ port deviceBound : (() -> msg) -> Sub msg
 port deviceLevel : (Float -> msg) -> Sub msg
 
 
-{-| Registers a specific event that occured during the record.
+{-| Registers specific events that occured during the record.
 
 This should only be used for NextSlide and NextSentence because the other case are directly managed by javascript.
 
 -}
-registerEvent : Data.EventType -> Cmd msg
-registerEvent event =
-    registerEventPort (Data.encodeEvent { ty = event, time = 0 })
+registerEvents : List Data.EventType -> Cmd msg
+registerEvents events =
+    events
+        |> Encode.list (\x -> Data.encodeEvent { ty = x, time = 0 })
+        |> registerEventsPort
 
 
 {-| Port that registers a specific event that occured during the record.
 -}
-port registerEventPort : Encode.Value -> Cmd msg
+port registerEventsPort : Encode.Value -> Cmd msg
 
 
 {-| Starts the recording.
 -}
-startRecording : Cmd msg
-startRecording =
-    startRecordingPort ()
+startRecording : List Data.EventType -> Cmd msg
+startRecording events =
+    events
+        |> Encode.list (\x -> Data.encodeEvent { ty = x, time = 0 })
+        |> startRecordingPort
 
 
 {-| Port that starts the recording.
 -}
-port startRecordingPort : () -> Cmd msg
+port startRecordingPort : Encode.Value -> Cmd msg
 
 
 {-| Starts the recording of the pointer.

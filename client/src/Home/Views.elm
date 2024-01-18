@@ -1,8 +1,8 @@
-module Home.Views exposing (view)
+module Home.Views exposing (view, capsuleProgress, progressIcons)
 
 {-| This module contains the home view of the polymny application.
 
-@docs view
+@docs view, capsuleProgress, progressIcons
 
 -}
 
@@ -39,8 +39,8 @@ import Utils
 
 {-| This function returns the view of the home page.
 -}
-view : Config -> User -> Home.Model -> ( Element App.Msg, Element App.Msg )
-view config user model =
+view : (Data.Project -> App.Msg) -> Config -> User -> Home.Model -> ( Element App.Msg, Element App.Msg )
+view mkToggle config user model =
     let
         lang =
             config.clientState.lang
@@ -74,7 +74,7 @@ view config user model =
     in
     ( Element.row [ Ui.wf, Ui.hf, Element.scrollbarX ]
         [ Element.el [ Ui.wfp 1, Ui.hf ] (leftColumn config user)
-        , Element.el [ Ui.wfp 6, Ui.p 10, Element.alignTop, Ui.hf, Element.scrollbarX ] (table config user)
+        , Element.el [ Ui.wfp 6, Ui.p 10, Element.alignTop, Ui.hf, Element.scrollbarX ] (table mkToggle config user)
         ]
     , popup
     )
@@ -241,10 +241,22 @@ type Poc
     | Capsule Data.Capsule
 
 
+{-| Converts the Poc into a Maybe Capsule.
+-}
+pocCapsule : Poc -> Maybe Data.Capsule
+pocCapsule p =
+    case p of
+        Capsule c ->
+            Just c
+
+        _ ->
+            Nothing
+
+
 {-| This function returns the table of the projects and capsules of the user.
 -}
-table : Config -> User -> Element App.Msg
-table config user =
+table : (Data.Project -> App.Msg) -> Config -> User -> Element App.Msg
+table mkToggle config user =
     let
         lang =
             config.clientState.lang
@@ -285,7 +297,7 @@ table config user =
         , columns =
             [ { header = makeHeader (Strings.dataProjectProjectName lang) config sortByName
               , width = Element.fill
-              , view = \i x -> makeCell (Utils.tern (i == len - 1) [ roundBottomLeft ] []) i (name x)
+              , view = \i x -> makeCell (Utils.tern (i == len - 1) [ roundBottomLeft ] []) i (name mkToggle x)
               }
             , { header = makeHeader (Strings.dataCapsuleProgress lang) config Nothing
               , width = Element.shrink
@@ -293,7 +305,7 @@ table config user =
               }
             , { header = makeHeader "" config Nothing
               , width = Element.fill
-              , view = \i x -> makeCell [] i (progressIcons config x)
+              , view = \i x -> makeCell [] i <| Maybe.withDefault Element.none <| Maybe.map (progressIcons config) <| pocCapsule x
               }
             , { header = makeHeader (Strings.dataCapsuleRoleRole lang) config Nothing
               , width = Element.shrink
@@ -377,26 +389,32 @@ makeCell extraAttr index element =
 projectsToPoc : List Data.Project -> List Poc
 projectsToPoc projects =
     let
+        filter : Data.Project -> Bool
+        filter project =
+            List.any (\x -> not x.hidden) project.capsules
+
         mapper : Data.Project -> List Poc
         mapper project =
             if project.folded then
                 [ Project project ]
 
             else
-                Project project :: List.map Capsule project.capsules
+                Project project :: List.map Capsule (List.filter (\x -> not x.hidden) project.capsules)
     in
-    List.concatMap mapper projects
+    projects
+        |> List.filter filter
+        |> List.concatMap mapper
 
 
 {-| This functions returns the name of the project or capsule.
 -}
-name : Poc -> Element App.Msg
-name poc =
+name : (Data.Project -> App.Msg) -> Poc -> Element App.Msg
+name mkToggle poc =
     case poc of
         Project p ->
             let
                 action =
-                    Ui.Msg (App.HomeMsg (Home.Toggle p))
+                    Ui.Msg (mkToggle p)
             in
             Ui.navigationElement action
                 (Ui.addLinkAttr [ Ui.p 10, Font.bold ])
@@ -824,11 +842,17 @@ capsuleProgress lang capsule =
                         Data.Idle ->
                             0
 
-                        Data.Running _ ->
-                            0.5
+                        Data.Running Nothing ->
+                            0
+
+                        Data.Running (Just pp) ->
+                            pp
 
                         Data.Done ->
                             1
+
+                        _ ->
+                            0
             in
             Ui.navigationElement (Ui.Route <| Route.Publication capsule.id)
                 [ Ui.wpx size
@@ -926,74 +950,69 @@ progressBar attributes animation =
 
 {-| The progress icons of a caspule.
 -}
-progressIcons : Config -> Poc -> Element App.Msg
-progressIcons config poc =
-    case poc of
-        Project _ ->
-            Element.none
+progressIcons : Config -> Data.Capsule -> Element App.Msg
+progressIcons config c =
+    let
+        lang =
+            config.clientState.lang
 
-        Capsule c ->
-            let
-                lang =
-                    config.clientState.lang
+        duration : Element App.Msg
+        duration =
+            case c.produced of
+                Data.Done ->
+                    Element.text <| TimeUtils.formatDuration c.duration
 
-                duration : Element App.Msg
-                duration =
-                    case c.produced of
-                        Data.Done ->
-                            Element.text <| TimeUtils.formatDuration c.duration
+                _ ->
+                    Element.none
 
-                        _ ->
-                            Element.none
+        watch : Element App.Msg
+        watch =
+            case ( c.published, Data.capsuleVideoPath c ) of
+                ( Data.Done, _ ) ->
+                    Ui.secondaryIcon []
+                        { icon = Icons.theaters
+                        , action = Ui.NewTab <| config.serverConfig.videoRoot ++ "/" ++ c.id ++ "/"
+                        , tooltip = Strings.actionsWatchCapsule lang
+                        }
 
-                watch : Element App.Msg
-                watch =
-                    case ( c.published, Data.videoPath c ) of
-                        ( Data.Done, _ ) ->
-                            Ui.secondaryIcon []
-                                { icon = Icons.theaters
-                                , action = Ui.NewTab <| config.serverConfig.videoRoot ++ "/" ++ c.id ++ "/"
-                                , tooltip = Strings.actionsWatchCapsule lang
-                                }
+                ( _, Just url ) ->
+                    Ui.secondaryIcon []
+                        { icon = Icons.theaters
+                        , action = Ui.NewTab url
+                        , tooltip = Strings.actionsWatchCapsule lang
+                        }
 
-                        ( _, Just url ) ->
-                            Ui.secondaryIcon []
-                                { icon = Icons.theaters
-                                , action = Ui.NewTab url
-                                , tooltip = Strings.actionsWatchCapsule lang
-                                }
+                _ ->
+                    Element.none
 
-                        _ ->
-                            Element.none
+        download : Element App.Msg
+        download =
+            case Data.capsuleVideoPath c of
+                Just url ->
+                    Ui.secondaryIcon []
+                        { icon = Icons.download
+                        , action = Ui.Download url
+                        , tooltip = Strings.stepsProductionDownloadVideo lang
+                        }
 
-                download : Element App.Msg
-                download =
-                    case Data.videoPath c of
-                        Just url ->
-                            Ui.secondaryIcon []
-                                { icon = Icons.download
-                                , action = Ui.Download url
-                                , tooltip = Strings.stepsProductionDownloadVideo lang
-                                }
+                _ ->
+                    Element.none
 
-                        _ ->
-                            Element.none
+        copy : Element App.Msg
+        copy =
+            case c.published of
+                Data.Done ->
+                    Ui.secondaryIcon []
+                        { icon = Icons.link
+                        , action = Ui.Msg <| App.CopyString <| config.serverConfig.videoRoot ++ "/" ++ c.id ++ "/"
+                        , tooltip = Strings.stepsPublicationCopyVideoUrl lang
+                        }
 
-                copy : Element App.Msg
-                copy =
-                    case c.published of
-                        Data.Done ->
-                            Ui.secondaryIcon []
-                                { icon = Icons.link
-                                , action = Ui.Msg <| App.CopyString <| config.serverConfig.videoRoot ++ "/" ++ c.id ++ "/"
-                                , tooltip = Strings.stepsPublicationCopyVideoUrl lang
-                                }
-
-                        _ ->
-                            Element.none
-            in
-            Element.row [ Element.spacing 10 ]
-                [ duration, watch, download, copy ]
+                _ ->
+                    Element.none
+    in
+    Element.row [ Element.spacing 10 ]
+        [ duration, watch, download, copy ]
 
 
 {-| Circle progress bar.
