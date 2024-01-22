@@ -1569,3 +1569,7 @@ msgstr "Update the assignment"
 #. Start the assignment
 msgid "Groups.startAssignment"
 msgstr "Start the assignment"
+
+#. All students have finished
+msgid "Groups.allStudentsHaveFinished"
+msgstr "All student have finished"

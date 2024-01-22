@@ -1,7 +1,7 @@
 module Lang exposing
     ( Lang(..), langs, fromString, toString, toLocal, flag
     , default, question, exclamation, dots
-    , hurray, warning
+    , colon, hurray, warning
     )
 
 {-| This module holds the lang type and the different strings represented in the different languages.
@@ -111,6 +111,18 @@ question string lang =
 
         _ ->
             string lang ++ "?"
+
+
+{-| Adds a colon at the end of a string.
+-}
+colon : (Lang -> String) -> Lang -> String
+colon string lang =
+    case lang of
+        FrFr ->
+            string lang ++ " :"
+
+        _ ->
+            string lang ++ ":"
 
 
 {-| Adds an exclamating mark to a string.

@@ -1580,3 +1580,7 @@ msgstr "Mettre à jour le devoir"
 #. Start the assignment
 msgid "Groups.startAssignment"
 msgstr "Démarrer le devoir"
+
+#. All students have finished
+msgid "Groups.allStudentsHaveFinished"
+msgstr "Tous les élèves ont terminé"

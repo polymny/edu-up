@@ -250,12 +250,12 @@ assignmentView config user ( assignment, answer ) =
             (Element.el [ Ui.cx ] <| Element.text statusLabel)
         , Element.column [ Ui.s 10, Ui.wfp 3 ]
             [ Element.row [ Ui.s 10 ]
-                [ Element.text <| Strings.groupsSubject lang
+                [ Element.text <| Lang.colon Strings.groupsSubject lang
                 , Element.text <| "[" ++ subjectCapsule.project ++ "]"
                 , Element.text subjectCapsule.name
                 ]
             , Element.row [ Ui.s 10 ]
-                [ Element.text <| Strings.groupsAnswer lang
+                [ Element.text <| Lang.colon Strings.groupsAnswer lang
                 , Element.text <| "[" ++ answerCapsule.project ++ "]"
                 , Element.text answerCapsule.name
                 ]
@@ -273,13 +273,24 @@ assignmentView config user ( assignment, answer ) =
                         ]
 
                 ( ( Nothing, Nothing ), ( Data.Working, False ) ) ->
-                    assignment.answers
-                        |> List.filter (\x -> not x.finished)
-                        |> List.filterMap (\x -> Data.getCapsuleById x.capsule user)
-                        |> List.filterMap (\x -> List.filter (\y -> y.username /= user.username) x.collaborators |> List.head)
-                        |> List.map .username
-                        |> String.join ", "
-                        |> (\x -> Strings.groupsWaitingFor lang ++ " " ++ x)
+                    let
+                        remaining =
+                            assignment.answers
+                                |> List.filter (\x -> not x.finished)
+                                |> List.filterMap (\x -> Data.getCapsuleById x.capsule user)
+                                |> List.filterMap (\x -> List.filter (\y -> y.username /= user.username) x.collaborators |> List.head)
+                                |> List.map .username
+
+                        content =
+                            if List.isEmpty remaining then
+                                Strings.groupsAllStudentsHaveFinished lang
+
+                            else
+                                remaining
+                                    |> String.join ", "
+                                    |> (\x -> Strings.groupsWaitingFor lang ++ " " ++ x)
+                    in
+                    content
                         |> Element.text
                         |> Ui.navigationElement (Ui.Msg <| App.CoursesMsg <| Courses.ToggleDetails assignment) []
 

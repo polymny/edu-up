@@ -1518,3 +1518,7 @@ msgstr ""
 #. Start the assignment
 msgid "Groups.startAssignment"
 msgstr ""
+
+#. All students have finished
+msgid "Groups.allStudentsHaveFinished"
+msgstr ""
