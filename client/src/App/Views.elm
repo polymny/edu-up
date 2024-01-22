@@ -146,8 +146,8 @@ title model =
                         App.Error _ ->
                             []
 
-                        App.Courses m ->
-                            [ "[Mes devoirs" ]
+                        App.Courses _ ->
+                            [ Strings.groupsMyAssignment lang ]
 
                 _ ->
                     []

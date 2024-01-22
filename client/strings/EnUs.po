@@ -1387,3 +1387,185 @@ msgstr "You can go back to the previous version by clicking the link in the bott
 #. Don't hesitate to send us feedback at ... .
 msgid "NewClient.pleaseSendFeedback"
 msgstr "Don't hesitate to send us feedback at"
+
+#. My assignment
+msgid "Groups.myAssignment"
+msgstr "My assignment"
+
+#. Create a group
+msgid "Groups.createGroup"
+msgstr "Create a group"
+
+#. Wording
+msgid "Groups.subject"
+msgstr "Subject"
+
+#. Template
+msgid "Groups.template"
+msgstr "Template"
+
+#. Anwser
+msgid "Groups.answer"
+msgstr "Answer"
+
+#. Preparing
+msgid "Groups.preparing"
+msgstr "Preparing"
+
+#. Prepared
+msgid "Groups.prepared"
+msgstr "Prepared"
+
+#. Ongoing
+msgid "Groups.ongoing"
+msgstr "Ongoing"
+
+#. Reviewing
+msgid "Groups.reviewing"
+msgstr "Reviewing"
+
+#. Finished
+msgid "Groups.finished"
+msgstr "Finished"
+
+#. Validated
+msgid "Groups.validated"
+msgstr "Validated"
+
+#. Edit assignment
+msgid "Groups.editAssignment"
+msgstr "Edit assignment"
+
+#. Validate assignment
+msgid "Groups.validateAssignment"
+msgstr "Validate assignment"
+
+#. Waiting for
+msgid "Groups.waitingFor"
+msgstr "Waiting for"
+
+#. Watch answer
+msgid "Groups.watchAnswer"
+msgstr "Watch answer"
+
+#. Students answers
+msgid "Groups.studentsAnswers"
+msgstr "Student answers"
+
+#. New group
+msgid "Groups.newGroup"
+msgstr "New group"
+
+#. Group name
+msgid "Groups.groupName"
+msgstr "Group name"
+
+#. New student
+msgid "Groups.newStudent"
+msgstr "New student"
+
+#. New teacher
+msgid "Groups.newTeacher"
+msgstr "New teacher"
+
+#. Delete group
+msgid "Groups.deleteGroup"
+msgstr "Delete group"
+
+#. Are you sure you want to delete the group
+msgid "Groups.areYouSureYouWantToDeleteTheGroup"
+msgstr "Are you sure you want to delete the group"
+
+#. Leave group
+msgid "Groups.leaveGroup"
+msgstr "Leave group"
+
+#. Are you sure you want to leave the group
+msgid "Groups.areYouSureYouWantToLeaveTheGroup"
+msgstr "Are you sure you want to leave the group"
+
+#. Last teacher
+msgid "Groups.lastTeacher"
+msgstr "Last teacher"
+
+#. You are the last teacher of the group
+msgid "Groups.youAreTheLastTeacherOfTheGroup"
+msgstr "You are the last teacher of the group"
+
+#. You cannot leave the group
+msgid "Groups.youCannotLeaveTheGroup"
+msgstr "You cannot leave the group"
+
+#. You can either add another teacher, or delete the group.
+msgid "Groups.addOtherTeacherOrDelete"
+msgstr "You can add another teacher before leaving the group, or delete the group"
+
+#. Select capsule
+msgid "Groups.selectCapsule"
+msgstr "Select capsule"
+
+#. Remove
+msgid "Groups.remove"
+msgstr "Remove"
+
+#. Student
+msgid "Groups.student"
+msgid_plural ""
+msgstr[0] "Student"
+msgstr[1] "Students"
+
+#. Teacher
+msgid "Groups.teacher"
+msgid_plural ""
+msgstr[0] "Teacher"
+msgstr[1] "Teachers"
+
+#. Add a student
+msgid "Groups.addStudent"
+msgstr "Add a student"
+
+#. Add a teacher
+msgid "Groups.addTeacher"
+msgstr "Add a teacher"
+
+#. Create a new assignment
+msgid "Groups.createNewAssignment"
+msgstr "Create a new assignment"
+
+#. Select
+msgid "Groups.select"
+msgstr "Select"
+
+#. Select a subject caspule
+msgid "Groups.selectSubjectCapsule"
+msgstr "Select a subject capsule"
+
+#. Select a template capsule for answer
+msgid "Groups.selectTemplateCapsule"
+msgstr "Select a template capsule for the answer"
+
+#. Define reviewing criteria
+msgid "Groups.defineReviewingCriteria"
+msgstr "Define the reviewing criteria"
+
+#. Criterion
+msgid "Groups.criterion"
+msgid_plural ""
+msgstr[0] "Criterion"
+msgstr[1] "Criteria"
+
+#. Add criterion
+msgid "Groups.addCriterion"
+msgstr "Add criterion"
+
+#. Create the assignement
+msgid "Groups.createAssignment"
+msgstr "Create the assignment"
+
+#. Update the assignement
+msgid "Groups.updateAssignment"
+msgstr "Update the assignment"
+
+#. Start the assignment
+msgid "Groups.startAssignment"
+msgstr "Start the assignment"

@@ -13,6 +13,7 @@ import Element.Border as Border
 import Element.Font as Font
 import Element.Input as Input
 import Html.Attributes exposing (style)
+import Lang exposing (Lang)
 import Material.Icons as Icons
 import RemoteData
 import Route
@@ -52,7 +53,7 @@ teacherView config user model =
         [ Element.row [ Ui.wf, Ui.s 20 ]
             [ Ui.secondary []
                 { action = Ui.Msg <| App.CoursesMsg <| Courses.NewGroup Utils.Request ""
-                , label = Element.text "[Créer un groupe]"
+                , label = Element.text <| Strings.groupsCreateGroup config.clientState.lang
                 }
             , Element.el [ Ui.hf, Background.color <| Colors.alpha 0.1, Ui.wpx 1, Ui.ar ] Element.none
             , Element.el [ Ui.wf, Element.scrollbarX ] <|
@@ -79,7 +80,7 @@ teacherView config user model =
             case model.selectedGroup of
                 Just group ->
                     [ Element.el [ Ui.wfp 1, Ui.hf ] <|
-                        participantLists user group model.selectorIndex
+                        participantLists config user group model.selectorIndex
                     , Element.el [ Ui.wfp 2, Ui.hf ] <|
                         assignmentManager config user model
                     ]
@@ -121,6 +122,10 @@ studentView config user model =
 assignmentView : Config -> Data.User -> ( Data.Assignment, Maybe ( Data.Answer, Data.Capsule ) ) -> Element App.Msg
 assignmentView config user ( assignment, answer ) =
     let
+        lang : Lang
+        lang =
+            config.clientState.lang
+
         subjectCapsule : Data.Capsule
         subjectCapsule =
             Data.getCapsuleById assignment.subject user
@@ -146,7 +151,7 @@ assignmentView config user ( assignment, answer ) =
                              else
                                 Ui.NewTab <| Maybe.withDefault "" <| Data.capsuleVideoPath subjectCapsule
                             )
-                            [ Element.text "[Sujet]"
+                            [ Element.text (Strings.groupsSubject lang)
                                 |> Element.el [ Ui.p 5, Ui.at, Ui.al, Background.color Colors.greyBorder, Ui.rbr 5 ]
                                 |> Element.inFront
                             , Ui.b 1
@@ -187,7 +192,11 @@ assignmentView config user ( assignment, answer ) =
                     Element.image [ Ui.hpx 200 ]
                         { src = Data.slidePath answerCapsule s, description = "" }
                         |> Ui.navigationElement (Ui.Route <| Route.Preparation <| answerCapsule.id)
-                            [ Element.text (Utils.tern (answer == Nothing) "[Modèle]" "[Réponse]")
+                            [ Element.text
+                                (Utils.tern (answer == Nothing)
+                                    (Strings.groupsTemplate lang)
+                                    (Strings.groupsAnswer lang)
+                                )
                                 |> Element.el [ Ui.p 5, Ui.at, Ui.al, Background.color Colors.greyBorder, Ui.rbr 5 ]
                                 |> Element.inFront
                             , Ui.b 1
@@ -200,25 +209,25 @@ assignmentView config user ( assignment, answer ) =
         ( statusLabel, statusColor ) =
             case ( answerFinished, assignment.state ) of
                 ( Nothing, Data.Preparation ) ->
-                    ( "[En préparation]", Colors.greyFont )
+                    ( Strings.groupsPreparing lang, Colors.greyFont )
 
                 ( Nothing, Data.Prepared ) ->
-                    ( "[Préparé]", Colors.blue )
+                    ( Strings.groupsPrepared lang, Colors.blue )
 
                 ( Nothing, Data.Working ) ->
-                    ( "[En cours]", Colors.blue )
+                    ( Strings.groupsOngoing lang, Colors.blue )
 
                 ( Nothing, Data.Evaluation ) ->
-                    ( "[En évaluation]", Colors.orange )
+                    ( Strings.groupsReviewing lang, Colors.orange )
 
                 ( Nothing, Data.Finished ) ->
-                    ( "[Terminé]", Colors.green2 )
+                    ( Strings.groupsFinished lang, Colors.green2 )
 
                 ( Just False, _ ) ->
-                    ( "[En cours]", Colors.blue )
+                    ( Strings.groupsOngoing lang, Colors.blue )
 
                 ( Just True, _ ) ->
-                    ( "[Validé]", Colors.green2 )
+                    ( Strings.groupsValidated lang, Colors.green2 )
     in
     Element.row
         [ Ui.wf
@@ -241,12 +250,12 @@ assignmentView config user ( assignment, answer ) =
             (Element.el [ Ui.cx ] <| Element.text statusLabel)
         , Element.column [ Ui.s 10, Ui.wfp 3 ]
             [ Element.row [ Ui.s 10 ]
-                [ Element.text "[Sujet:]"
+                [ Element.text <| Strings.groupsSubject lang
                 , Element.text <| "[" ++ subjectCapsule.project ++ "]"
                 , Element.text subjectCapsule.name
                 ]
             , Element.row [ Ui.s 10 ]
-                [ Element.text "[Réponse:]"
+                [ Element.text <| Strings.groupsAnswer lang
                 , Element.text <| "[" ++ answerCapsule.project ++ "]"
                 , Element.text answerCapsule.name
                 ]
@@ -254,11 +263,11 @@ assignmentView config user ( assignment, answer ) =
                 ( ( Nothing, Nothing ), ( Data.Preparation, _ ) ) ->
                     Element.row [ Ui.s 10 ]
                         [ Ui.secondary []
-                            { label = Element.text "[Modifier le devoir]"
+                            { label = Element.text <| Strings.groupsEditAssignment lang
                             , action = Ui.Route <| Route.Assignment assignment.id
                             }
                         , Ui.primary []
-                            { label = Element.text "[Valider le devoir]"
+                            { label = Element.text <| Strings.groupsValidateAssignment lang
                             , action = Ui.Msg <| App.CoursesMsg <| Courses.ValidateAssignment assignment
                             }
                         ]
@@ -270,7 +279,7 @@ assignmentView config user ( assignment, answer ) =
                         |> List.filterMap (\x -> List.filter (\y -> y.username /= user.username) x.collaborators |> List.head)
                         |> List.map .username
                         |> String.join ", "
-                        |> (\x -> "|En attente de " ++ x ++ "]")
+                        |> (\x -> Strings.groupsWaitingFor lang ++ " " ++ x)
                         |> Element.text
                         |> Ui.navigationElement (Ui.Msg <| App.CoursesMsg <| Courses.ToggleDetails assignment) []
 
@@ -297,7 +306,12 @@ assignmentView config user ( assignment, answer ) =
                                     , Background.color <| Utils.tern a.finished Colors.green2 Colors.blue
                                     , Font.color Colors.greyBackground
                                     ]
-                                    (Element.el [ Ui.cx ] <| Element.text <| Utils.tern a.finished "[Terminé]" "[En cours]")
+                                    (Element.el [ Ui.cx ] <|
+                                        Element.text <|
+                                            Utils.tern a.finished
+                                                (Strings.groupsFinished lang)
+                                                (Strings.groupsOngoing lang)
+                                    )
                                 , case
                                     ( a.finished
                                     , Data.getCapsuleById a.capsule user
@@ -310,18 +324,18 @@ assignmentView config user ( assignment, answer ) =
                                     ( True, Just url ) ->
                                         Ui.link []
                                             { action = Ui.NewTab url
-                                            , label = "[Voir la réponse]"
+                                            , label = Strings.groupsWatchAnswer lang
                                             }
 
                                     _ ->
                                         Element.none
                                 ]
                     in
-                    Element.column [ Ui.pt 20, Ui.s 10 ] (Ui.title "[Réponses des élèves]" :: List.map mapper assignment.answers)
+                    Element.column [ Ui.pt 20, Ui.s 10 ] (Ui.title (Strings.groupsStudentsAnswers lang) :: List.map mapper assignment.answers)
 
                 ( ( Just a, Just False ), _ ) ->
                     Ui.primary []
-                        { label = Element.text "[Valider le devoir]"
+                        { label = Element.text <| Strings.groupsValidateAssignment lang
                         , action = Ui.Msg <| App.CoursesMsg <| Courses.ValidateAnswer a
                         }
 
@@ -338,6 +352,7 @@ assignmentView config user ( assignment, answer ) =
 popup : Config -> Data.User -> Courses.Model Data.Group -> Element App.Msg
 popup config user model =
     let
+        lang : Lang
         lang =
             config.clientState.lang
     in
@@ -346,14 +361,14 @@ popup config user model =
             Element.none
 
         Courses.NewGroupPopup groupName ->
-            Ui.popup "[Nouveau groupe]" <|
+            Ui.popup (Strings.groupsNewGroup lang) <|
                 Element.column [ Ui.wf, Ui.hf, Ui.p 20 ]
                     [ Input.text
                         [ Ui.wf ]
                         { onChange = App.CoursesMsg << Courses.NewGroup Utils.Request
                         , text = groupName
-                        , placeholder = Just <| Input.placeholder [] <| Element.text "[Nom du groupe : e.g. 'Terminale 2']"
-                        , label = Input.labelAbove [] (Ui.title "[Nom du groupe]")
+                        , placeholder = Just <| Input.placeholder [] <| Element.text <| Strings.groupsGroupName lang
+                        , label = Input.labelAbove [] <| Ui.title <| Strings.groupsGroupName lang
                         }
                     , Element.row [ Ui.wf, Ui.ab ]
                         [ Ui.secondary []
@@ -373,10 +388,10 @@ popup config user model =
                 title =
                     case participantRole of
                         Data.Student ->
-                            "[Nouvel élève]"
+                            Strings.groupsNewStudent lang
 
                         Data.Teacher ->
-                            "[Nouveau professeur]"
+                            Strings.groupsNewTeacher lang
             in
             Ui.popup title <|
                 Element.column [ Ui.wf, Ui.hf, Ui.p 20 ]
@@ -384,8 +399,8 @@ popup config user model =
                         [ Ui.wf ]
                         { onChange = App.CoursesMsg << Courses.AddParticipant Utils.Request participantRole
                         , text = participantEmail
-                        , placeholder = Just <| Input.placeholder [] <| Element.text "[exemple@exemple.ex]"
-                        , label = Input.labelAbove [] (Ui.title "[Adresse email]")
+                        , placeholder = Just <| Input.placeholder [] <| Element.text "email@example.com"
+                        , label = Input.labelAbove [] (Ui.title <| Strings.dataUserEmailAddress lang)
                         }
                     , Element.row [ Ui.wf, Ui.ab ]
                         [ Ui.secondary []
@@ -400,9 +415,14 @@ popup config user model =
                     ]
 
         Courses.DeleteGroupPopup group ->
-            Ui.popup "[Supprimer le groupe]" <|
+            let
+                makeQuestion : Lang -> String
+                makeQuestion l =
+                    Strings.groupsAreYouSureYouWantToDeleteTheGroup l ++ " " ++ group.name
+            in
+            Ui.popup (Strings.groupsDeleteGroup lang) <|
                 Element.column [ Ui.wf, Ui.hf, Ui.p 20 ]
-                    [ Element.text <| "[Êtes-vous sûr de vouloir supprimer le groupe " ++ group.name ++ " ?]"
+                    [ Element.text <| Lang.question makeQuestion lang
                     , Element.row [ Ui.wf, Ui.ab ]
                         [ Ui.secondary []
                             { action = Ui.Msg <| App.CoursesMsg <| Courses.DeleteGroup Utils.Cancel group
@@ -416,9 +436,9 @@ popup config user model =
                     ]
 
         Courses.SelfRemovePopup ->
-            Ui.popup "[Quitter le groupe]" <|
+            Ui.popup (Strings.groupsLeaveGroup lang) <|
                 Element.column [ Ui.wf, Ui.hf, Ui.p 20 ]
-                    [ Element.text <| "[Êtes-vous sûr de vouloir quitter le groupe ?]"
+                    [ Element.text <| Strings.groupsAreYouSureYouWantToLeaveTheGroup lang
                     , Element.row [ Ui.wf, Ui.ab ]
                         [ Ui.secondary []
                             { action = Ui.Msg <| App.CoursesMsg <| Courses.SelfRemove Utils.Cancel
@@ -432,13 +452,11 @@ popup config user model =
                     ]
 
         Courses.LastTeacherPopup ->
-            Ui.popup "[Dernier enseignant]" <|
+            Ui.popup (Strings.groupsLastTeacher lang) <|
                 Element.column [ Ui.wf, Ui.hf, Ui.p 20 ]
-                    [ Element.text <| "[Vous êtes le dernier professeur du groupe.]"
-                    , Element.text <| "[Vous ne pouvez pas quitter le groupe.]"
-                    , Element.text <| "[ - Veuillez ajouter un autre professeur avant de quitter le groupe.]"
-                    , Element.text <| "[Ou]"
-                    , Element.text <| "[ - Supprimer le groupe.]"
+                    [ Element.text <| Strings.groupsYouAreTheLastTeacherOfTheGroup lang
+                    , Element.text <| Strings.groupsYouCannotLeaveTheGroup lang
+                    , Element.text <| Strings.groupsAddOtherTeacherOrDelete lang
                     , Element.row [ Ui.wf, Ui.ab ]
                         [ Ui.primary [ Ui.ar ]
                             { action = Ui.Msg <| App.CoursesMsg <| Courses.SelfRemove Utils.Cancel
@@ -479,7 +497,7 @@ popup config user model =
                                 ]
                             ]
                    )
-                |> Ui.popup "[Choisissez la capsule]"
+                |> Ui.popup (Strings.groupsSelectCapsule lang)
 
 
 {-| Group button view.
@@ -504,9 +522,13 @@ groupButton group selected =
 
 {-| Participant list view.
 -}
-participantLists : Data.User -> Data.Group -> Int -> Element App.Msg
-participantLists user group selectorIndex =
+participantLists : Config -> Data.User -> Data.Group -> Int -> Element App.Msg
+participantLists config user group selectorIndex =
     let
+        lang : Lang
+        lang =
+            config.clientState.lang
+
         buttonWidth : Int
         buttonWidth =
             150
@@ -604,7 +626,7 @@ participantLists user group selectorIndex =
                             , Ui.p 5
                             , Ui.r 30
                             , Font.color Colors.green1
-                            , Ui.tooltip <| "[Enlever " ++ participant.username ++ "]"
+                            , Ui.tooltip <| (Strings.groupsRemove lang ++ participant.username)
                             , Element.htmlAttribute <|
                                 Transition.properties [ Transition.backgroundColor 200 [ Transition.easeInOut ] ]
                             ]
@@ -654,7 +676,7 @@ participantLists user group selectorIndex =
                         , Font.bold
                         ]
                     <|
-                        Element.text "[Élèves:]"
+                        Element.text (Strings.groupsStudent lang (List.length students))
                 , Ui.navigationElement (Ui.Msg <| App.CoursesMsg <| Courses.ChangeSelectorIndex 1)
                     [ Ui.wpx buttonWidth
                     , Ui.hf
@@ -676,7 +698,7 @@ participantLists user group selectorIndex =
                         , Font.bold
                         ]
                     <|
-                        Element.text "[Profs:]"
+                        Element.text (Strings.groupsTeacher lang (List.length teachers))
                 ]
             , Utils.tern
                 isTeacher
@@ -689,7 +711,7 @@ participantLists user group selectorIndex =
                     , Element.htmlAttribute <|
                         Transition.properties [ Transition.color 200 [ Transition.easeInOut ] ]
                     ]
-                    (Element.el [] <| Element.text "[Supprimer le groupe]")
+                    (Element.el [] <| Element.text <| Strings.groupsDeleteGroup lang)
                 )
                 Element.none
             ]
@@ -745,7 +767,11 @@ participantLists user group selectorIndex =
                                 Ui.icon
                                     18
                                     Icons.add
-                            , Element.text <| "[Ajouter un " ++ Utils.tern (selectorIndex == 0) "élève" "professeur" ++ "]"
+                            , if selectorIndex == 0 then
+                                Element.text <| Strings.groupsAddStudent lang
+
+                              else
+                                Element.text <| Strings.groupsAddTeacher lang
                             ]
                     ]
                     []
@@ -757,6 +783,10 @@ participantLists user group selectorIndex =
 assignmentManager : Config -> Data.User -> Courses.Model Data.Group -> Element App.Msg
 assignmentManager config user model =
     let
+        lang : Lang
+        lang =
+            config.clientState.lang
+
         isTeacher : Bool
         isTeacher =
             model.selectedGroup
@@ -836,21 +866,21 @@ assignmentManager config user model =
             Ui.navigationElement
                 (Ui.Msg <| App.CoursesMsg <| Courses.StartNewAssignment)
                 [ Font.color Colors.green1 ]
-                (Element.text "+ [Créer un nouveau devoir]")
+                (Element.text <| "+ " ++ Strings.groupsCreateNewAssignment lang)
 
         subjectCapsuleSelect : Maybe String -> Element App.Msg
         subjectCapsuleSelect capsuleId =
             Element.column
                 [ Ui.s 10 ]
-                [ Element.el [ Font.bold ] <| Element.text "[Choisir une capsule sujet.]"
+                [ Element.el [ Font.bold ] <| Element.text <| Strings.groupsSelectSubjectCapsule lang
                 , Element.row
                     [ Ui.s 10 ]
                     [ Maybe.andThen (\x -> Data.getCapsuleById x user) capsuleId
                         |> Maybe.map (\x -> x.project ++ " / " ++ x.name)
-                        |> Maybe.withDefault "[Choisir une capsule]"
+                        |> Maybe.withDefault (Strings.groupsSelectCapsule lang)
                         |> Element.text
                     , Ui.primary [ Ui.s 10 ]
-                        { label = Element.text "[Choisir]"
+                        { label = Element.text <| Strings.groupsSelect lang
                         , action = Ui.Msg <| App.CoursesMsg <| Courses.SelectCapsule True
                         }
                     ]
@@ -860,15 +890,15 @@ assignmentManager config user model =
         answerTemplateCapsuleSelect capsuleId =
             Element.column
                 [ Ui.s 10 ]
-                [ Element.el [ Font.bold ] <| Element.text "[Choisir une capsule modèle pour la réponse.]"
+                [ Element.el [ Font.bold ] <| Element.text <| Strings.groupsSelectTemplateCapsule lang
                 , Element.row
                     [ Ui.s 10 ]
                     [ Maybe.andThen (\x -> Data.getCapsuleById x user) capsuleId
                         |> Maybe.map (\x -> x.project ++ " / " ++ x.name)
-                        |> Maybe.withDefault "[Choisir une capsule]"
+                        |> Maybe.withDefault (Strings.groupsSelectCapsule lang)
                         |> Element.text
                     , Ui.primary [ Ui.s 10 ]
-                        { label = Element.text "[Choisir]"
+                        { label = Element.text (Strings.groupsSelect lang)
                         , action = Ui.Msg <| App.CoursesMsg <| Courses.SelectCapsule False
                         }
                     ]
@@ -877,7 +907,7 @@ assignmentManager config user model =
         criteriaEdition : List String -> Element App.Msg
         criteriaEdition criteria =
             Element.column [ Ui.s 10 ]
-                [ Element.el [ Font.bold ] <| Element.text "[Choisir les critères d'évaluation.]"
+                [ Element.el [ Font.bold ] <| Element.text <| Strings.groupsDefineReviewingCriteria lang
                 , Element.column [ Ui.s 10 ] <|
                     List.indexedMap
                         (\i x ->
@@ -888,14 +918,14 @@ assignmentManager config user model =
                                         , Ui.p 5
                                         , Ui.r 30
                                         , Font.color Colors.green1
-                                        , Ui.tooltip <| "[Enlever " ++ x ++ "]"
+                                        , Ui.tooltip <| Strings.groupsRemove lang
                                         , Element.htmlAttribute <|
                                             Transition.properties [ Transition.backgroundColor 200 [ Transition.easeInOut ] ]
                                         ]
                                     <|
                                         Ui.icon 15 Icons.close
                                 , Input.text []
-                                    { label = Input.labelHidden "[Critère]"
+                                    { label = Input.labelHidden <| Strings.groupsCriterion lang 1
                                     , onChange = \m -> App.CoursesMsg <| Courses.CriteriaChanged i m
                                     , placeholder = Nothing
                                     , text = x
@@ -913,7 +943,7 @@ assignmentManager config user model =
                             Transition.properties [ Transition.color 200 [ Transition.easeInOut ] ]
                         ]
                         [ Element.el [] <| Ui.icon 18 Icons.add
-                        , Element.text <| "[Ajouter un critère]"
+                        , Element.text <| Strings.groupsAddCriterion lang
                         ]
                 ]
 
@@ -943,10 +973,10 @@ assignmentManager config user model =
                             Ui.spinningSpinner [] 25
 
                         ( _, Nothing ) ->
-                            Element.text "[Créer le devoir]"
+                            Element.text <| Strings.groupsCreateAssignment lang
 
                         ( _, Just _ ) ->
-                            Element.text "[Mettre à jour le devoir]"
+                            Element.text <| Strings.groupsUpdateAssignment lang
                 }
 
         startAssignmentButton : Data.Assignment -> Element App.Msg
@@ -954,7 +984,7 @@ assignmentManager config user model =
             case a.state of
                 Data.Preparation ->
                     Ui.primary []
-                        { label = Element.text "[Démarrer le devoir]"
+                        { label = Element.text <| Strings.groupsStartAssignment lang
                         , action = Ui.Msg <| App.CoursesMsg <| Courses.ValidateAssignment a
                         }
 
