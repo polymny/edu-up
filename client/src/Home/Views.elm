@@ -102,7 +102,7 @@ leftColumn config user =
         newCourseButton : Element App.Msg
         newCourseButton =
             Ui.primary [ Ui.wf ]
-                { label = Element.text "[Mes devoirs]"
+                { label = Element.text <| Strings.groupsMyAssignment lang
                 , action = Ui.Route <| Route.Courses Nothing
                 }
 
