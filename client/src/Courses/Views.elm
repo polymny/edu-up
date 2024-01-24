@@ -33,10 +33,11 @@ view config user model =
     -- if a user is teaching any course, they're registered as teacher and can create new courses.
     let
         isTeacher =
-            -- user.groups
-            --     |> List.concatMap .participants
-            --     |> List.any (\x -> x.username == user.username && x.role == Data.Teacher)
-            user.username == "tforgione"
+            (user.plan == Data.Admin)
+                || (user.groups
+                        |> List.concatMap .participants
+                        |> List.any (\x -> x.username == user.username && x.role == Data.Teacher)
+                   )
     in
     if isTeacher then
         teacherView config user model
